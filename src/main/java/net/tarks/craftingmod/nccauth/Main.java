@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import net.tarks.craftingmod.nccauth.discord.DiscordPipe;
+import net.tarks.craftingmod.nccauth.discord.ICommander;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -18,7 +19,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
-public class Main {
+public class Main implements ICommander {
     private static final String cafeURL = "https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
     public static void main(String[] args){
         System.out.println("Hello World!");
@@ -74,8 +75,8 @@ public class Main {
                 }
             }
         }
-        if(cfg.discordToken.equalsIgnoreCase("Please type discord bot token here.")){
-            traceE("Discord token을 생성해주세요!");
+        if(cfg.discordToken.equalsIgnoreCase("Please type discord bot token here.") || cfg.discordBotChID == -1 || cfg.discordRoomID == -1){
+            traceE("Discord 설정을 완료해주세요!");
             try {
                 Desktop.getDesktop().open(config_file.getParentFile());
             } catch (IOException e) {
@@ -88,10 +89,10 @@ public class Main {
 
         getComments(cfg,18000); // 5 hours?
 
-        discord = new DiscordPipe(cfg);
+        discord = new DiscordPipe(cfg,this);
     }
     public Config getNaverConfig(String id){
-        Config out = new Config(-1,-1,"Please type discord bot token here.",-1);
+        Config out = new Config(-1,-1,"Please type discord bot token here.",-1,-1,"","");
         Document document = null;
         try{
             document = getUrlDOM(id);
@@ -143,6 +144,7 @@ public class Main {
         if(out.cafeID == -1 || out.articleID == -1){
             traceE("URL " + id + " 파싱 실패!");
         }
+        out.cafeCommentURL = id;
         return out;
     }
     public ArrayList<Comment> getComments(Config cfg,long timeLimit_sec){
