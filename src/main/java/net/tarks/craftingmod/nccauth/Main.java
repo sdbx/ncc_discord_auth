@@ -5,6 +5,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
+import net.tarks.craftingmod.nccauth.discord.DiscordPipe;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -13,14 +14,9 @@ import org.jsoup.select.Elements;
 
 import java.awt.*;
 import java.io.*;
-import java.net.URLEncoder;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Main {
     private static final String cafeURL = "https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
@@ -31,6 +27,7 @@ public class Main {
 
     private Gson g;
     private Main _this;
+    private DiscordPipe discord;
     public Main(String[] args){
         _this = this;
         g = new GsonBuilder().create();
@@ -77,10 +74,21 @@ public class Main {
                 }
             }
         }
+        if(cfg.discordToken.equalsIgnoreCase("Please type discord bot token here.")){
+            traceE("Discord token을 생성해주세요!");
+            try {
+                Desktop.getDesktop().open(config_file.getParentFile());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.exit(-1);
+        }
         //Config cfg = new Config(26686242,7156);
-        cfg = new Config(23370764,783788,"",0);
+        //cfg = new Config(23370764,783788,"",0);
 
         getComments(cfg,18000); // 5 hours?
+
+        discord = new DiscordPipe(cfg);
     }
     public Config getNaverConfig(String id){
         Config out = new Config(-1,-1,"Please type discord bot token here.",-1);
