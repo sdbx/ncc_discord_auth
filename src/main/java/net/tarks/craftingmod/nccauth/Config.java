@@ -15,6 +15,7 @@ public class Config {
     public String discordWelcomeMsg;
     public String discordAuthedMsg;
     public String discordGame;
+    public long discordGameType;
     public Config(String discord_token, String cafeURL){
         cafeID = -1;
         articleID = -1;
@@ -28,6 +29,7 @@ public class Config {
         discordWelcomeMsg = "";
         discordAuthedMsg = "";
         discordGame = "";
+        discordGameType = 0;
     }
     public void setID(long cfID,long arID){
         cafeID = cfID;

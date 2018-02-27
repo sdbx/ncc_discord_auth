@@ -11,9 +11,11 @@ import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberNickChangeEvent;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.core.exceptions.HierarchyException;
 import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.hooks.EventListener;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import net.dv8tion.jda.core.managers.GuildController;
 import net.tarks.craftingmod.nccauth.Config;
 import net.tarks.craftingmod.nccauth.Util;
 
@@ -30,7 +32,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         super(c,cmd);
         try {
             discordClient = new JDABuilder(AccountType.BOT)
-                    .setStatus(OnlineStatus.IDLE).setGame(Game.playing(cfg.discordGame)).setToken(cfg.discordToken).buildBlocking();
+                    .setStatus(OnlineStatus.IDLE).setGame(getGame(cfg.discordGame,cfg.discordGameType)).setToken(cfg.discordToken).buildBlocking();
         } catch (LoginException | InterruptedException e) {
             e.printStackTrace();
         }
@@ -41,6 +43,29 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         discordClient.addEventListener(this);
         discordClient.addEventListener(new InitListener());
         //discordClient.getGuildById(152746825806381056L).getTextChannelById(236873884283043842L).sendMessage("앙뇽");
+    }
+    protected Game getGame(String title,long gametype){
+        Game game;
+        switch((int)gametype){
+            /*
+            case 0:
+                game = Game.playing(title);
+                break;
+                */
+            case 1:
+                game = Game.watching(title);
+                break;
+            case 2:
+                game = Game.listening(title);
+                break;
+            case 3:
+                game = Game.streaming(title,"https://cafe.naver.com/sdbx");
+                break;
+            default:
+                game = Game.playing(title);
+                break;
+        }
+        return game;
     }
 
     /**
@@ -53,12 +78,23 @@ public class DiscordPipe extends AuthQueue implements EventListener {
             System.out.println("Result: " + Util.getJsonPretty(new GsonBuilder().create().toJson(user)));
             TextChannel channel = discordClient.getTextChannelById(user.saidChannelID);
             String msg;
-            if(user.token < 0){
+            /* roles test */
+            List<Role> roles = channel.getGuild().getRolesByName(cfg.discordToRolesName,true);
+            if(roles.size() != 1){
+                msg = "[Config error] roles를 찾을 수 없습니다.";
+            }else if(user.token < 0){
                 msg = "<@!#discordid>님의 인증시간(#m분)이 초과되었습니다.\n다시 해주세요.".replace("#discordid",Long.toString(user.userID))
                         .replace("#m",Integer.toString(Math.abs(user.token)));
             }else{
+                Role role = roles.get(0);
                 msg = "<@!#discordid>님(#cafeid)의 인증이 완료되었습니다. #suffix".replace("#discordid",Long.toString(user.userID))
                         .replace("#cafeid",user.cafeID).replace("#suffix",cfg.discordAuthedMsg);
+                try{
+                    new GuildController(channel.getGuild()).addSingleRoleToMember(channel.getGuild().getMember(discordClient.getUserById(user.userID)),role).reason("Authed").queue();
+                }catch (HierarchyException e){
+                    e.printStackTrace();
+                    msg = "인증이 완료되었지만 예기치 못한 오류가 발생하였습니다.```\n" + e.getClass().getName() + ": " + e.getMessage() + "\n```";
+                }
             }
             if(!channel.canTalk()){
                 try {
@@ -131,6 +167,12 @@ public class DiscordPipe extends AuthQueue implements EventListener {
             if(content.startsWith("/auth")){
                 if(!event.isFromType(ChannelType.PRIVATE)){
                     if(event.getGuild().getIdLong() == cfg.discordRoomID){
+                        List<Role> roles = event.getGuild().getRolesByName(cfg.discordToRolesName,true);
+                        Role toRole;
+                        if(roles.size() != 1){
+                            event.getChannel().sendMessage("[Config fail] No roles found / Too many roles at " + cfg.discordToRolesName).queue();
+                            return;
+                        }
                         // receive auth command
                         String[] split = content.split(" ");
                         DiscordUser user = new DiscordUser(sender.getIdLong(),event.getChannel().getIdLong());
@@ -180,6 +222,15 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                         .replace("$channel","<#" + cfg.discordMainChID + ">");
                 event.getGuild().getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
             }
+            if(content.startsWith("!debugrole")){
+                List<Role> test = event.getGuild().getRoles();
+                for(Role r:test){
+                    System.out.println(r.getName());
+                    if(r.getName().equals("SDBX")){
+                        new GuildController(event.getGuild()).removeRolesFromMember(event.getGuild().getMember(sender),r).reason("테스트지 뭐긴뭐야").queue();
+                    }
+                }
+            }
                         /*
             Set config command
              */
@@ -195,7 +246,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                 if(event.isFromType(ChannelType.PRIVATE)){
                     String[] splits = content.split(" ");
                     String[] inputS = {"discordToRolesName","discordWelcomeMsg","discordAuthedMsg","discordGame"};
-                    String[] inputL = {"discordRoomID","discordBotChID","discordMainChID"};
+                    String[] inputL = {"discordRoomID","discordBotChID","discordMainChID","discordGameType"};
                     if(splits.length >= 3){
                         if(cfg.trustedUsers.contains(sender.getIdLong())){
                             boolean modded = false;
@@ -225,20 +276,37 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                             if(!modded){
                                 for(String il : inputL){
                                     if(splits[1].equals(il) && splits[2].length() >= 1){
-                                        try {
-                                            cfg.getClass().getField(il).setLong(cfg,Long.parseLong(splits[2]));
-                                            modded = true;
-                                            break;
-                                        } catch (IllegalAccessException | NoSuchFieldException | NumberFormatException e) {
-                                            e.printStackTrace();
+                                        boolean hp_n = true;
+                                        if(il.equals("discordGameType")){
+                                            String[] lists = {"playing","watching","listening","streaming"};
+                                            for(int i=0;i<=lists.length;i+=1){
+                                                if(splits[2].equalsIgnoreCase(lists[i])){
+                                                    splits[2] = Integer.toString(i);
+                                                    hp_n = false;
+                                                    break;
+                                                }
+                                            }
+                                        }else{
+                                            hp_n = false;
+                                        }
+                                        if(hp_n){
+                                            pChannel.sendMessage("\"playing\",\"watching\",\"listening\",\"streaming\"").queue();
+                                        }else{
+                                            try {
+                                                cfg.getClass().getField(il).setLong(cfg,Long.parseLong(splits[2]));
+                                                modded = true;
+                                                break;
+                                            } catch (IllegalAccessException | NoSuchFieldException | NumberFormatException e) {
+                                                e.printStackTrace();
+                                            }
                                         }
                                     }
                                 }
                             }
                             if(modded){
                                cmd.saveConfig(cfg);
-                               if(splits[1].equals("discordGame")){
-                                   discordClient.getPresence().setGame(Game.listening(splits[2]));
+                               if(splits[1].equals("discordGame") || splits[1].equals("discordGameType")){
+                                   discordClient.getPresence().setGame(getGame(cfg.discordGame,cfg.discordGameType));
                                }
                             }
                         }else{
