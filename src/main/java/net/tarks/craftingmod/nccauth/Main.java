@@ -17,6 +17,7 @@ import java.awt.*;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.security.CodeSource;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -41,7 +42,7 @@ public class Main implements ICommander {
         trace("Config file: " + config_file.getAbsolutePath());
         if(config_file.exists() && config_file.canRead()){
             try {
-                JsonReader reader = new JsonReader(new FileReader(config_file));
+                JsonReader reader = new JsonReader(new InputStreamReader(new FileInputStream(config_file), Charset.forName("utf-8")));
                 cfg = g.fromJson(reader, new TypeToken<Config>(){}.getType());
             } catch (FileNotFoundException e) {
                 e.printStackTrace();

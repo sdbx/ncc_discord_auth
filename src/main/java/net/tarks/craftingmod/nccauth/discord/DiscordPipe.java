@@ -24,9 +24,8 @@ import net.tarks.craftingmod.nccauth.UserCafeDB;
 import net.tarks.craftingmod.nccauth.Util;
 
 import javax.security.auth.login.LoginException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
+import java.io.*;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
@@ -56,7 +55,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
 
         if(dbfile.exists() && dbfile.canRead()){
             try {
-                JsonReader reader = new JsonReader(new FileReader(dbfile));
+                JsonReader reader = new JsonReader(new InputStreamReader(new FileInputStream(dbfile), Charset.forName("utf-8")));
                 authlist = g.fromJson(reader, new TypeToken<UserCafeDB>(){}.getType());
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
