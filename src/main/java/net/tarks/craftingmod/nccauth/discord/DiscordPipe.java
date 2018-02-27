@@ -222,16 +222,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                         .replace("$channel","<#" + cfg.discordMainChID + ">");
                 event.getGuild().getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
             }
-            if(content.startsWith("!debugrole")){
-                List<Role> test = event.getGuild().getRoles();
-                for(Role r:test){
-                    System.out.println(r.getName());
-                    if(r.getName().equals("SDBX")){
-                        new GuildController(event.getGuild()).removeRolesFromMember(event.getGuild().getMember(sender),r).reason("테스트지 뭐긴뭐야").queue();
-                    }
-                }
-            }
-                        /*
+            /*
             Set config command
              */
             if(content.startsWith("/setconfig") && content.split(" ")[0].equalsIgnoreCase("/setconfig")){
