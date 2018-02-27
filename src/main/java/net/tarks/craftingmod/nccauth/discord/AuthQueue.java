@@ -1,6 +1,7 @@
 package net.tarks.craftingmod.nccauth.discord;
 
 import net.dv8tion.jda.core.JDA;
+import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.tarks.craftingmod.nccauth.Comment;
 import net.tarks.craftingmod.nccauth.Config;

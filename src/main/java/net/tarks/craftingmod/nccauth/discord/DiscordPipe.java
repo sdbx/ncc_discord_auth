@@ -1,10 +1,13 @@
 package net.tarks.craftingmod.nccauth.discord;
 
 import com.google.gson.GsonBuilder;
+import net.dv8tion.jda.bot.sharding.ShardManager;
 import net.dv8tion.jda.core.AccountType;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.JDABuilder;
+import net.dv8tion.jda.core.OnlineStatus;
 import net.dv8tion.jda.core.entities.*;
+import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberNickChangeEvent;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
@@ -21,11 +24,13 @@ import java.util.StringJoiner;
 
 public class DiscordPipe extends AuthQueue implements EventListener {
     protected JDA discordClient;
+    protected ShardManager sm;
 
     public DiscordPipe(Config c,ICommander cmd){
         super(c,cmd);
         try {
-            discordClient = new JDABuilder(AccountType.BOT).setToken(cfg.discordToken).buildBlocking();
+            discordClient = new JDABuilder(AccountType.BOT)
+                    .setStatus(OnlineStatus.IDLE).setGame(Game.playing(cfg.discordGame)).setToken(cfg.discordToken).buildBlocking();
         } catch (LoginException | InterruptedException e) {
             e.printStackTrace();
         }
@@ -113,9 +118,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
             System.out.printf("[%s][%s] %s: %s\n", event.getGuild().getName(),
                     event.getTextChannel().getName(), event.getMember().getEffectiveName(),
                     event.getMessage().getContentDisplay());
-            if(event.getMessage().getContentDisplay().startsWith("^test")){
 
-            }
         }
     }
     public void execCommand(MessageReceivedEvent event){
@@ -191,12 +194,22 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                 }
                 if(event.isFromType(ChannelType.PRIVATE)){
                     String[] splits = content.split(" ");
-                    String[] inputS = {"discordToRolesName","discordWelcomeMsg","discordAuthedMsg"};
+                    String[] inputS = {"discordToRolesName","discordWelcomeMsg","discordAuthedMsg","discordGame"};
                     String[] inputL = {"discordRoomID","discordBotChID","discordMainChID"};
                     if(splits.length >= 3){
                         if(cfg.trustedUsers.contains(sender.getIdLong())){
-                            // set field sudo
                             boolean modded = false;
+                            if(splits[1].equals("URL") && splits[2].length() >= 1){
+                                Config move = cmd.getNaverConfig(splits[2]);
+                                if(move.cafeID >= 0 && move.articleID >= 0 && move.cafeCommentURL != "Cafe URL.."){
+                                    cfg.cafeID = move.cafeID;
+                                    cfg.articleID = move.articleID;
+                                    cfg.cafeCommentURL = move.cafeCommentURL;
+                                }
+                            }else if(splits[1].equals("game") && splits[2].length() >= 1){
+                                //event
+                            }
+                            // set field sudo
                             for(String is : inputS){
                                 if(splits[1].equals(is) && splits[2].length() >= 1){
                                     try {
@@ -224,6 +237,9 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                             }
                             if(modded){
                                cmd.saveConfig(cfg);
+                               if(splits[1].equals("discordGame")){
+                                   discordClient.getPresence().setGame(Game.listening(splits[2]));
+                               }
                             }
                         }else{
                             pChannel.sendMessage("권한을 얻기 위하여 token의 첫 5자리를 ```\n/setconfig <token>\n```\n으로 입력해주세요.").queue();

@@ -14,6 +14,7 @@ public class Config {
     public ArrayList<Long> trustedUsers;
     public String discordWelcomeMsg;
     public String discordAuthedMsg;
+    public String discordGame;
     public Config(String discord_token, String cafeURL){
         cafeID = -1;
         articleID = -1;
@@ -26,6 +27,7 @@ public class Config {
         trustedUsers = new ArrayList<>();
         discordWelcomeMsg = "";
         discordAuthedMsg = "";
+        discordGame = "";
     }
     public void setID(long cfID,long arID){
         cafeID = cfID;
