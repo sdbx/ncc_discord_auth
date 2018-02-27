@@ -15,6 +15,9 @@ import org.jsoup.select.Elements;
 
 import java.awt.*;
 import java.io.*;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.security.CodeSource;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -229,7 +232,14 @@ public class Main implements ICommander {
         System.exit(-1);
     }
 
-    private File getRootdir(){
-        return new File(ClassLoader.getSystemClassLoader().getResource(".").getPath());
+    private File getRootdir() {
+        try{
+            CodeSource codeSource = Main.class.getProtectionDomain().getCodeSource();
+            File jarFile = new File(codeSource.getLocation().toURI().getPath());
+            String jarDir = jarFile.getParentFile().getPath();
+            return new File(jarDir);
+        }catch (Exception e){
+            return null;
+        }
     }
 }

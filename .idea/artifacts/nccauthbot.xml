@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="nccauthbot">
+    <output-path>$PROJECT_DIR$/out/artifacts/nccauthbot</output-path>
+    <root id="archive" name="nccauthbot.jar">
+      <element id="directory" name="META-INF">
+        <element id="file-copy" path="$PROJECT_DIR$/manifest/META-INF/MANIFEST.MF" />
+      </element>
+    </root>
+  </artifact>
+</component>
