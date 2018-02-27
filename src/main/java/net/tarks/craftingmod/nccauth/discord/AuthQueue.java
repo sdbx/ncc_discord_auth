@@ -15,7 +15,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public abstract class AuthQueue extends ListenerAdapter implements Runnable {
-    private static final long limit_minute = 10;
+    public static long limit_minute = 10;
     protected ICommander cmd;
     protected Config cfg;
 
@@ -39,6 +39,9 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
         return requestAuth(new DiscordUser(discordUID,saidChannel));
     }
     protected int requestAuth(DiscordUser discordUser){
+        if(timelimit_sec.containsKey(discordUser.userID)){
+            return (int) Math.min((Instant.now().getEpochSecond()-timelimit_sec.get(discordUser.userID)),-1);
+        }
         ArrayList<Integer> tokens = new ArrayList<>();
         for(DiscordUser du : queue){
             tokens.add(du.token);
@@ -66,13 +69,13 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
         // huge resource
         Instant now = Instant.now();
 
-        ArrayList<Comment> comments = cmd.getComments(cfg,limit_minute * 60);
+        ArrayList<Comment> comments = cmd.getComments(cfg,60 * limit_minute);
         for(int i=0;i<queue.size();i+=1){
             DiscordUser user = queue.get(i);
             if(now.getEpochSecond() >= timelimit_sec.get(user.userID)){
-                user.token = -1;
+                user.token = -1 * (int)limit_minute;
                 changed.add(user);
-                queue.remove(i);
+                queue.remove(user);
                 timelimit_sec.remove(user.userID);
                 continue;
             }
@@ -82,7 +85,7 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
                         user.cafeID = c.userID;
                         user.username = c.nickname;
                         changed.add(user);
-                        queue.remove(i);
+                        queue.remove(user);
                         timelimit_sec.remove(user.userID);
                         break;
                     }

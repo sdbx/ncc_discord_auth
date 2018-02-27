@@ -87,12 +87,12 @@ public class Main implements ICommander {
         //Config cfg = new Config(26686242,7156);
         //cfg = new Config(23370764,783788,"",0);
 
-        getComments(cfg,18000); // 5 hours?
+        getComments(cfg,-1); // 5 hours?
 
         discord = new DiscordPipe(cfg,this);
     }
     public Config getNaverConfig(String id){
-        Config out = new Config(-1,-1,"Please type discord bot token here.",-1,-1,"","");
+        Config out = new Config("Please type discord bot token here.","Cafe URL..");
         Document document = null;
         try{
             document = getUrlDOM(id);
@@ -147,6 +147,11 @@ public class Main implements ICommander {
         out.cafeCommentURL = id;
         return out;
     }
+    public void saveConfig(Config c){
+        Util.write(new File(getRootdir(),"config.json"),Util.getJsonPretty(
+                g.toJson(c)
+        ));
+    }
     public ArrayList<Comment> getComments(Config cfg,long timeLimit_sec){
         ArrayList<Comment> out = new ArrayList<>();
         Document document = null;
@@ -161,7 +166,6 @@ public class Main implements ICommander {
             return out;
         }
         Elements comments = document.getElementsByClass("u_cbox_comment");
-        trace("Comments Length(include reply): " + comments.size());
         for(int i = 0;i<comments.size();i+=1){
             Comment comment = new Comment();
             Elements es;
@@ -195,11 +199,11 @@ public class Main implements ICommander {
             }
             if(comment.userID != null && comment.nickname != null && comment.content != null){
                 if(timeLimit_sec <= 0 || comment.getTimeDelta() < timeLimit_sec){
-                    trace(g.toJson(comment));
                     out.add(comment);
                 }
             }
         }
+        trace(g.toJson(out));
         return out;
     }
     public Document getUrlDOM(String url) throws IOException {

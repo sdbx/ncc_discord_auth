@@ -1,5 +1,7 @@
 package net.tarks.craftingmod.nccauth;
 
+import java.util.ArrayList;
+
 public class Config {
     public long cafeID;
     public long articleID;
@@ -7,15 +9,23 @@ public class Config {
     public String discordToken;
     public long discordRoomID; // room id for management
     public long discordBotChID;
+    public  long discordMainChID;
     public String discordToRolesName;
-    public Config(long cid,long aid, String discord_token, long discord_mainID,long discord_channelID, String discord_rolesName, String cafeURL){
-        cafeID = cid;
-        articleID = aid;
+    public ArrayList<Long> trustedUsers;
+    public String discordWelcomeMsg;
+    public String discordAuthedMsg;
+    public Config(String discord_token, String cafeURL){
+        cafeID = -1;
+        articleID = -1;
         discordToken = discord_token;
-        discordRoomID = discord_mainID;
-        discordToRolesName = discord_rolesName;
+        discordRoomID = -1;
+        discordToRolesName = "Roles name";
         cafeCommentURL = cafeURL;
-        discordBotChID = discord_channelID;
+        discordBotChID = -1;
+        discordMainChID = -1;
+        trustedUsers = new ArrayList<>();
+        discordWelcomeMsg = "";
+        discordAuthedMsg = "";
     }
     public void setID(long cfID,long arID){
         cafeID = cfID;

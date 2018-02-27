@@ -7,4 +7,5 @@ import java.util.ArrayList;
 
 public interface ICommander {
     ArrayList<Comment> getComments(Config cfg, long timeLimit_sec);
+    void saveConfig(Config cfg);
 }
