@@ -169,10 +169,13 @@ public class DiscordPipe extends AuthQueue implements EventListener {
 
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        guildMemberJoin(event.getGuild(),event.getUser());
+    }
+    public void guildMemberJoin(Guild g, User u){
         String msg = cfg.discordWelcomeMsg;
-        msg = msg.replace("$username",event.getUser().getName())
+        msg = msg.replace("$username",u.getName())
                 .replace("$channel","<#" + cfg.discordMainChID + ">");
-        event.getGuild().getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
+        g.getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
     }
 
     @Override
@@ -180,8 +183,8 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         guildMemberLeave(event.getGuild(),event.getUser());
     }
     public void guildMemberLeave(Guild g,User u){
-        String msg = "$username님이 디스코드를 나갔습니다.";
-        msg = msg.replace("$username",u.getName());
+        String msg = "$username (<@!$userid>님이 디스코드를 나갔습니다.";
+        msg = msg.replace("$username",u.getName()).replace("$userid",Long.toString(u.getIdLong()));
         g.getTextChannelById(cfg.discordBotChID).sendMessage(msg).queue();
         long id = u.getIdLong();
 
@@ -223,6 +226,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         if(!event.getMessage().isFromType(ChannelType.VOICE)){
             User sender = event.getAuthor();
             String content = event.getMessage().getContentRaw();
+            Guild guild = event.getGuild();
             /*
             Auth command
              */
@@ -236,10 +240,25 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                         if(roles.size() != 1){
                             event.getChannel().sendMessage("[Config fail] No roles found / Too many roles at " + cfg.discordToRolesName).queue();
                             return;
+                        }else{
+                            toRole = roles.get(0);
                         }
                         // check exists
                         if(authlist.hadAuth(user)){
                             event.getChannel().sendMessage(String.format("이미 인증이 완료된 디스코드 아이디(%s)입니다. ",authlist.list.get(user.userID))).queue();
+                            return;
+                        }
+                        roles = guild.getMember(sender).getRoles();
+                        boolean need = true;
+                        ArrayList<String> names = new ArrayList<>();
+                        for(Role role : roles){
+                            if(!role.getName().equals("@everyone")){
+                                need = false;
+                                names.add(role.getName());
+                            }
+                        }
+                        if(!need){
+                            event.getChannel().sendMessage(String.format("이미 다른 권한(%s)을 부여받았습니다.",String.join(",",names))).queue();
                             return;
                         }
                         // receive auth command
@@ -285,12 +304,29 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                 }
             }
             if(content.startsWith("!emuWelcome") && cfg.trustedUsers.contains(sender.getIdLong())){
-                String msg = cfg.discordWelcomeMsg;
-                msg = msg.replace("$username","<@!" + event.getAuthor().getIdLong() + ">")
-                        .replace("$channel","<#" + cfg.discordMainChID + ">");
-                event.getGuild().getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
+                guildMemberJoin(guild,sender);
             }else if(content.startsWith("!emuExit") && cfg.trustedUsers.contains(sender.getIdLong())){
                 guildMemberLeave(event.getGuild(),event.getAuthor());
+            }else if(content.startsWith("!emuNewbie") && cfg.trustedUsers.contains(sender.getIdLong())){
+                authlist.list.remove(sender.getIdLong());
+                authlist.save();
+                new GuildController(guild).removeRolesFromMember(guild.getMember(sender),guild.getMember(sender).getRoles()).queue();
+                event.getTextChannel().sendMessage("[디버그] 싱싱한 뉴비가 되었습니다.").queue();
+            }else if(content.startsWith("!getnaver") && content.split(" ").length >= 2){
+                String name = content.split(" ")[1];
+                List<Member> members = event.getGuild().getMembers();
+                long id = -1;
+                for(Member m : members){
+                    if(m.getEffectiveName().equals(name)){
+                        id = m.getUser().getIdLong();
+                        break;
+                    }
+                }
+                if(id >= 0 && authlist.list.containsKey(id)){
+                    event.getTextChannel().sendMessage(String.format("%s님의 아이디는 %s 입니다.",name,authlist.list.get(id))).queue();
+                }else{
+                    event.getTextChannel().sendMessage(String.format("%s님은 인증되지 않았습니다.",name)).queue();
+                }
             }
             /*
             Set config command
