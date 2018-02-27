@@ -6,5 +6,7 @@ net/tarks/craftingmod/nccauth/discord/ICommander.class
 net/tarks/craftingmod/nccauth/Config.class
 net/tarks/craftingmod/nccauth/discord/DiscordUser.class
 net/tarks/craftingmod/nccauth/Main.class
+net/tarks/craftingmod/nccauth/discord/DiscordPipe$1.class
 net/tarks/craftingmod/nccauth/discord/InitListener.class
+net/tarks/craftingmod/nccauth/UserCafeDB.class
 net/tarks/craftingmod/nccauth/Comment.class

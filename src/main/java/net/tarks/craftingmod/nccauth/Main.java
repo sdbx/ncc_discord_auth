@@ -36,7 +36,7 @@ public class Main implements ICommander {
         _this = this;
         g = new GsonBuilder().create();
 
-        File config_file = new File(getRootdir(),"config.json");
+        File config_file = new File(Util.getRootdir(),"config.json");
         Config cfg = null;
         trace("Config file: " + config_file.getAbsolutePath());
         if(config_file.exists() && config_file.canRead()){
@@ -77,6 +77,7 @@ public class Main implements ICommander {
                     System.exit(0);
                 }
             }
+            return;
         }
         if(cfg.discordToken.equalsIgnoreCase("Please type discord bot token here.") || cfg.discordBotChID == -1 || cfg.discordRoomID == -1){
             traceE("Discord 설정을 완료해주세요!");
@@ -151,7 +152,7 @@ public class Main implements ICommander {
         return out;
     }
     public void saveConfig(Config c){
-        Util.write(new File(getRootdir(),"config.json"),Util.getJsonPretty(
+        Util.write(new File(Util.getRootdir(),"config.json"),Util.getJsonPretty(
                 g.toJson(c)
         ));
     }
@@ -230,16 +231,5 @@ public class Main implements ICommander {
     private void exitFail(){
         System.out.println("Exiting");
         System.exit(-1);
-    }
-
-    private File getRootdir() {
-        try{
-            CodeSource codeSource = Main.class.getProtectionDomain().getCodeSource();
-            File jarFile = new File(codeSource.getLocation().toURI().getPath());
-            String jarDir = jarFile.getParentFile().getPath();
-            return new File(jarDir);
-        }catch (Exception e){
-            return null;
-        }
     }
 }

@@ -1,6 +1,8 @@
 package net.tarks.craftingmod.nccauth.discord;
 
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
 import net.dv8tion.jda.bot.sharding.ShardManager;
 import net.dv8tion.jda.core.AccountType;
 import net.dv8tion.jda.core.JDA;
@@ -9,6 +11,7 @@ import net.dv8tion.jda.core.OnlineStatus;
 import net.dv8tion.jda.core.entities.*;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.core.events.guild.member.GuildMemberLeaveEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberNickChangeEvent;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.core.exceptions.HierarchyException;
@@ -17,9 +20,13 @@ import net.dv8tion.jda.core.hooks.EventListener;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.dv8tion.jda.core.managers.GuildController;
 import net.tarks.craftingmod.nccauth.Config;
+import net.tarks.craftingmod.nccauth.UserCafeDB;
 import net.tarks.craftingmod.nccauth.Util;
 
 import javax.security.auth.login.LoginException;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
@@ -27,6 +34,7 @@ import java.util.StringJoiner;
 public class DiscordPipe extends AuthQueue implements EventListener {
     protected JDA discordClient;
     protected ShardManager sm;
+    protected UserCafeDB authlist;
 
     public DiscordPipe(Config c,ICommander cmd){
         super(c,cmd);
@@ -43,6 +51,21 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         discordClient.addEventListener(this);
         discordClient.addEventListener(new InitListener());
         //discordClient.getGuildById(152746825806381056L).getTextChannelById(236873884283043842L).sendMessage("앙뇽");
+
+        File dbfile = new File(Util.getRootdir(),"users.json");
+
+        if(dbfile.exists() && dbfile.canRead()){
+            try {
+                JsonReader reader = new JsonReader(new FileReader(dbfile));
+                authlist = g.fromJson(reader, new TypeToken<UserCafeDB>(){}.getType());
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+        if(authlist == null){
+            authlist = new UserCafeDB();
+        }
+        authlist.init();
     }
     protected Game getGame(String title,long gametype){
         Game game;
@@ -74,26 +97,37 @@ public class DiscordPipe extends AuthQueue implements EventListener {
      */
     @Override
     protected void onAuthResult(ArrayList<DiscordUser> users) {
+        boolean changed = false;
         for(DiscordUser user : users){
             System.out.println("Result: " + Util.getJsonPretty(new GsonBuilder().create().toJson(user)));
             TextChannel channel = discordClient.getTextChannelById(user.saidChannelID);
             String msg;
             /* roles test */
             List<Role> roles = channel.getGuild().getRolesByName(cfg.discordToRolesName,true);
+            System.out.println("duplicate: " + authlist.duplicateAuth(user));
             if(roles.size() != 1){
                 msg = "[Config error] roles를 찾을 수 없습니다.";
-            }else if(user.token < 0){
-                msg = "<@!#discordid>님의 인증시간(#m분)이 초과되었습니다.\n다시 해주세요.".replace("#discordid",Long.toString(user.userID))
-                        .replace("#m",Integer.toString(Math.abs(user.token)));
+            }else if(user.token < 0) {
+                msg = "<@!#discordid>님의 인증시간(#m분)이 초과되었습니다.\n다시 해주세요.".replace("#discordid", Long.toString(user.userID))
+                        .replace("#m", Integer.toString(Math.abs(user.token)));
+            }else if(authlist.duplicateAuth(user)){
+                msg = "<@!#discordid>님의 해당 네이버 아이디(#naverid)와 중복된 다른 아이디 (<@!#secondid>)이(가) 있습니다. 인증에 실패하였습니다."
+                        .replace("#discordid",Long.toString(user.userID)).replace("#naverid", user.cafeID)
+                        .replace("#secondid",Long.toString(authlist.getDiscordIDFromCafeID(user)));
             }else{
                 Role role = roles.get(0);
                 msg = "<@!#discordid>님(#cafeid)의 인증이 완료되었습니다. #suffix".replace("#discordid",Long.toString(user.userID))
                         .replace("#cafeid",user.cafeID).replace("#suffix",cfg.discordAuthedMsg);
                 try{
                     new GuildController(channel.getGuild()).addSingleRoleToMember(channel.getGuild().getMember(discordClient.getUserById(user.userID)),role).reason("Authed").queue();
+                    changed = true;
+                    authlist.putUser(user);
                 }catch (HierarchyException e){
                     e.printStackTrace();
-                    msg = "인증이 완료되었지만 예기치 못한 오류가 발생하였습니다.```\n" + e.getClass().getName() + ": " + e.getMessage() + "\n```";
+                    msg = "인증이 완료되었지만 권한에 대한 예기치 못한 오류가 발생하였습니다.```\n" + e.getClass().getName() + ": " + e.getMessage() + "\n```";
+                    // @TODO remove
+                    //changed = true;
+                    //authlist.putUser(user);
                 }
             }
             if(!channel.canTalk()){
@@ -105,6 +139,9 @@ public class DiscordPipe extends AuthQueue implements EventListener {
             }else{
                 channel.sendMessage(msg).queue();
             }
+        }
+        if(changed){
+            authlist.save();
         }
     }
     /**
@@ -138,6 +175,21 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         event.getGuild().getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
     }
 
+    @Override
+    public void onGuildMemberLeave(GuildMemberLeaveEvent event) {
+        guildMemberLeave(event.getGuild(),event.getUser());
+    }
+    public void guildMemberLeave(Guild g,User u){
+        String msg = "$username님이 디스코드를 나갔습니다.";
+        msg = msg.replace("$username",u.getName());
+        g.getTextChannelById(cfg.discordBotChID).sendMessage(msg).queue();
+        long id = u.getIdLong();
+        if(authlist.list.containsKey(id)){
+            authlist.list.remove(id);
+            authlist.save();
+        }
+    }
+
     /**
      * Message receiver to detect command.
      * @param event
@@ -167,15 +219,21 @@ public class DiscordPipe extends AuthQueue implements EventListener {
             if(content.startsWith("/auth")){
                 if(!event.isFromType(ChannelType.PRIVATE)){
                     if(event.getGuild().getIdLong() == cfg.discordRoomID){
+                        DiscordUser user = new DiscordUser(sender.getIdLong(),event.getChannel().getIdLong());
+
                         List<Role> roles = event.getGuild().getRolesByName(cfg.discordToRolesName,true);
                         Role toRole;
                         if(roles.size() != 1){
                             event.getChannel().sendMessage("[Config fail] No roles found / Too many roles at " + cfg.discordToRolesName).queue();
                             return;
                         }
+                        // check exists
+                        if(authlist.hadAuth(user)){
+                            event.getChannel().sendMessage(String.format("이미 인증이 완료된 디스코드 아이디(%s)입니다. ",authlist.list.get(user.userID))).queue();
+                            return;
+                        }
                         // receive auth command
                         String[] split = content.split(" ");
-                        DiscordUser user = new DiscordUser(sender.getIdLong(),event.getChannel().getIdLong());
                         user.saidChannelID = event.getTextChannel().getIdLong();
                         List<Member> members = event.getGuild().getMembers();
                         String name = null;
@@ -216,11 +274,13 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                     }
                 }
             }
-            if(content.startsWith("!emuWelcome")){
+            if(content.startsWith("!emuWelcome") && cfg.trustedUsers.contains(sender.getIdLong())){
                 String msg = cfg.discordWelcomeMsg;
                 msg = msg.replace("$username","<@!" + event.getAuthor().getIdLong() + ">")
                         .replace("$channel","<#" + cfg.discordMainChID + ">");
                 event.getGuild().getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
+            }else if(content.startsWith("!emuExit") && cfg.trustedUsers.contains(sender.getIdLong())){
+                guildMemberLeave(event.getGuild(),event.getAuthor());
             }
             /*
             Set config command

@@ -1,5 +1,7 @@
 package net.tarks.craftingmod.nccauth.discord;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
@@ -19,6 +21,7 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
     public static long limit_minute = 10;
     protected ICommander cmd;
     protected Config cfg;
+    protected Gson g;
 
     private ArrayList<DiscordUser> queue;
     private HashMap<Long,Long> timelimit_sec;
@@ -27,6 +30,8 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
     public AuthQueue(Config c,ICommander cmd){
         this.cmd = cmd;
         this.cfg = c;
+
+        g = new GsonBuilder().create();
 
         queue = new ArrayList<>();
         timelimit_sec = new HashMap<>();
