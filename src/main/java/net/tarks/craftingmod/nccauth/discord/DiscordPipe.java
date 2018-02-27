@@ -91,6 +91,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     }
 
     /**
+     * synchronized by sub thread(caller: AuthQueue)
      * Event on auth success or fail(token = -1)
      * @param users
      */
@@ -183,9 +184,12 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         msg = msg.replace("$username",u.getName());
         g.getTextChannelById(cfg.discordBotChID).sendMessage(msg).queue();
         long id = u.getIdLong();
-        if(authlist.list.containsKey(id)){
-            authlist.list.remove(id);
-            authlist.save();
+
+        synchronized (lock){
+            if(authlist.list.containsKey(id)){
+                authlist.list.remove(id);
+                authlist.save();
+            }
         }
     }
 
@@ -195,8 +199,9 @@ public class DiscordPipe extends AuthQueue implements EventListener {
      */
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
-        execCommand(event);
-
+        synchronized (lock) {
+            execCommand(event);
+        }
         if (event.isFromType(ChannelType.PRIVATE))
         {
             System.out.printf("[PM] %s: %s\n", event.getAuthor().getName(),
@@ -208,6 +213,12 @@ public class DiscordPipe extends AuthQueue implements EventListener {
 
         }
     }
+
+    /**
+     * Synchronized by main thread
+     * onMessageReceived
+     * @param event
+     */
     public void execCommand(MessageReceivedEvent event){
         if(!event.getMessage().isFromType(ChannelType.VOICE)){
             User sender = event.getAuthor();

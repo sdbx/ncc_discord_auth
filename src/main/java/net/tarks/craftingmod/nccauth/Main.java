@@ -31,10 +31,7 @@ public class Main implements ICommander {
     }
 
     private Gson g;
-    private Main _this;
-    private DiscordPipe discord;
     public Main(String[] args){
-        _this = this;
         g = new GsonBuilder().create();
 
         File config_file = new File(Util.getRootdir(),"config.json");
@@ -94,7 +91,7 @@ public class Main implements ICommander {
 
         getComments(cfg,-1); // 5 hours?
 
-        discord = new DiscordPipe(cfg,this);
+        DiscordPipe discord = new DiscordPipe(cfg,this);
     }
     public Config getNaverConfig(String id){
         Config out = new Config("Please type discord bot token here.","Cafe URL..");
