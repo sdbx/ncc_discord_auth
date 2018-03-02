@@ -43,8 +43,10 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
         service.scheduleWithFixedDelay(this,0,10,TimeUnit.SECONDS);
     }
 
-    protected int requestAuth(long discordUID,long saidChannel){
-        return requestAuth(new DiscordUser(discordUID,saidChannel));
+    protected int requestAuth(long discordUID,long saidChannel,String cafeName){
+        DiscordUser u = new DiscordUser(discordUID,saidChannel);
+        u.username = cafeName;
+        return requestAuth(u);
     }
     protected int requestAuth(DiscordUser discordUser){
         synchronized (lock){
@@ -65,6 +67,32 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
             queue.add(discordUser);
             timelimit_sec.put(discordUser.userID,now.plus(limit_minute, ChronoUnit.MINUTES).getEpochSecond());
             return token;
+        }
+    }
+
+    /**
+     * Remove user from queue
+     * @param discordUID
+     */
+    protected boolean editQueue(long discordUID,String newCafename){
+        return editQueue(discordUID,newCafename,null);
+    }
+    protected boolean editQueue(long discordUID,String newCafename,String newCafeID){
+        boolean result = false;
+        synchronized (lock){
+            for(DiscordUser user : queue){
+                if(user.userID == discordUID){
+                    if(newCafeID != null){
+                        user.cafeID = newCafeID;
+                    }
+                    if(newCafename != null){
+                        user.username = newCafename;
+                    }
+                    result = true;
+                    break;
+                }
+            }
+            return result;
         }
     }
 

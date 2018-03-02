@@ -27,6 +27,7 @@ import javax.security.auth.login.LoginException;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.StringJoiner;
 
@@ -34,6 +35,8 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     protected JDA discordClient;
     protected ShardManager sm;
     protected UserCafeDB authlist;
+
+    protected String authCommand = "!auth";
 
     public DiscordPipe(Config c,ICommander cmd){
         super(c,cmd);
@@ -152,6 +155,8 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     public void onGuildMemberNickChange(GuildMemberNickChangeEvent event) {
         String prevnick = event.getPrevNick();
         String newnick = event.getNewNick();
+        User user = event.getUser();
+        Guild guild = event.getGuild();
         if(prevnick == null){
             prevnick = event.getUser().getName() + " (기본)";
         }else{
@@ -165,6 +170,10 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         // nickname change
         discordClient.getTextChannelById(cfg.discordBotChID).sendMessage(String.format(
                 "<@!#discordid>님이 닉네임을 변경하였습니다.```\n%s -> %s\n```".replace("#discordid",Long.toString(event.getUser().getIdLong())),prevnick,newnick)).queue();
+        if(editQueue(user.getIdLong(),newnick)){
+            discordClient.getTextChannelById(cfg.discordMainChID).sendMessage(String.format(
+                    "<@!#discordid>님, 닉네임이 변경되었으니 \"**%s**\" 닉네임으로 댓글을 달아주세요.".replace("#discordid",Long.toString(event.getUser().getIdLong())),newnick)).queue();
+        }
     }
 
     @Override
@@ -225,23 +234,24 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     public void execCommand(MessageReceivedEvent event){
         if(!event.getMessage().isFromType(ChannelType.VOICE)){
             User sender = event.getAuthor();
+            Channel channel = event.getTextChannel();
             String content = event.getMessage().getContentRaw();
             Guild guild = event.getGuild();
             /*
             Auth command
              */
-            if(content.startsWith("/auth")){
+            /**
+             * \uD83D\uDD10
+             */
+            if(content.startsWith(authCommand)){
                 if(!event.isFromType(ChannelType.PRIVATE)){
                     if(event.getGuild().getIdLong() == cfg.discordRoomID){
                         DiscordUser user = new DiscordUser(sender.getIdLong(),event.getChannel().getIdLong());
 
                         List<Role> roles = event.getGuild().getRolesByName(cfg.discordToRolesName,true);
-                        Role toRole;
                         if(roles.size() != 1){
                             event.getChannel().sendMessage("[Config fail] No roles found / Too many roles at " + cfg.discordToRolesName).queue();
                             return;
-                        }else{
-                            toRole = roles.get(0);
                         }
                         // check exists
                         if(authlist.hadAuth(user)){
@@ -277,15 +287,20 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                         }
                         user.username = name;
                         if(split.length >= 2){
-                            if(split.length == 2 && split[1].matches("^[a-zA-Z0-9]*$")){
-                                user.cafeID = split[1];
-                                user.username = split[1];
+                            if(content.startsWith(authCommand + "id")){
+                                if(split.length == 2 && split[1].matches("^[a-zA-Z0-9]*$")){
+                                    user.cafeID = split[1];
+                                }else{
+                                    event.getTextChannel().sendMessage("올바른 cafeID 형식이 아닙니다.").queue();
+                                    return;
+                                }
                             }else{
                                 if(user.username.length() >= 1){
                                     user.username = content.substring(content.indexOf(" ")+1);
                                 }
                             }
                         }
+                        //auth start
                         try {
                             PrivateChannel pChannel = sender.openPrivateChannel().complete(true);
                             int auth = this.requestAuth(user);
@@ -295,7 +310,20 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                                         .replace("#url",cfg.cafeCommentURL)
                                         .replace("#num",Integer.toString(auth)).replace("#minute",Long.toString(limit_minute))).queue();
                             }
-                            event.getTextChannel().sendMessage((auth >= 0)?String.format("인증 코드를 개인메세지로 보냈습니다. %s 닉네임만 인증됩니다.",name):String.format("이미 인증 대기중 입니다. %s초 남았습니다.",Math.abs(auth))).queue();
+                            // update
+                            StringBuilder sb = new StringBuilder();
+                            if(auth >= 0){
+                                sb.append("인증 코드를 개인메세지로 보냈습니다.");
+                            }else{
+                                this.editQueue(user.userID,user.username,user.cafeID);
+                                sb.append(String.format("인증을 갱신하였습니다. (%s초 남음),",Math.abs(auth)));
+                            }
+                            if(user.cafeID != null){
+                                sb.append(String.format(" \"**%s**\" 카페 ID만 인증됩니다.",user.cafeID));
+                            }else{
+                                sb.append(String.format(" \"**%s**\" 닉네임만 인증됩니다.",user.username));
+                            }
+                            event.getTextChannel().sendMessage(sb.toString()).queue();
                         } catch (RateLimitedException e) {
                             e.printStackTrace();
                             event.getTextChannel().sendMessage("실패: 개인 메세지를 사용할 수 없습니다.").queue();
@@ -307,26 +335,46 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                 guildMemberJoin(guild,sender);
             }else if(content.startsWith("!emuExit") && cfg.trustedUsers.contains(sender.getIdLong())){
                 guildMemberLeave(event.getGuild(),event.getAuthor());
-            }else if(content.startsWith("!emuNewbie") && cfg.trustedUsers.contains(sender.getIdLong())){
+            }else if(content.startsWith("!emuNewbie") && cfg.trustedUsers.contains(sender.getIdLong())) {
                 authlist.list.remove(sender.getIdLong());
                 authlist.save();
-                new GuildController(guild).removeRolesFromMember(guild.getMember(sender),guild.getMember(sender).getRoles()).queue();
+                new GuildController(guild).removeRolesFromMember(guild.getMember(sender), guild.getMember(sender).getRoles()).queue();
                 event.getTextChannel().sendMessage("[디버그] 싱싱한 뉴비가 되었습니다.").queue();
+            }else if(content.startsWith("!emuAuth") && cfg.trustedUsers.contains(sender.getIdLong())) {
+                List<Role> roles = event.getGuild().getRolesByName(cfg.discordToRolesName,true);
+                if(roles.size() != 1){
+                    event.getChannel().sendMessage("[Config fail] No roles found / Too many roles at " + cfg.discordToRolesName).queue();
+                    return;
+                }
+                new GuildController(channel.getGuild()).addSingleRoleToMember(channel.getGuild().getMember(discordClient.getUserById(sender.getIdLong())),roles.get(0)).reason("Emulated-Authed").queue();
             }else if(content.startsWith("!getnaver") && content.split(" ").length >= 2){
                 String name = content.split(" ")[1];
                 List<Member> members = event.getGuild().getMembers();
+                HashMap<Long,String> nicks = new HashMap<>();
                 long id = -1;
                 for(Member m : members){
                     if(m.getEffectiveName().equals(name)){
                         id = m.getUser().getIdLong();
-                        break;
+                        nicks.put(id,String.format("%s(%s#%s)",m.getEffectiveName(),m.getUser().getName(),m.getUser().getDiscriminator()));
                     }
                 }
-                if(id >= 0 && authlist.list.containsKey(id)){
-                    event.getTextChannel().sendMessage(String.format("%s님의 아이디는 %s 입니다.",name,authlist.list.get(id))).queue();
+                String msg;
+                if(nicks.size() <= 0){
+                    msg = String.format("%s님을 찾을 수 없습니다.",name);
                 }else{
-                    event.getTextChannel().sendMessage(String.format("%s님은 인증되지 않았습니다.",name)).queue();
+                    ArrayList<String> stack = new ArrayList<>();
+                    nicks.forEach((k,s)->{
+                        if(authlist.list.containsKey(k)) {
+                            stack.add(String.format("%s님의 아이디는 %s 입니다", s, authlist.list.get(k)));
+                        }else{
+                            stack.add(String.format("%s님은 인증되지 않았습니다",s));
+                        }
+                    });
+                    msg = String.join("\n",stack);
                 }
+                event.getTextChannel().sendMessage(msg).queue();
+            }else if(content.equalsIgnoreCase("!gorani")){
+                event.getTextChannel().sendMessage("<:gorani:234540165631049738>").queue();
             }
             /*
             Set config command
