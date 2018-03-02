@@ -96,6 +96,15 @@ public abstract class AuthQueue extends ListenerAdapter implements Runnable {
         }
     }
 
+    protected int getToken(long discordUID){
+        for(DiscordUser u : queue){
+            if(u.userID == discordUID){
+                return u.token;
+            }
+        }
+        return -1;
+    }
+
     protected abstract void onAuthResult(ArrayList<DiscordUser> users);
 
     @Override

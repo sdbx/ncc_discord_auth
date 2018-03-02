@@ -328,11 +328,17 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                         try {
                             PrivateChannel pChannel = sender.openPrivateChannel().complete(true);
                             int auth = this.requestAuth(user);
+                            System.out.println("Auth key: " + auth);
                             if(auth >= 0){
                                 pChannel.sendMessage("<@!#discordid>님이 회원임을 인증할려면 **#minute분안에** #url 에 __#num__ 숫자를 댓글에 남겨주세요.\n"
                                         .replace("#discordid",Long.toString(sender.getIdLong()))
                                         .replace("#url",cfg.cafeCommentURL)
                                         .replace("#num",Integer.toString(auth)).replace("#minute",Long.toString(limit_minute))).queue();
+                            }else{
+                                pChannel.sendMessage("<@!#discordid>님이 회원임을 인증할려면 **#second초안에** #url 에 __#num__ 숫자를 댓글에 남겨주세요.\n"
+                                        .replace("#discordid",Long.toString(sender.getIdLong()))
+                                        .replace("#url",cfg.cafeCommentURL)
+                                        .replace("#num",Integer.toString(getToken(sender.getIdLong()))).replace("#second",Long.toString(Math.abs(auth)))).queue();
                             }
                             // update
                             StringBuilder sb = new StringBuilder();
