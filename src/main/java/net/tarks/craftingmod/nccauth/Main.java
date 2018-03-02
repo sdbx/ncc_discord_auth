@@ -24,7 +24,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 public class Main implements ICommander {
-    private static final String cafeURL = "https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
+    private static final String cafeCommentURL = "https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
+    private static final String cafeArticleURL = "http://cafe.naver.com/ArticleList.nhn?search.clubid=#cafeID&search.boardtype=L&userDisplay=#n";
     public static void main(String[] args){
         System.out.println("Hello World!");
         new Main(args);
@@ -86,12 +87,80 @@ public class Main implements ICommander {
             }
             System.exit(-1);
         }
+        if(cfg.version < Config.config_version){
+            Config c = new Config(null,null);
+            c.copyFrom(cfg);
+            c.version = Config.config_version;
+            saveConfig(c);
+            traceE("Config이 업데이트 되었습니다!");
+            try {
+                Desktop.getDesktop().open(config_file.getParentFile());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.exit(-1);
+            return;
+        }
         //Config cfg = new Config(26686242,7156);
         //cfg = new Config(23370764,783788,"",0);
 
         getComments(cfg,-1); // 5 hours?
 
         DiscordPipe discord = new DiscordPipe(cfg,this);
+    }
+    public ArrayList<Article> getNaverArticles(long cafeID,int number) {
+        Document document = null;
+        ArrayList<Article> out = new ArrayList<>();
+        try {
+            document = getUrlDOM(cafeArticleURL.replace("#cafeID",Long.toString(cafeID)).replace("#n",Integer.toString(number)));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if(document == null){
+            traceE("게시글 목록 불러오기 실패!");
+            return out;
+        }
+        Elements es = document.getElementsByAttributeValue("name","ArticleList");
+        if(es.size() != 1){
+            return out;
+        }
+        try{
+            es = es.get(0).getElementsByTag("tbody").get(0).children();
+            for(int i=0;i<es.size();i+=2){
+                Article article = new Article();
+                Element e = es.get(i);
+                Elements nodes = e.getElementsByClass("m-tcol-c");
+                for(int k=0;k<Math.min(3,nodes.size());k+=1){
+                    Element el = nodes.get(k);
+                    switch(k){
+                        case 0:
+                            article.id = Integer.parseInt(el.text());
+                            break;
+                        case 1:
+                            article.title = el.text();
+                            break;
+                        case 2:
+                            article.username = el.text();
+                            String s = el.attr("onclick");
+                            if(s != null){
+                                // spagetti!
+                                article.userID = s.split(",")[1].split("'")[1];
+                                article.link = String.format("http://cafe.naver.com/%s/%d",s.split(",")[8].split("'")[1],article.id);
+                            }
+                            break;
+                    }
+                }
+                article.hasFile = e.getElementsByClass("list-i-upload").size() >= 1;
+                article.hasImage = e.getElementsByClass("list-i-img").size() >= 1;
+                article.hasVideo = e.getElementsByClass("list-i-movie").size() >= 1;
+                article.hasVote = e.getElementsByClass("list-i-poll").size() >= 1;
+                article.question = e.getElementsByClass("ico-q").size() >= 1;
+                out.add(article);
+            }
+        }catch (NullPointerException e){
+            e.printStackTrace();
+        }
+        return out;
     }
     public Config getNaverConfig(String id){
         Config out = new Config("Please type discord bot token here.","Cafe URL..");
@@ -217,7 +286,7 @@ public class Main implements ICommander {
         return connection.get();
     }
     public Document getCommentDOM(Config cfg) throws IOException {
-        return getUrlDOM(cafeURL.replace("#cafeID",Long.toString(cfg.cafeID)).replace("#artiID",Long.toString(cfg.articleID)));
+        return getUrlDOM(cafeCommentURL.replace("#cafeID",Long.toString(cfg.cafeID)).replace("#artiID",Long.toString(cfg.articleID)));
     }
 
     private void traceE(String s){

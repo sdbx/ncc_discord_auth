@@ -25,6 +25,7 @@ import net.tarks.craftingmod.nccauth.Util;
 
 import javax.security.auth.login.LoginException;
 import java.io.*;
+import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     protected JDA discordClient;
     protected ShardManager sm;
     protected UserCafeDB authlist;
+    protected ArticleAlert alert;
 
     protected String authCommand = "!auth";
 
@@ -68,6 +70,11 @@ public class DiscordPipe extends AuthQueue implements EventListener {
             authlist = new UserCafeDB();
         }
         authlist.init();
+
+        alert = new ArticleAlert(discordClient,cmd,cfg);
+        if(cfg.enableArticleAlert){
+            alert.enable(true);
+        }
     }
     protected Game getGame(String title,long gametype){
         Game game;
@@ -406,44 +413,48 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                                 //event
                             }
                             // set field sudo
-                            for(String is : inputS){
-                                if(splits[1].equals(is) && splits[2].length() >= 1){
-                                    try {
-                                        String pt = content.substring(content.indexOf(" ")+1);
-                                        cfg.getClass().getField(is).set(cfg,pt.substring(pt.indexOf(" ")+1));
-                                        modded = true;
-                                        break;
-                                    } catch (IllegalAccessException | NoSuchFieldException e) {
-                                        e.printStackTrace();
-                                    }
-                                }
+                            if(splits[1].equalsIgnoreCase("discordToken")){
+                                return;
                             }
-                            if(!modded){
-                                for(String il : inputL){
-                                    if(splits[1].equals(il) && splits[2].length() >= 1){
-                                        boolean hp_n = true;
-                                        if(il.equals("discordGameType")){
+                            Field[] fields = Config.class.getFields();
+                            for(Field f : fields){
+                                if(f.getName().equalsIgnoreCase(splits[1])){
+                                    if(f.getType() == long.class && splits[2].length() >= 1){
+                                        String cmd = splits[1];
+                                        String param = splits[2];
+                                        if(cmd.equalsIgnoreCase("discordGameType")){
                                             String[] lists = {"playing","watching","listening","streaming"};
+                                            boolean mod_type = false;
                                             for(int i=0;i<=lists.length;i+=1){
-                                                if(splits[2].equalsIgnoreCase(lists[i])){
-                                                    splits[2] = Integer.toString(i);
-                                                    hp_n = false;
-                                                    break;
+                                                if(param.equalsIgnoreCase(lists[i])){
+                                                    try {
+                                                        f.setLong(cfg,i);
+                                                        modded = true;
+                                                        mod_type = true;
+                                                        break;
+                                                    } catch (IllegalAccessException | NumberFormatException e) {
+                                                        e.printStackTrace();
+                                                    }
                                                 }
                                             }
-                                        }else{
-                                            hp_n = false;
-                                        }
-                                        if(hp_n){
-                                            pChannel.sendMessage("\"playing\",\"watching\",\"listening\",\"streaming\"").queue();
+                                            if(!mod_type){
+                                                pChannel.sendMessage("\"playing\",\"watching\",\"listening\",\"streaming\"").queue();
+                                            }
                                         }else{
                                             try {
-                                                cfg.getClass().getField(il).setLong(cfg,Long.parseLong(splits[2]));
+                                                f.setLong(cfg,Long.parseLong(splits[2]));
                                                 modded = true;
-                                                break;
-                                            } catch (IllegalAccessException | NoSuchFieldException | NumberFormatException e) {
+                                            } catch (IllegalAccessException | NumberFormatException e) {
                                                 e.printStackTrace();
                                             }
+                                        }
+                                    }else if(f.getType() == String.class){
+                                        try {
+                                            String pt = content.substring(content.indexOf(" ")+1);
+                                            f.set(cfg,pt.substring(pt.indexOf(" ")+1));
+                                            modded = true;
+                                        } catch (IllegalAccessException e) {
+                                            e.printStackTrace();
                                         }
                                     }
                                 }
