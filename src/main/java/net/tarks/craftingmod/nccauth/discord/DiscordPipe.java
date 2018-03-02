@@ -4,10 +4,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import net.dv8tion.jda.bot.sharding.ShardManager;
-import net.dv8tion.jda.core.AccountType;
-import net.dv8tion.jda.core.JDA;
-import net.dv8tion.jda.core.JDABuilder;
-import net.dv8tion.jda.core.OnlineStatus;
+import net.dv8tion.jda.core.*;
 import net.dv8tion.jda.core.entities.*;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.guild.member.GuildMemberJoinEvent;
@@ -24,6 +21,7 @@ import net.tarks.craftingmod.nccauth.UserCafeDB;
 import net.tarks.craftingmod.nccauth.Util;
 
 import javax.security.auth.login.LoginException;
+import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
@@ -129,7 +127,17 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                 msg = "<@!#discordid>님(#cafeid)의 인증이 완료되었습니다. #suffix".replace("#discordid",Long.toString(user.userID))
                         .replace("#cafeid",user.cafeID).replace("#suffix",cfg.discordAuthedMsg);
                 try{
-                    new GuildController(channel.getGuild()).addSingleRoleToMember(channel.getGuild().getMember(discordClient.getUserById(user.userID)),role).reason("Authed").queue();
+                    Member m = channel.getGuild().getMember(discordClient.getUserById(user.userID));
+                    boolean mod = true;
+                    for(Role r : m.getRoles()){
+                        if(r.getName().equals(role.getName())){
+                            mod = false;
+                            break;
+                        }
+                    }
+                    if(mod){
+                        new GuildController(channel.getGuild()).addSingleRoleToMember(m,role).reason("Authed").queue();
+                    }
                     changed = true;
                     authlist.putUser(user);
                 }catch (HierarchyException e){
@@ -242,7 +250,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     public void execCommand(MessageReceivedEvent event){
         if(!event.getMessage().isFromType(ChannelType.VOICE)){
             User sender = event.getAuthor();
-            Channel channel = event.getTextChannel();
+            TextChannel channel = event.getTextChannel();
             String content = event.getMessage().getContentRaw();
             Guild guild = event.getGuild();
             /*
@@ -268,16 +276,24 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                         }
                         roles = guild.getMember(sender).getRoles();
                         boolean need = true;
+                        boolean fake = false;
                         ArrayList<String> names = new ArrayList<>();
                         for(Role role : roles){
                             if(!role.getName().equals("@everyone")){
                                 need = false;
                                 names.add(role.getName());
                             }
+                            if(role.getName().equalsIgnoreCase(cfg.discordToRolesName)){
+                                fake = true;
+                            }
                         }
                         if(!need){
-                            event.getChannel().sendMessage(String.format("이미 다른 권한(%s)을 부여받았습니다.",String.join(",",names))).queue();
-                            return;
+                            if(fake){
+                                event.getChannel().sendMessage("이미 권한을 부여받았으므로, 네이버 아이디 인증만 합니다.").queue();
+                            }else{
+                                event.getChannel().sendMessage(String.format("이미 다른 권한(%s)을 부여받았습니다.",String.join(",",names))).queue();
+                                return;
+                            }
                         }
                         // receive auth command
                         String[] split = content.split(" ");
@@ -349,14 +365,26 @@ public class DiscordPipe extends AuthQueue implements EventListener {
                 new GuildController(guild).removeRolesFromMember(guild.getMember(sender), guild.getMember(sender).getRoles()).queue();
                 event.getTextChannel().sendMessage("[디버그] 싱싱한 뉴비가 되었습니다.").queue();
             }else if(content.startsWith("!emuAuth") && cfg.trustedUsers.contains(sender.getIdLong())) {
-                List<Role> roles = event.getGuild().getRolesByName(cfg.discordToRolesName,true);
-                if(roles.size() != 1){
+                List<Role> roles = event.getGuild().getRolesByName(cfg.discordToRolesName, true);
+                if (roles.size() != 1) {
                     event.getChannel().sendMessage("[Config fail] No roles found / Too many roles at " + cfg.discordToRolesName).queue();
                     return;
                 }
-                new GuildController(channel.getGuild()).addSingleRoleToMember(channel.getGuild().getMember(discordClient.getUserById(sender.getIdLong())),roles.get(0)).reason("Emulated-Authed").queue();
-            }else if(content.startsWith("!getnaver") && content.split(" ").length >= 2){
-                String name = content.split(" ")[1];
+                new GuildController(channel.getGuild()).addSingleRoleToMember(channel.getGuild().getMember(discordClient.getUserById(sender.getIdLong())), roles.get(0)).reason("Emulated-Authed").queue();
+            }else if(content.startsWith("!emuTrash") && cfg.trustedUsers.contains(sender.getIdLong())) {
+                authlist.list.remove(sender.getIdLong());
+                authlist.save();
+            }else if(content.startsWith("!hp") || content.startsWith("!ㅗ디ㅔ")){
+                EmbedBuilder eb = new EmbedBuilder();
+                eb.setColor(Color.YELLOW);
+                eb.setTitle("Command list");
+                eb.addField("auth [닉네임]", "닉네임 인증",false);
+                eb.addField("authid <네이버ID>","아이디 인증",false);
+                eb.addField("naver <닉네임>", "네이버 아이디 찾기",false);
+                eb.addField("hp","도움말",false);
+                channel.sendMessage(eb.build()).queue();
+            }else if(content.startsWith("!naver") && content.split(" ").length >= 2){
+                String name = content.substring(content.indexOf(" ")+1);
                 List<Member> members = event.getGuild().getMembers();
                 HashMap<Long,String> nicks = new HashMap<>();
                 long id = -1;
