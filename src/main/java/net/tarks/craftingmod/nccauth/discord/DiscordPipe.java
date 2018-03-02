@@ -190,7 +190,8 @@ public class DiscordPipe extends AuthQueue implements EventListener {
     public void guildMemberJoin(Guild g, User u){
         String msg = cfg.discordWelcomeMsg;
         msg = msg.replace("$username",u.getName())
-                .replace("$channel","<#" + cfg.discordMainChID + ">");
+                .replace("$channel","<#" + cfg.discordMainChID + ">")
+                .replace("$userid",Long.toString(u.getIdLong()));
         g.getTextChannelById(cfg.discordMainChID).sendMessage(msg).queue();
     }
 

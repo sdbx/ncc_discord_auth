@@ -1,6 +1,8 @@
 net/tarks/craftingmod/nccauth/discord/DiscordPipe.class
 net/tarks/craftingmod/nccauth/discord/ICommander.class
+net/tarks/craftingmod/nccauth/discord/ArticleAlert.class
 net/tarks/craftingmod/nccauth/discord/DiscordUser.class
+net/tarks/craftingmod/nccauth/Article.class
 net/tarks/craftingmod/nccauth/UserCafeDB.class
 net/tarks/craftingmod/nccauth/Comment.class
 net/tarks/craftingmod/nccauth/Main$1.class
