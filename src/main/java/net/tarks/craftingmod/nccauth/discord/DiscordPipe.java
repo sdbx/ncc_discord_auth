@@ -183,7 +183,7 @@ public class DiscordPipe extends AuthQueue implements EventListener {
         guildMemberLeave(event.getGuild(),event.getUser());
     }
     public void guildMemberLeave(Guild g,User u){
-        String msg = "$username (<@!$userid>님이 디스코드를 나갔습니다.";
+        String msg = "$username (<@!$userid>)님이 디스코드를 나갔습니다.";
         msg = msg.replace("$username",u.getName()).replace("$userid",Long.toString(u.getIdLong()));
         g.getTextChannelById(cfg.discordBotChID).sendMessage(msg).queue();
         long id = u.getIdLong();
