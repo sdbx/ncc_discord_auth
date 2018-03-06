@@ -1,6 +1,7 @@
 package net.tarks.craftingmod.nccauth;
 
 
+import javax.annotation.Nullable;
 import java.io.*;
 import java.security.CodeSource;
 import java.util.Map;
@@ -63,7 +64,7 @@ public class Util {
             e.printStackTrace();
         }
     }
-
+    @Nullable
     public static File getRootdir() {
         try{
             CodeSource codeSource = Main.class.getProtectionDomain().getCodeSource();
