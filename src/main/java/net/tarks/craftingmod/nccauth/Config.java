@@ -1,6 +1,9 @@
 package net.tarks.craftingmod.nccauth;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 
 public class Config {
@@ -51,10 +54,31 @@ public class Config {
             Object value;
             try {
                 value = f.get(cfg);
-                if(value != null){
+                if(value != null && !Modifier.isFinal(f.getModifiers())){
                     f.set(this,value);
                 }
             } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    public void copyFrom(ConfigKt cfg_kt){
+
+    }
+    public void copyTo(ConfigKt cfg_kt){
+        Field[] fields = this.getClass().getFields();
+        for(Field f : fields){
+            Object value;
+            try {
+                value = f.get(this);
+                if(value != null && !Modifier.isFinal(f.getModifiers())){
+                    String fname = f.getName();
+                    Method kt_md = cfg_kt.getClass().getMethod("set" +
+                            fname.substring(0,1).toUpperCase() + fname.substring(1),f.getDeclaringClass());
+                    //f.set(this,value);
+                    kt_md.invoke(cfg_kt,value);
+                }
+            } catch (IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
                 e.printStackTrace();
             }
         }

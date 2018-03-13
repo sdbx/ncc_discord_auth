@@ -17,7 +17,7 @@ import java.nio.charset.Charset
 
 fun main(args:Array<String>){
     AnsiConsole.systemInstall()
-    System.setProperty("jsse.enableSNIExtension", "false")
+    //System.setProperty("jsse.enableSNIExtension", "false")
     val configF:File? = MainKt.getDefaultDIR().let {
         it?.resolve("config.json")
     }
@@ -26,14 +26,14 @@ fun main(args:Array<String>){
             fgBrightRed()
             a("Can't find root directory")
             reset()
-            System.out.println(this)
+            println(this)
         }
         return;
     }
     ansi().run {
         fgDefault()
         a("Config path: ${configF.absolutePath}, exist: ${configF.exists()}")
-        System.out.println(this)
+        println(this)
     }
     val cafeLink:String? = args.getOrNull(0)
     val main:MainKt = MainKt(configFile = configF,cafeLink = cafeLink)
@@ -49,11 +49,11 @@ class MainKt(val configFile:File,val cafeLink:String? = null) {
                 null
             }
         }
-        fun getNaverConfig(cafeURL:String):Config {
-            var out:Config = Config("Please type discord bot token here.","Cafe URL..")
+        fun getNaverConfig(cafeURL:String):ConfigKt {
+            var out:ConfigKt = ConfigKt("Please type discord bot token here.","Cafe URL..")
             val doc:Document? = getUrlDOM(cafeURL)
             if(doc == null || doc.title().contains("로그인") || doc.getElementsByClass("error_content_body").size >= 1){
-                System.out.println(ansi().fgBrightRed().a("네이버 게시물을 전체 공개로 해주세요.").reset())
+                println(ansi().fgBrightRed().a("네이버 게시물을 전체 공개로 해주세요.").reset())
                 return out
             }
             val es = doc.getElementsByAttributeValue("name", "articleDeleteFrm")
@@ -63,7 +63,7 @@ class MainKt(val configFile:File,val cafeLink:String? = null) {
                 cafeCommentURL = cafeURL
             }
             if(out.cafeID < 0 || out.articleID < 0){
-                System.out.println(ansi().fgBrightRed().a("URL $cafeURL 파싱 실패!").reset())
+                println(ansi().fgBrightRed().a("URL $cafeURL 파싱 실패!").reset())
             }
             return out
         }
@@ -94,7 +94,7 @@ class MainKt(val configFile:File,val cafeLink:String? = null) {
                     bgDefault()
                     fgBrightRed()
                     a("######################")
-                    System.out.println(this)
+                    println(this)
                 }
                 if(config.cafeID >= 0L && config.articleID >= 0L){
                     Util.write(configFile, Util.getJsonPretty(g.toJson(config)))
@@ -103,6 +103,4 @@ class MainKt(val configFile:File,val cafeLink:String? = null) {
         }
         println("${configFile.absolutePath}")
     }
-
-    fun trace(s:)
 }

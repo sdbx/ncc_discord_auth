@@ -1,6 +1,7 @@
 package net.tarks.craftingmod.nccauth
 
 data class ConfigKt(val discordToken:String,val cafeURL:String){
+    val config_version:Int = Config.config_version
     var version:Int = Config.config_version
 
     var cafeID: Long = 0
@@ -15,4 +16,8 @@ data class ConfigKt(val discordToken:String,val cafeURL:String){
     var discordAuthedMsg: String = ""
     var discordGame: String = ""
     var discordGameType: Long = 0
+
+    var enableArticleAlert: Boolean = false
+    var articleUpdateSec: Long = 0
+    var discordArticleIDs: ArrayList<Long> = ArrayList()
 }
