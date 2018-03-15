@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import * as encoding from 'encoding';
 import * as request from 'request-promise-native';
+import * as Long from 'long';
 
 const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
 export class Article {
@@ -9,6 +10,13 @@ export class Article {
     public static readonly FLAG_VIDEO:number = 0b100;
     public static readonly FLAG_QUESTION:number = 0b10;
     public static readonly FLAG_VOTE:number = 0b1;
+
+    public id:number; // int, article id
+    public title:string; // article title
+    public flags:number; // int, (file,image,video,question,vote)
+    public username:string;
+    public userid:string; // real user identifier
+    public link:URL; // url
     public constructor(con:any) {
         this.id = (con.id == null) ? -1 : con.id;
         this.title = con.title;
@@ -32,16 +40,26 @@ export class Article {
     public static flag(file:boolean,image:boolean,video:boolean,question:boolean,vote:boolean,flag:number=0):number {
         return genflag(flag,file,image,video,question,vote);
     }
-    public id:number; // int, article id
-    public title:string; // article title
-    public flags:number; // int, (file,image,video,question,vote)
-    public username:string;
-    public userid:string; // real user identifier
-    public link:URL; // url
+}
+export class Comment {
+    public content:string;
+    public userid:string;
+    public nickname:string;
+    public timestamp:number;
+
+    public constructor(con:any){
+        this.content = con.content;
+        this.userid = con.userid;
+        this.nickname = con.nickname;
+        this.timestamp = (con.timestamp == null) ? Date.now() : con.timestamp;
+    }
+    public getTimeDiffer(){
+        return Date.now() - this.timestamp;
+    }
 }
 
 export module fetcher {
-    export async function getWeb(requrl:string,param:object) {
+    async function getWeb(requrl:string,param:object) {
         let buffer = await request({
             url: requrl,
             qs: param,
@@ -50,7 +68,7 @@ export module fetcher {
         let body:string = encoding.convert(buffer, "utf-8","euc-kr").toString();
         return cheerio.load(body);
     }
-    export async function getArticles(cafeid:Number) {
+    export async function getArticles(cafeid:Number):Promise<Array<Article>> {
         let params:Object = {
             'search.clubid':cafeid.toString(),
             'search.boardtype':"L",
@@ -58,18 +76,54 @@ export module fetcher {
         }
         let $:any = await getWeb(articleURL,params);
         
-        let articleList:any = $('[name="ArticleList"] > table > tbody > tr:nth-child(2n+1)')
-        .map((i, el) => { console.log($(el).children('td:nth-child(3)').find('m-tcol-c').html());
+        let articleList:Array<Article> = $('[name="ArticleList"] > table > tbody > tr:nth-child(2n+1)')
+        .map((i, el) => { //console.log($(el).children('td:nth-child(3)').html());
+            let clickscript:string = $(el).children('td:nth-child(3)').find('.m-tcol-c').attr('onclick');
+            let arid:number = parseInt($(el).children('td:nth-child(1)').text(),10);
+            console.log($(el).find(".list-i-img") == null);
             return new Article({
-            id: parseInt($(el).children('td:nth-child(1)').text(),10),
-            title: $(el).children('td:nth-child(2)').find('m-tcol-c').text(),
-            username: $(el).children('td:nth-child(3)').find('m-tcol-c').text()//,
-            //link: query(el).children('td:nth-child(3)').find('m-tcol-c').html()
-            //userid: Number.parseInt(query(query(el).children('td:nth-child(3)').find('m-tcol-c')).attr('onclick').split(",")[1].split(",")[1])//
+            id: arid,
+            title: $(el).children('td:nth-child(2)').find('.m-tcol-c').text(),
+            username: $(el).children('td:nth-child(3)').find('.m-tcol-c').text(),
+            link: "http://cafe.naver.com/" + clickscript.split(",")[8].split("'")[1] + "/" + arid,
+            userid: clickscript.split(",")[1].split("\'")[1],
+            flags: Article.flag(
+                $(el).find(".list-i-upload").length > 0,
+                $(el).find(".list-i-img").length > 0,
+                $(el).find(".list-i-movie").length > 0,
+                $(el).find(".list-i-poll").length > 0,
+                $(el).find(".ico-q").length > 0)
         })}).get();
         for(let article of articleList){
-            console.log(article.username + "");
+            console.log(article.id + " / " + article.title + " / " + article.username + " / " + article.link + " / " + article.userid);
         }
+        return Promise.resolve<Array<Article>>(articleList);
+        /*
+        return new Promise<Array<Article>>((resolve) => {
+            resolve(articleList);
+        });
+        */
+    }
+    export async function getComments(cafeid:number,articleid:number):Promise<Array<Comment>>{
+        let params:Object = {
+            'search.clubid':cafeid.toString(),
+            'search.articleid':articleid.toString(),
+            'search.orderby':"desc"
+        }
+        let $:any = await getWeb(articleURL,params);
+
+        if($.title().indexOf("로그인") >= 0){
+            console.log("네이버 게시물을 전체 공개로 해주세요.");
+            return Promise.reject("Memeber_open");
+        }
+        $.find('.u_cbox_comment').filter((i,el) => {
+            return !$(el).hasClass("re");
+        }).map((i,el) => {
+            let author:any = $(el).find(".u_cbox_info_main").find("a");
+            $(el).find(".u_cbox_info_main").find("a");
+            
+        }).get();
+        // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
     }
 }
 

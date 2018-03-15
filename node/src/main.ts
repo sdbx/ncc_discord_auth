@@ -7,8 +7,9 @@ class Inner {
     }
 }
 Inner.main();
+/*
 fetcher.getWeb("http://cafe.naver.com/ArticleList.nhn", {
     'search.clubid':'26686242',
     'search.boardtype':'L'
-})
+})*/
 fetcher.getArticles(26686242);
