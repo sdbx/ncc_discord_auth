@@ -4,6 +4,8 @@ import * as request from 'request-promise-native';
 import * as Long from 'long';
 
 const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
+const commentURL:string = "https://m.cafe.naver.com/CommentView.nhn";
+
 export class Article {
     public static readonly FLAG_FILE:number = 0b10000;
     public static readonly FLAG_IMAGE:number = 0b1000;
@@ -54,18 +56,23 @@ export class Comment {
         this.timestamp = (con.timestamp == null) ? Date.now() : con.timestamp;
     }
     public getTimeDiffer(){
-        return Date.now() - this.timestamp;
+        return new Date().getTime() - this.timestamp;
     }
 }
 
 export module fetcher {
-    async function getWeb(requrl:string,param:object) {
+    async function getWeb(requrl:string,param:object,convert:boolean=false) {
         let buffer = await request({
             url: requrl,
             qs: param,
             encoding: null
         });
-        let body:string = encoding.convert(buffer, "utf-8","euc-kr").toString();
+        let body:string;
+        if(convert){
+            body = encoding.convert(buffer, "utf-8","euc-kr").toString();
+        }else{
+            body = buffer;
+        }
         return cheerio.load(body);
     }
     export async function getArticles(cafeid:Number):Promise<Array<Article>> {
@@ -74,13 +81,12 @@ export module fetcher {
             'search.boardtype':"L",
             'userDisplay':"5"
         }
-        let $:any = await getWeb(articleURL,params);
+        let $:any = await getWeb(articleURL,params,true);
         
         let articleList:Array<Article> = $('[name="ArticleList"] > table > tbody > tr:nth-child(2n+1)')
         .map((i, el) => { //console.log($(el).children('td:nth-child(3)').html());
             let clickscript:string = $(el).children('td:nth-child(3)').find('.m-tcol-c').attr('onclick');
             let arid:number = parseInt($(el).children('td:nth-child(1)').text(),10);
-            console.log($(el).find(".list-i-img") == null);
             return new Article({
             id: arid,
             title: $(el).children('td:nth-child(2)').find('.m-tcol-c').text(),
@@ -110,19 +116,35 @@ export module fetcher {
             'search.articleid':articleid.toString(),
             'search.orderby':"desc"
         }
-        let $:any = await getWeb(articleURL,params);
+        let $:any = await getWeb(commentURL,params);
 
-        if($.title().indexOf("로그인") >= 0){
+        if($("title").text().indexOf("로그인") >= 0){
             console.log("네이버 게시물을 전체 공개로 해주세요.");
             return Promise.reject("Memeber_open");
         }
-        $.find('.u_cbox_comment').filter((i,el) => {
+        //console.log( $('.u_cbox_comment').html());
+        let comments:Array<Comment> = $('.u_cbox_comment').filter((i,el) => {
             return !$(el).hasClass("re");
         }).map((i,el) => {
             let author:any = $(el).find(".u_cbox_info_main").find("a");
-            $(el).find(".u_cbox_info_main").find("a");
-            
+            let reft:string = author.attr("href");
+            let tstring:string = $(el).find(".u_cbox_date").text(); 
+
+            let ymd:Array<string> = tstring.split(".");
+            let hm:Array<string> = ymd[ymd.length-1].split(":");
+            return new Comment({
+                userid:reft.substring(reft.lastIndexOf("=")+1),
+                nickname:author.text(),
+                content:$(el).find(".u_cbox_contents").text(),
+                timestamp:new Date(parseInt(ymd[0]),parseInt(ymd[1])-1,parseInt(ymd[2]),parseInt(hm[0].substr(1)),parseInt(hm[1])).getTime()-32400000
+            });
         }).get();
+
+        for(let comment of comments){
+            console.log(comment.userid + " / " + comment.nickname + " / " + comment.content + " / " + comment.timestamp);
+        }
+
+        return Promise.resolve<Array<Comment>>(comments);
         // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
     }
 }
