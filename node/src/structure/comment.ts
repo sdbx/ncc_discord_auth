@@ -4,7 +4,7 @@ export default class Comment {
     public nickname:string;
     public timestamp:number;
 
-    public constructor(con:any) {
+    public constructor(con:{content:string,userid:string,nickname:string,timestamp:number}) {
         this.content = con.content;
         this.userid = con.userid;
         this.nickname = con.nickname;

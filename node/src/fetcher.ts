@@ -9,7 +9,7 @@ const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
 const commentURL:string = "https://m.cafe.naver.com/CommentView.nhn";
 
 async function getWeb(requrl:string, param:object, convert:boolean = false) {
-    const buffer = await request({
+    const buffer:any = await request({
         url: requrl,
         qs: param,
         encoding: null,
@@ -48,7 +48,7 @@ export async function getArticles(cafeid:number):Promise<Article[]> {
             $(el).find(".ico-q").length > 0),
     });}).get();
     for (const article of articleList) {
-        console.log(article.id + " / " + article.title + " / " + article.username + " / " + article.link + " / " + article.userid);
+        console.log(article);
     }
     return Promise.resolve<Article[]>(articleList);
     /*

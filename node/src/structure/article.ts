@@ -16,8 +16,8 @@ export default class Article {
     public flags:number; // int, (file,image,video,question,vote)
     public username:string;
     public userid:string; // real user identifier
-    public link:URL; // url
-    public constructor(con:any) {
+    public link:string; // url
+    public constructor(con:{id:number,title:string,username:string,userid:string,link:string,flags:number}) {
         this.id = (con.id == null) ? -1 : con.id;
         this.title = con.title;
         this.username = con.username;
