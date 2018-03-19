@@ -1,9 +1,8 @@
-import {fetcher} from './fetcher';
-import * as Fetcher from './fetcher';
+import * as fetcher from "./fetcher";
 
 class Inner {
     public static main():number {
-        console.log('hello world');
+        console.log("hello world");
         return 0;
     }
 }
