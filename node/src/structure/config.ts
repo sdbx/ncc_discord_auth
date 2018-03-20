@@ -1,10 +1,6 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import { promisify } from "util";
 
-const readfile = promisify(fs.readFile);
-const writefile = promisify(fs.writeFile);
-const access = promisify(fs.access);
-const mkdir = promisify(fs.mkdir);
 export default class Config {
     public static readonly appVersion:number = 1;
     public version:number = Config.appVersion;
@@ -18,12 +14,22 @@ export default class Config {
         if (await this.checkDir()) {
             const write:string = JSON.stringify(this,(key:string,value:any) => {
                 if (key === "saveTo" || key === "dirpath") {
-                    value = "Constant";
+                    value = "____";
+                }
+                if (key === "version"){
+                    value = Config.appVersion;
                 }
                 return value;
             },"\t");
-            const result = await access(this.saveTo,fs.constants.W_OK)
-                .then(() => writefile(this.saveTo,write,{encoding:"utf-8"}))
+            const result = await fs.access(this.saveTo,fs.constants.W_OK)
+                .catch((err:any) => {
+                    if (err.code === "ENOENT") {
+                        return;
+                    } else {
+                        throw err;
+                    }
+                })
+                .then(() => fs.writeFile(this.saveTo,write,{encoding:"utf-8"}))
                 .then(() => true)
                 .catch((err) => {console.log(err); return false;});
             return Promise.resolve(result);
@@ -34,11 +40,11 @@ export default class Config {
         }
     }
     public async import(createIfNeed:boolean = false):Promise<void> {
-        const accessible = await access(this.saveTo,fs.constants.R_OK)
-                                .then(() => true)
-                                .catch(() => false);
+        const accessible:boolean = await fs.stat(this.saveTo)
+                        .then((stat:fs.Stats) => true)
+                        .catch((err:any) => false);
         if (accessible) {
-            const text:string = await readfile(this.saveTo,{encoding:"utf-8"});
+            const text:string = await fs.readFile(this.saveTo,{encoding:"utf-8"});
             const data:any = JSON.parse(text);
             data.saveTo = null;
             data.dirpath = null;
@@ -48,15 +54,18 @@ export default class Config {
         } else {
             console.error("Can't read config file");
             if (createIfNeed) {
-                await this.export();
+                const result:boolean = await this.export();
+                if (!result) {
+                    return Promise.reject("Can't access directory");
+                }
             }
             return Promise.resolve();
         }
     }
     private async checkDir():Promise<boolean> {
-        return await access(this.dirpath,fs.constants.R_OK | fs.constants.W_OK)
+        return await fs.access(this.dirpath,fs.constants.R_OK | fs.constants.W_OK)
             .then(() => Promise.resolve(true))
-            .catch((err) => mkdir(this.dirpath,0o777))
+            .catch((err) => fs.mkdir(this.dirpath))
             .then(() => Promise.resolve(true))
             .catch((err) => Promise.resolve(false));
     }
