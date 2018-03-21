@@ -1,10 +1,17 @@
 import * as fs from "fs-extra";
 import { promisify } from "util";
+import * as fetcher from "../fetcher";
 
 export default class Config {
-    public static readonly appVersion:number = 1;
+    public static readonly appVersion:number = 2;
     public version:number = Config.appVersion;
     public discordID:DiscordID = new DiscordID();
+    public cafe:Cafe = new Cafe();
+    public game:Game = new Game();
+    public discordToken:string = "token";
+    public roleName:string = "@everyone";
+    public articleCfg:ArticleCfg = new ArticleCfg();
+
     private readonly saveTo:string = "./config/config.json";
     private readonly dirpath:string = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
     public constructor() {
@@ -14,10 +21,10 @@ export default class Config {
         if (await this.checkDir()) {
             const write:string = JSON.stringify(this,(key:string,value:any) => {
                 if (key === "saveTo" || key === "dirpath") {
-                    value = "____";
+                    value = "Constant";
                 }
-                if (key === "version"){
-                    value = Config.appVersion;
+                if (key === "version") {
+                    value = Config.appVersion.toString();
                 }
                 return value;
             },"\t");
@@ -26,6 +33,7 @@ export default class Config {
                     if (err.code === "ENOENT") {
                         return;
                     } else {
+                        console.log(err.code);
                         throw err;
                     }
                 })
@@ -49,6 +57,20 @@ export default class Config {
             data.saveTo = null;
             data.dirpath = null;
             this.clone(data,this);
+            let force:boolean = false;
+            if (this.cafe.url.match(/^(http|https):\/\/.*cafe.naver.com\/.*/igm).length >= 1
+                && (this.cafe.id <= 0 || this.cafe.article <= 0)) {
+                const localCafe:Cafe = await fetcher.parseNaver(this.cafe.url)
+                                            .then((cafe:Cafe) => cafe)
+                                            .catch((err:any) => new Cafe());
+                if (!Number.isNaN(localCafe.id) && localCafe.id > 0) {
+                    this.cafe = localCafe;
+                    force = true;
+                }
+            }
+            if (data.version < Config.appVersion || force) {
+                await this.export();
+            }
             // console.log(JSON.stringify(this));
             return Promise.resolve();
         } else {
@@ -99,8 +121,37 @@ export class DiscordID {
     public room:number = 0;
     public botChannel:number = 0;
     public welcomeChannel:number = 0; // discordMainChID
+    public articleChannels:number[] = [];
 }
 export class Message {
     public welcome:string = "Hello!";
     public authed:string = "Authed";
+}
+export class Cafe {
+    public url:string = "";
+    public id:number = 0;
+    public article:number = 0;
+}
+export class Game {
+    public static readonly Playing:string = "playing";
+    public static readonly Watching:string = "watching";
+    public static readonly Listening:string = "listening";
+    public static readonly Streaming:string = "streaming";
+    public name:string = "Bots";
+    public type:string = "Playing";
+    public getID(type:string):number {
+        const order:string[] = [Game.Playing,Game.Watching,Game.Listening,Game.Streaming];
+        let out:number = 0;
+        for (let i = 0;i < order.length;i += 1) {
+            if (order[i].toLowerCase() === type.toLowerCase()) {
+                out = i;
+                break;
+            }
+        }
+        return out;
+    }
+}
+export class ArticleCfg {
+    public enableAlert:boolean = false;
+    public updateSec:number = 120;
 }
