@@ -5,12 +5,12 @@ import * as fetcher from "../fetcher";
 export default class Config {
     public static readonly appVersion:number = 2;
     public version:number = Config.appVersion;
-    public discordID:DiscordID = new DiscordID();
-    public cafe:Cafe = new Cafe();
+    public discordID:IDiscordID = {articleChannels:[]} as any;
+    public cafe:ICafe = {} as any;
     public game:Game = new Game();
     public discordToken:string = "token";
     public roleName:string = "@everyone";
-    public articleCfg:ArticleCfg = new ArticleCfg();
+    public articleCfg:IArticleCfg = {} as any;
 
     private readonly saveTo:string = "./config/config.json";
     private readonly dirpath:string = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
@@ -60,9 +60,9 @@ export default class Config {
             let force:boolean = false;
             if (this.cafe.url.match(/^(http|https):\/\/.*cafe.naver.com\/.*/igm).length >= 1
                 && (this.cafe.id <= 0 || this.cafe.article <= 0)) {
-                const localCafe:Cafe = await fetcher.parseNaver(this.cafe.url)
-                                            .then((cafe:Cafe) => cafe)
-                                            .catch((err:any) => new Cafe());
+                const localCafe:ICafe = await fetcher.parseNaver(this.cafe.url)
+                                            .then((cafe:ICafe) => cafe)
+                                            .catch((err:any) => this.cafe);
                 if (!Number.isNaN(localCafe.id) && localCafe.id > 0) {
                     this.cafe = localCafe;
                     force = true;
@@ -117,28 +117,32 @@ export default class Config {
         return copy;
     }
 }
-export class DiscordID {
-    public room:number = 0;
-    public botChannel:number = 0;
-    public welcomeChannel:number = 0; // discordMainChID
-    public articleChannels:number[] = [];
+export interface IDiscordID {
+    room:number;
+    botChannel:number;
+    welcomeChannel:number; // discordMainChID
+    articleChannels:number[];
 }
-export class Message {
-    public welcome:string = "Hello!";
-    public authed:string = "Authed";
+export interface IMessage {
+    welcome:string;
+    authed:string;
 }
-export class Cafe {
-    public url:string = "";
-    public id:number = 0;
-    public article:number = 0;
+export interface ICafe {
+    url:string;
+    id:number;
+    article:number;
 }
 export class Game {
     public static readonly Playing:string = "playing";
     public static readonly Watching:string = "watching";
     public static readonly Listening:string = "listening";
     public static readonly Streaming:string = "streaming";
-    public name:string = "Bots";
-    public type:string = "Playing";
+    public name:string;
+    public type:string;
+    constructor(input:{name:string,type:string}= {name:"Bots",type:"Playing"}) {
+        this.name = input.name;
+        this.type = input.type;
+    }
     public getID(type:string):number {
         const order:string[] = [Game.Playing,Game.Watching,Game.Listening,Game.Streaming];
         let out:number = 0;
@@ -151,7 +155,7 @@ export class Game {
         return out;
     }
 }
-export class ArticleCfg {
-    public enableAlert:boolean = false;
-    public updateSec:number = 120;
+export interface IArticleCfg {
+    enableAlert:boolean;
+    updateSec:number;
 }

@@ -12,7 +12,6 @@ fetcher.getComments(26686242,7212);
 fetcher.getArticles(26686242);
 const cfg:Config = new Config();
 cfg.import(true);
-fetcher.parseNaver("http://cafe.naver.com/sdbx/7212");
 // cfg.export();
 /*
 fetcher.getWeb("http://cafe.naver.com/ArticleList.nhn", {

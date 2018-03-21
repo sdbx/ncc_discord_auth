@@ -4,7 +4,7 @@ import * as Long from "long";
 import * as request from "request-promise-native";
 import Article from "./structure/article";
 import Comment from "./structure/comment";
-import { Cafe, Game } from "./structure/config";
+import { Game, ICafe } from "./structure/config";
 import Config from "./structure/config";
 
 const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
@@ -105,21 +105,19 @@ export async function getComments(cafeid:number,articleid:number):Promise<Commen
     return Promise.resolve<Comment[]>(comments);
     // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
 }
-export async function parseNaver(url:string):Promise<Cafe> {
-    const out:Cafe = new Cafe();
-    out.url = url;
-
-    const $:any = await getWeb(url,{},true);
+export async function parseNaver(purl:string):Promise<ICafe> {
+    const $:any = await getWeb(purl,{},true);
     if ($("title").text().indexOf("로그인") >= 0) {
         console.log("네이버 게시물을 전체 공개로 해주세요.");
         return Promise.reject("Memeber_open");
     }
     // console.log("aa: " + $("#main-area > script").html());
     const src:string = $("#main-area > script").html();
-    out.id = Number.parseInt(src.match(/clubid=[0-9]*/m)[0].split("=")[1]);
-    out.article = Number.parseInt(src.match(/articleid=[0-9]*/m)[0].split("=")[1]);
-    console.log(out);
-    return Promise.resolve(out);
+    return Promise.resolve({
+        id: Number.parseInt(src.match(/clubid=[0-9]*/m)[0].split("=")[1]),
+        article: Number.parseInt(src.match(/articleid=[0-9]*/m)[0].split("=")[1]),
+        url: purl,
+    } as ICafe);
 }
 
 export function genflag(input:number,...arg:boolean[]):number {
