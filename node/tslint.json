@@ -29,7 +29,8 @@
         "max-line-length": {"options":[120], "severity":"warning"},
         "quotemark": [true, "double", "avoid-escape"],
         "max-classes-per-file": {"options":[10], "severity":"warning"},
-        "variable-name": {"options":["allow-leading-underscore"],"severity": "warning"}
+        "variable-name": {"options":["allow-leading-underscore"],"severity": "warning"},
+        "forin": false,
     },
     "rulesDirectory": []
 }
