@@ -22,15 +22,15 @@
               "variable-declaration": "nospace"
             }
         ],
-        "whitespace": [true, "check-branch", "check-decl", "check-operator", "check-module", "check-typecast", "check-type-operator", "check-preblock"],
+        "whitespace": {"options":["check-branch", "check-decl", "check-operator", "check-module", "check-typecast", "check-type-operator", "check-preblock"]},
         "no-bitwise": false,
         "object-literal-sort-keys": false,
         "no-console": false,
         "max-line-length": {"options":[120], "severity":"warning"},
-        "quotemark": [true, "double", "avoid-escape"],
+        "quotemark": {"options":["double", "avoid-escape"]},
         "max-classes-per-file": {"options":[10], "severity":"warning"},
         "variable-name": {"options":["allow-leading-underscore"],"severity": "warning"},
-        "forin": false,
+        "forin": false
     },
     "rulesDirectory": []
 }
