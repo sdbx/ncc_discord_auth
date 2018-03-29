@@ -30,7 +30,8 @@
         "quotemark": {"options":["double", "avoid-escape"]},
         "max-classes-per-file": {"options":[10], "severity":"warning"},
         "variable-name": {"options":["allow-leading-underscore"],"severity": "warning"},
-        "forin": false
+        "forin": false,
+        "no-string-literal": false
     },
     "rulesDirectory": []
 }

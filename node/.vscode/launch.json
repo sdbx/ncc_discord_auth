@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/src\\main.ts",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
-            ]
+            ],
         }
     ]
 }
