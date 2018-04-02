@@ -17,13 +17,13 @@ const res:string = "C:/Users/user/Documents/FTP/Scanned/export__/";
 const id_list:string = "C:/Users/user/Documents/FTP/Scanned/export__/etc/20180328175607_문서등록대장목록_2.xlsx";
 const output:string = "C:/Users/user/Documents/output.xlsx";
 const added:string[] = [];
-const ids:object[] = XlsxUtil.getXLSXTable(id_list,"asdf");
+const ids:object[] = XlsxUtil.getXLSXTable(id_list);
 
 const xlsxlist:string[] = fs.readdirSync(input).map((v) => {return {
         name:v,
         time:fs.statSync(res + v).mtime.getTime(),
     };})
-    .sort((a, b) => -1 * (a.time - b.time))
+    .sort((a, b) => (a.time - b.time))
     .filter((v) => v.name.endsWith(".xlsx"))
     .map((v) => v.name);
 /**
@@ -50,6 +50,7 @@ dateOverride.set(26,new Date(2017,4 - 1,11,0));
 /**
  * Mod any
  */
+const test_docs:XlsxUtil = new XlsxUtil();
 xlsxlist.forEach((value, i) => {
     if (!value.endsWith(".xlsx")) {
         return;
@@ -75,8 +76,9 @@ xlsxlist.forEach((value, i) => {
             date.setDate(date.getDate() - 1);
         }while (date.getDay() === 0 || date.getDay() === 6);
     }
-    const v:object[] = XlsxUtil.getXLSXTable(input + "/" + value,"aa");
+    const v:object[] = XlsxUtil.getXLSXTable(input + "/" + value);
     console.log(input + "/" + value);
+    let exclude:boolean = true;
     const exp:object[] = v.filter((data,index) => {
         return data["수신기관"] != null && (data["수신기관"] as string).indexOf("천안시") >= 0; // false: 스킵
     }).map((data, index) => {
@@ -115,8 +117,12 @@ xlsxlist.forEach((value, i) => {
                 }
             }
         });
+        exclude = false;
         return obj;
     });
+    if (exclude) {
+        test_docs.addCells([{_docid:docid,_index:i,_time:doctime.join(".")}]);
+    }
     if (exp != null && exp.length > 0) {
         added.push(value);
     }
@@ -137,3 +143,4 @@ function getKeyRegex(data:object,...regexes:RegExp[]):any {
  * Export to
  */
 toFile.exportXLSX(output);
+// test_docs.exportXLSX("C:/Users/user/Documents/a.xlsx");

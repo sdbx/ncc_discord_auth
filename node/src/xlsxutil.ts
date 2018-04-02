@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as XLSX from "xlsx";
 
 export default class XlsxUtil {
-    public static getXLSXTable(path:string,sheet:string):object[] {
+    public static getXLSXTable(path:string,sheet:string = null):object[] {
         const out:object[] = [];
         const arr_xlsx:Array<Array<[string,string | number | Date]>> = this.getXLSXTableAsArray(path,sheet);
         for (const index in arr_xlsx) {
@@ -44,6 +44,9 @@ export default class XlsxUtil {
             const headers:object = {};
             const data = [];
 
+            if (sheet !== null && y !== sheet) {
+                return;
+            }
             let col:string;
             let row:number;
             let value:any;
@@ -226,6 +229,22 @@ export default class XlsxUtil {
           return false;
         }
         return typeof obj[Symbol.iterator] === "function";
+    }
+    /**
+     * Get value of object matching regex and key
+     * @param data object to find
+     * @param key_regex Regex[es]
+     */
+    public static getByRegex(data:object,...key_regex:RegExp[]):any {
+        const entries:Array<[string,any]> = Object.entries(data);
+        for (const [key,value] of entries) {
+            for (const regex of key_regex) {
+                if (key.match(regex)) {
+                    return value;
+                }
+            }
+        }
+        return null;
     }
     /**
      * @static ends
