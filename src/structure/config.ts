@@ -2,93 +2,92 @@ import * as fs from "fs-extra";
 import fetcher from "../fetcher";
 
 export default class Config {
-    public static readonly appVersion:number = 2;
-    public version:number = Config.appVersion;
+    public static readonly appVersion:number = 2; // app version
+    private static readonly defaultWhitelist:string = "appVersion,defaultWhitelist,saveTo,_whitelist,whitelist,dirpath";
+    public version:number; // config version
+    protected saveTo:string; // save location
+    protected whitelist:string[]; // whitelist for config
+    /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
     public cafe:ICafe = {} as any;
     public game:Game = new Game();
     public discordToken:string = "token";
     public roleName:string = "@everyone";
     public articleCfg:IArticleCfg = {} as any;
+    */
 
-    private readonly saveTo:string = "./config/config.json";
+    // private readonly saveTo:string = "./config/config.json";
     private readonly dirpath:string = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
-    public constructor() {
-        console.log("Hi");
+    /**
+     * Create constructor
+     * @param _name Name of config
+     * @param _version Version
+     */
+    public constructor(_name:string,_version:number = Config.appVersion) {
+        this.saveTo = `./config/${_name}.json`;
+        this.version = _version;
+        this.whitelist = [];
     }
-    public async export():Promise<boolean> {
+    /**
+     * export config to file
+     * @returns success? (reject,resolve)
+     */
+    public async export():Promise<void> {
         if (await this.checkDir()) {
-            const write:string = JSON.stringify(this,(key:string,value:any) => {
-                if (key === "saveTo" || key === "dirpath") {
-                    value = "Constant";
-                }
-                if (key === "version") {
-                    value = Config.appVersion.toString();
-                }
-                return value;
-            },"\t");
-            const result = await fs.access(this.saveTo,fs.constants.W_OK)
-                .catch((err:any) => {
-                    if (err.code === "ENOENT") {
-                        return;
-                    } else {
-                        console.log(err.code);
-                        throw err;
-                    }
-                })
+            // make whitelist
+            const ignore:string[] = this.whitelist.map(a => Object.assign({}, a));
+            Config.defaultWhitelist.split(",").forEach(v => ignore.push(v));
+
+            const write:string = JSON.stringify(this,(key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
+            return await fs.access(this.saveTo,fs.constants.W_OK)
                 .then(() => fs.writeFile(this.saveTo,write,{encoding:"utf-8"}))
-                .then(() => true)
-                .catch((err) => {console.log(err); return false;});
-            return Promise.resolve(result);
+                .then(() => Promise.resolve())
+                .catch(err => Promise.reject(err));
         } else {
             console.error("export - No directory");
-            // return Promise.reject("No directory");
-            return Promise.resolve(false);
+            return Promise.reject("No directory");
         }
     }
-    public async import(createIfNeed:boolean = false):Promise<void> {
-        const accessible:boolean = await fs.stat(this.saveTo)
-                        .then((stat:fs.Stats) => true)
-                        .catch((err:any) => false);
-        if (accessible) {
+    /**
+     * import config from file
+     * @returns success? (reject,resolve)
+     */
+    public async import():Promise<void> {
+        const error:any = await fs.stat(this.saveTo)
+                        .then((stat:fs.Stats) => null)
+                        .catch((err:any) => err);
+        if (error == null) {
+            // load data
             const text:string = await fs.readFile(this.saveTo,{encoding:"utf-8"});
             const data:any = JSON.parse(text);
-            data.saveTo = null;
-            data.dirpath = null;
-            this.clone(data,this);
-            let force:boolean = false;
-            if (this.cafe.url.match(/^(http|https):\/\/.*cafe.naver.com\/.*/igm).length >= 1
-                && (this.cafe.id <= 0 || this.cafe.article <= 0)) {
-                const localCafe:ICafe = await fetcher.parseNaver(this.cafe.url)
-                                            .then((cafe:ICafe) => cafe)
-                                            .catch((err:any) => this.cafe);
-                if (!Number.isNaN(localCafe.id) && localCafe.id > 0) {
-                    this.cafe = localCafe;
-                    force = true;
+            const file_version:number = data.version;
+            // remove non-cloneable
+            const ignore:string[] = this.whitelist.map(a => Object.assign({}, a));
+            Config.defaultWhitelist.split(",").forEach(v => ignore.push(v));
+            ignore.push("version");
+            for (const [key,value] of Object.entries(ignore)) {
+                if (ignore.indexOf(key) >= 0) {
+                    delete data[key];
                 }
             }
-            if (data.version < Config.appVersion || force) {
+            // clone!
+            this.clone(data,this);
+            // update if app version is higher
+            if (file_version < this.version) {
                 await this.export();
             }
-            // console.log(JSON.stringify(this));
             return Promise.resolve();
         } else {
             console.error("Can't read config file");
-            if (createIfNeed) {
-                const result:boolean = await this.export();
-                if (!result) {
-                    return Promise.reject("Can't access directory");
-                }
-            }
-            return Promise.resolve();
+            return Promise.reject(error);
         }
     }
     private async checkDir():Promise<boolean> {
-        return await fs.access(this.dirpath,fs.constants.R_OK | fs.constants.W_OK)
-            .then(() => Promise.resolve(true))
+        return Promise.resolve(await fs.access(this.dirpath,fs.constants.R_OK | fs.constants.W_OK)
+            .then(() => true)
             .catch((err) => fs.mkdir(this.dirpath))
-            .then(() => Promise.resolve(true))
-            .catch((err) => Promise.resolve(false));
+            .then(() => true)
+            .catch((err) => Promise.resolve(false)));
     }
     private clone(obj:any,toObject:any = null):any {
         if (obj === null || typeof(obj) !== "object") {
@@ -116,6 +115,7 @@ export default class Config {
         return copy;
     }
 }
+/*
 export interface IDiscordID {
     room:number;
     botChannel:number;
@@ -158,3 +158,4 @@ export interface IArticleCfg {
     enableAlert:boolean;
     updateSec:number;
 }
+*/

@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import * as encoding from "encoding";
-import request from "request-promise-native";
+const request = require("request-promise-native"); // tslint-disable-line no-var-requires
+// import * as request from "request-promise-native";
 import Article from "./structure/article";
 import Comment from "./structure/comment";
 import { Game, ICafe } from "./structure/config";
@@ -9,7 +10,7 @@ import Config from "./structure/config";
 const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
 const commentURL:string = "https://m.cafe.naver.com/CommentView.nhn";
 
-export default class fetcher {
+export default class Fetcher {
     public static async getWeb(requrl:string, param:object, convert:boolean = false) {
         const buffer:any = await request({
             url: requrl,

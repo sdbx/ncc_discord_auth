@@ -1,12 +1,15 @@
-import fetcher from "./fetcher";
+import Fetcher from "./fetcher";
 import Config from "./structure/config";
 
-fetcher.getComments(26686242,7212);
-fetcher.getArticles(26686242);
+Fetcher.getComments(26686242,7212);
+Fetcher.getArticles(26686242);
 const cfg:Config = new Config();
 cfg.import(true);
 
-console.log(fetcher.parseNaver("https"));
+async function test() {
+    console.log(JSON.stringify(await Fetcher.parseNaver("http://cafe.naver.com/sdbx/7157")));
+}
+test();
 
 // cfg.export();
 /*

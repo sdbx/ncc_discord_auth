@@ -1,4 +1,4 @@
-import * as fetcher from "../fetcher";
+import fetcher from "../fetcher";
 
 export default class Article {
     public static readonly FLAG_FILE:number = 0b10000;

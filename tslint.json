@@ -34,10 +34,11 @@
     "no-console": false,
     "variable-name": [true, "ban-keywords", "check-format", "allow-leading-underscore", "allow-snake-case"],
     "object-literal-sort-keys": false,
-    "no-unnecessary-class": true,
+    "no-unnecessary-class": {"options":[true], "severity":"warn"},
     "no-empty": {"severity": "warning"},
     "no-string-literal": false,
     "prefer-const": {"severity":"warn"},
     "triple-equals": [true, "allow-null-check","allow-undefined-check"],
+    "no-var-requires": false
   }
 }
