@@ -3,8 +3,9 @@ import * as encoding from "encoding";
 const request = require("request-promise-native"); // tslint-disable-line no-var-requires
 // import * as request from "request-promise-native";
 import Article from "./structure/article";
+// import { Game, ICafe } from "./structure/config";
+import Cafe from "./structure/cafe";
 import Comment from "./structure/comment";
-import { Game, ICafe } from "./structure/config";
 import Config from "./structure/config";
 
 const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
@@ -106,7 +107,7 @@ export default class Fetcher {
         return Promise.resolve<Comment[]>(comments);
         // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
     }
-    public static async parseNaver(purl:string):Promise<ICafe> {
+    public static async parseNaver(purl:string):Promise<Cafe> {
         const $:any = await this.getWeb(purl,{},true);
         if ($("title").text().indexOf("로그인") >= 0) {
             console.log("네이버 게시물을 전체 공개로 해주세요.");
@@ -118,20 +119,6 @@ export default class Fetcher {
             id: Number.parseInt(src.match(/clubid=[0-9]*/m)[0].split("=")[1]),
             article: Number.parseInt(src.match(/articleid=[0-9]*/m)[0].split("=")[1]),
             url: purl,
-        } as ICafe);
-    }
-    
-    public static genflag(input:number,...arg:boolean[]):number {
-        const len = arg.length;
-        let out = input;
-        for (const [i, flag] of Object.entries(arg)) {
-            const offset:number = len - Number.parseInt(i) - 1;
-            if (flag) {
-                out |= (1 << offset);
-            } else {
-                out &= ~(1 << offset);
-            }
-        }
-        return out;
-    }    
+        } as Cafe);
+    }   
 }

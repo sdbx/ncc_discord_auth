@@ -1,11 +1,11 @@
 import * as fs from "fs-extra";
+import * as path from "path";
 import fetcher from "../fetcher";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version
-    private static readonly defaultWhitelist:string = "appVersion,defaultWhitelist,saveTo,_whitelist,whitelist,dirpath";
+    private static readonly excludes:string = "appVersion,defaultWhitelist,saveTo,whitelist,dirpath";
     public version:number; // config version
-    protected saveTo:string; // save location
     protected whitelist:string[]; // whitelist for config
     /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
@@ -17,16 +17,24 @@ export default class Config {
     */
 
     // private readonly saveTo:string = "./config/config.json";
-    private readonly dirpath:string = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
+    protected readonly saveTo:string; // save location
+    protected readonly dirpath:string;
     /**
      * Create constructor
      * @param _name Name of config
      * @param _version Version
      */
     public constructor(_name:string,_version:number = Config.appVersion) {
-        this.saveTo = `./config/${_name}.json`;
+        this.dirpath = path.resolve(".");
+        if (this.dirpath.endsWith("build")) {
+            this.dirpath = path.resolve("..");
+        }
+        this.dirpath = path.resolve(this.dirpath,"config");
+        this.saveTo = path.resolve(this.dirpath,`${_name}.json`);
+        // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
         this.whitelist = [];
+        // console.log(`${_name}'s config: ${this.saveTo}`);
     }
     /**
      * export config to file
@@ -36,10 +44,17 @@ export default class Config {
         if (await this.checkDir()) {
             // make whitelist
             const ignore:string[] = this.whitelist.map(a => Object.assign({}, a));
-            Config.defaultWhitelist.split(",").forEach(v => ignore.push(v));
+            Config.excludes.split(",").forEach(v => ignore.push(v));
 
             const write:string = JSON.stringify(this,(key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
             return await fs.access(this.saveTo,fs.constants.W_OK)
+                .catch(err => {
+                    if (err.code === "ENOENT") {
+                        return null;
+                    } else {
+                        throw err;
+                    }
+                })
                 .then(() => fs.writeFile(this.saveTo,write,{encoding:"utf-8"}))
                 .then(() => Promise.resolve())
                 .catch(err => Promise.reject(err));
@@ -53,8 +68,8 @@ export default class Config {
      * @returns success? (reject,resolve)
      */
     public async import():Promise<void> {
-        const error:any = await fs.stat(this.saveTo)
-                        .then((stat:fs.Stats) => null)
+        const error:any = await fs.access(this.saveTo,fs.constants.F_OK | fs.constants.W_OK)
+                        .then(() => null)
                         .catch((err:any) => err);
         if (error == null) {
             // load data
@@ -63,7 +78,7 @@ export default class Config {
             const file_version:number = data.version;
             // remove non-cloneable
             const ignore:string[] = this.whitelist.map(a => Object.assign({}, a));
-            Config.defaultWhitelist.split(",").forEach(v => ignore.push(v));
+            Config.excludes.split(",").forEach(v => ignore.push(v));
             ignore.push("version");
             for (const [key,value] of Object.entries(ignore)) {
                 if (ignore.indexOf(key) >= 0) {
@@ -71,7 +86,7 @@ export default class Config {
                 }
             }
             // clone!
-            this.clone(data,this);
+            this.clone(data);
             // update if app version is higher
             if (file_version < this.version) {
                 await this.export();
@@ -82,37 +97,32 @@ export default class Config {
             return Promise.reject(error);
         }
     }
-    private async checkDir():Promise<boolean> {
+    protected clone(source:any) {
+        for (const key of Object.keys(this)) {
+            if (this.hasOwnProperty(key) && source.hasOwnProperty(key)) {
+                this[key] = this.clone_chain(source[key],this[key]);
+            }
+        }
+    }
+    protected async checkDir():Promise<boolean> {
         return Promise.resolve(await fs.access(this.dirpath,fs.constants.R_OK | fs.constants.W_OK)
             .then(() => true)
             .catch((err) => fs.mkdir(this.dirpath))
             .then(() => true)
             .catch((err) => Promise.resolve(false)));
     }
-    private clone(obj:any,toObject:any = null):any {
-        if (obj === null || typeof(obj) !== "object") {
-            return obj;
+    protected clone_chain<T>(source:any,dest:T):T {
+        if (source == null || !(dest instanceof Object)) {
+            // primitive type
+            return source as T;
         }
-        let copy:any;
-        if (toObject == null) {
-            copy = obj.constructor();
-        } else {
-            copy = toObject;
+        const out:T = dest.constructor();
+        for (const key of Object.keys(out)) {
+            if (out.hasOwnProperty(key) && source.hasOwnProperty(key)) {
+                out[key] = this.clone_chain(source[key],out[key]);
+            }
         }
-        // const copy:any = obj.constructor();
-        for (const attr in obj) {
-          if (obj.hasOwnProperty(attr)) {
-              const value:any = this.clone(obj[attr],toObject[attr]);
-              if (value != null) {
-                  try {
-                    copy[attr] = value;
-                  } catch (err) {
-                      console.log(err);
-                  }
-              }
-          }
-        }
-        return copy;
+        return out;
     }
 }
 /*

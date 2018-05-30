@@ -1,5 +1,3 @@
-import fetcher from "../fetcher";
-
 export default class Article {
     public static readonly FLAG_FILE:number = 0b10000;
     public static readonly FLAG_IMAGE:number = 0b1000;
@@ -8,8 +6,21 @@ export default class Article {
     public static readonly FLAG_VOTE:number = 0b1;
 
     public static flag(file:boolean,image:boolean,video:boolean,question:boolean,vote:boolean,flag:number = 0):number {
-        return fetcher.genflag(flag,file,image,video,question,vote);
+        return this.genflag(flag,file,image,video,question,vote);
     }
+    public static genflag(input:number,...arg:boolean[]):number {
+        const len = arg.length;
+        let out = input;
+        for (const [i, flag] of Object.entries(arg)) {
+            const offset:number = len - Number.parseInt(i) - 1;
+            if (flag) {
+                out |= (1 << offset);
+            } else {
+                out &= ~(1 << offset);
+            }
+        }
+        return out;
+    } 
 
     public id:number; // int, article id
     public title:string; // article title
