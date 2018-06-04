@@ -2,11 +2,11 @@ import * as cheerio from "cheerio";
 import * as encoding from "encoding";
 const request = require("request-promise-native"); // tslint-disable-line no-var-requires
 // import * as request from "request-promise-native";
+import Config from "./config";
 import Article from "./structure/article";
 // import { Game, ICafe } from "./structure/config";
 import Cafe from "./structure/cafe";
 import Comment from "./structure/comment";
-import Config from "./structure/config";
 
 const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
 const commentURL:string = "https://m.cafe.naver.com/CommentView.nhn";

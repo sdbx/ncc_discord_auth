@@ -1,12 +1,12 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import fetcher from "../fetcher";
+import fetcher from "./fetcher";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version
-    private static readonly excludes:string = "appVersion,defaultWhitelist,saveTo,whitelist,dirpath";
+    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath";
     public version:number; // config version
-    protected whitelist:string[]; // whitelist for config
+    protected blacklist:string[]; // blacklist for config
     /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
     public cafe:ICafe = {} as any;
@@ -33,7 +33,7 @@ export default class Config {
         this.saveTo = path.resolve(this.dirpath,`${_name}.json`);
         // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
-        this.whitelist = [];
+        this.blacklist = [];
         // console.log(`${_name}'s config: ${this.saveTo}`);
     }
     /**
@@ -42,8 +42,8 @@ export default class Config {
      */
     public async export():Promise<void> {
         if (await this.checkDir()) {
-            // make whitelist
-            const ignore:string[] = this.whitelist.map(a => Object.assign({}, a));
+            // make blacklist
+            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
             Config.excludes.split(",").forEach(v => ignore.push(v));
 
             const write:string = JSON.stringify(this,(key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
@@ -67,17 +67,18 @@ export default class Config {
      * import config from file
      * @returns success? (reject,resolve)
      */
-    public async import():Promise<void> {
-        const error:any = await fs.access(this.saveTo,fs.constants.F_OK | fs.constants.W_OK)
+    public async import(write:boolean = false):Promise<void> {
+        const error:any = await fs.access(this.saveTo,fs.constants.F_OK | fs.constants.R_OK)
                         .then(() => null)
                         .catch((err:any) => err);
+        let file_version = Number.MAX_SAFE_INTEGER;
         if (error == null) {
             // load data
             const text:string = await fs.readFile(this.saveTo,{encoding:"utf-8"});
             const data:any = JSON.parse(text);
-            const file_version:number = data.version;
+            file_version = data.version;
             // remove non-cloneable
-            const ignore:string[] = this.whitelist.map(a => Object.assign({}, a));
+            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
             Config.excludes.split(",").forEach(v => ignore.push(v));
             ignore.push("version");
             for (const [key,value] of Object.entries(ignore)) {
@@ -87,14 +88,19 @@ export default class Config {
             }
             // clone!
             this.clone(data);
-            // update if app version is higher
-            if (file_version < this.version) {
-                await this.export();
-            }
-            return Promise.resolve();
         } else {
             console.error("Can't read config file");
-            return Promise.reject(error);
+            if (write) {
+                return await this.export().then(() => Promise.resolve()).catch((err) => Promise.reject(err));
+            } else {
+                return Promise.reject(error);
+            }
+        }
+        // update if app version is higher or write
+        if (file_version < this.version || write) {
+            return await this.export().then(() => Promise.resolve()).catch((err) => Promise.reject(err));
+        } else {
+            return Promise.resolve();
         }
     }
     protected clone(source:any) {
