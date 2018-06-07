@@ -25,7 +25,20 @@ export default class Runtime {
     }
     protected async onMessage(msg:Discord.Message) {
         if (this.cfg.prefix.test(msg.content)) {
-            await msg.channel.sendMessage("프레타다냥");
+            const lv = msg.content.split(" ");
+            if (lv.length >= 2) {
+                for (const [_name,role] of msg.guild.roles) {
+                    const name = role.name;
+                    if (name.startsWith("__")) {
+                        if (name === `__${lv[1]}`) {
+                            await msg.member.addRole(role,"Color");
+                        } else {
+                            await msg.member.removeRole(role,"Color");
+                        }
+                    }
+                }
+                await msg.channel.sendMessage("적용됐다냥");
+            }
         }
     }
 }
