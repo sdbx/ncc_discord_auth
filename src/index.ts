@@ -1,7 +1,8 @@
 import Runtime from "./discord/runtime";
+import Ncc from "./ncc/ncc";
 async function init() {
     const run:Runtime = new Runtime();
-    run.start();
+    await run.start();
     /*
     const cfg = new Bot();
     await cfg.import(true).catch((err) => null);

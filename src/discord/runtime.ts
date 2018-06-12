@@ -30,7 +30,7 @@ export default class Runtime {
                 for (const [_name,role] of msg.guild.roles) {
                     const name = role.name;
                     if (name.startsWith("__")) {
-                        if (name === `__${lv[1]}`) {
+                        if (name === `__${lv[lv.length - 1]}`) {
                             await msg.member.addRole(role,"Color");
                         } else {
                             await msg.member.removeRole(role,"Color");
@@ -44,7 +44,7 @@ export default class Runtime {
 }
 class Bot extends Config {
     public token = "Bot token";
-    protected prefixRegex = (/^(네코\s*메이드\s+|)(프레|레타|프레타|프렛땨|네코)(야|[짱|쨩](아|)|님)/).source;
+    protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코)(야|[짱쨩]아?|님)/).source;
     constructor() {
         super("bot");
         this.blacklist.push("prefix","prefixRegex");
