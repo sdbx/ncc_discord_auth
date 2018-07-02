@@ -118,7 +118,7 @@ export default class Config {
             .catch((err) => Promise.resolve(false)));
     }
     protected clone_chain<T>(source:any,dest:T):T {
-        if (source == null || !(dest instanceof Object)) {
+        if (source == null || !(dest instanceof Object) || dest == null) {
             // primitive type
             return source as T;
         }

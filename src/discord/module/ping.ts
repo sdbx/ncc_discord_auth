@@ -1,19 +1,17 @@
 import * as Discord from "discord.js";
-import Plugin from "../plugin";
+import Plugin, { CmdParam } from "../plugin";
 
 export default class Ping extends Plugin {
     public async init(cl:Discord.Client) {
-        super.init(cl);
-        this.client.on("message",this.onMessage.bind(this));
-        return Promise.resolve();
+        return super.init(cl);
     }
     public async ready() {
-        console.log("ping ready");
-        return Promise.resolve();
+        return super.ready();
     }
-    private async onMessage(msg:Discord.Message) {
-        if (msg.content === "!ping") {
-            msg.reply("pong!");
+    public async onCommand(msg:Discord.Message, param:CmdParam):Promise<void> {
+        if (param.cmd === "핑") {
+            msg.reply(`퐁! \`${this.client.ping}\``);
         }
+        return Promise.resolve();
     }
 }

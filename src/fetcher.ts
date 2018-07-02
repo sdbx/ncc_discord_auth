@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import * as encoding from "encoding";
-const request = require("request-promise-native"); // tslint-disable-line no-var-requires
+import * as request from "request-promise-native";
+// const request = require("request-promise-native"); // tslint-disable-line no-var-requires
 // import * as request from "request-promise-native";
 import Config from "./config";
 import Article from "./structure/article";
