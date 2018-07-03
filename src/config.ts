@@ -4,9 +4,9 @@ import fetcher from "./fetcher";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version
-    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath";
+    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName";
     public version:number; // config version
-    protected blacklist:string[]; // blacklist for config
+    public blacklist:string[]; // blacklist for config
     /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
     public cafe:ICafe = {} as any;
@@ -16,6 +16,7 @@ export default class Config {
     public articleCfg:IArticleCfg = {} as any;
     */
 
+    public readonly configName:string;
     // private readonly saveTo:string = "./config/config.json";
     protected readonly saveTo:string; // save location
     protected readonly dirpath:string;
@@ -34,6 +35,7 @@ export default class Config {
         // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
         this.blacklist = [];
+        this.configName = _name;
         // console.log(`${_name}'s config: ${this.saveTo}`);
     }
     /**

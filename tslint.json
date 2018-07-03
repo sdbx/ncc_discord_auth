@@ -34,7 +34,7 @@
     "no-console": false,
     "variable-name": [true, "ban-keywords", "check-format", "allow-leading-underscore", "allow-snake-case"],
     "object-literal-sort-keys": false,
-    "no-unnecessary-class": {"options":[true], "severity":"warn"},
+    "no-unnecessary-class": {"severity":"warn"},
     "no-empty": {"severity": "warning"},
     "no-string-literal": false,
     "prefer-const": {"severity":"warn"},

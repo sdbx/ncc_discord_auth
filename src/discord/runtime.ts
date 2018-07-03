@@ -5,10 +5,12 @@ import Plugin, { CmdParam } from "./plugin";
 import Auth from "./module/auth";
 import Ping from "./module/ping";
 
-const expDest = /[\w가-힣 ]+?(을|를|좀)/i;
-const expCmd = /[\w가-힣]+(줘|해)/i;
-const expCmdSuffix = /(해|줘|해줘)/i;
+const expDest = /.+?(을|를|좀)\s+/i;
+const expCmd = /[\w가-힣]+(줘|해)/ig;
+const expCmdSuffix = /(해|줘|해줘)/ig;
 const expCmdFilter = /[가-힣\w]+/i;
+const expSet = /(설정|세팅|정|바꿔)/ig;
+const expTo = /(으로|로)/ig;
 export default class Runtime {
     private cfg = new Bot();
     private client:Discord.Client;
@@ -39,12 +41,13 @@ export default class Runtime {
             chain = chain.replace(prefix,"");
             // test destination
             if (expDest.test(chain)) {
-                params.dest = chain.match(expDest)[0].split(" ").filter(this.filterEmpty);
+                params.dest = chain.match(expDest)[0].trim().split(" ").filter(this.filterEmpty)
                 chain = chain.replace(expDest,"");
             }
             // test command
             if (expCmd.test(chain)) {
-                params.cmd = chain.match(expCmd)[0];
+                const cmdarr = chain.match(expCmd);
+                params.cmd = cmdarr[cmdarr.length - 1];
                 chain = chain.replace(expCmd, "");
             } else {
                 params.cmd = chain.substr(chain.lastIndexOf(" ")).trim();
@@ -61,6 +64,20 @@ export default class Runtime {
             }
             // etc..
             params.etc = chain.split(" ").filter(this.filterEmpty);
+            // check export
+            if (expSet.test(params.cmd)) {
+                // wow global setting mod!
+                if (params.dest.length === 1 && params.etc.length >= 1) {
+                    let endsStr = chain;
+                    const endsWithDest = endsStr.match(expTo);
+                    if (endsWithDest != null) {
+                        endsStr = endsStr.substring(0,endsStr.lastIndexOf(endsWithDest[endsWithDest.length - 1]));
+                    }
+                    await Promise.all(this.plugins.map((value) => value.changeConfig.bind(value)(params.dest[params.dest.length - 1],endsStr)));
+                } else {
+                    msg.channel.send(this.cfg.textWrong);
+                }
+            }
             // dispatch command
             await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg,params)));
         } else {
@@ -72,6 +89,7 @@ export default class Runtime {
     }
 }
 class Bot extends Config {
+    public textWrong = "잘못됐다냥!";
     public token = "Bot token";
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {
