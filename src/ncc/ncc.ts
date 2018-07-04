@@ -1,5 +1,6 @@
 import Session, { Credentials } from "node-ncc-es6";
 import * as read from "read";
+import { CookieJar } from "tough-cookie";
 import Config from "../config";
 
 export default class Ncc {
@@ -23,16 +24,19 @@ export default class Ncc {
             this.credit = await this.requestCredent(this.auth.username);
         } else {
             this.credit = new Credentials("id","pw");
-            this.credit.setCookieJar(this.auth.cookie);
+            this.credit.setCookieJar(this.auth.cookie as CookieJar);
         }
         this.session = new Session(this.credit);
 
-        const name = await this.credit.validateLogin().then((username) => username).catch((() => this.credit.login()).bind(this)).then((() => {
+        const name:string = await this.credit.validateLogin().then((username) => username).catch((() => this.credit.login()).bind(this)).then((() => {
             this.auth.cookie = this.credit.getCookieJar();
+            return null;
             // return this.auth.export();
-        }).bind(this)).catch((err) => console.log(err.stack));
+        }).bind(this)).then(() => null).catch((err) => console.log(err.stack));
         if (name != null) {
             console.log(`Username: ${name}`);
+        } else {
+            console.log(`Username: ${await this.credit.validateLogin()}`);
         }
         await this.session.connect();
         return Promise.resolve(this.session);
@@ -44,7 +48,7 @@ export default class Ncc {
     }
 }
 class Cookie extends Config {
-    public cookie:object = null;
+    public cookie:CookieJar = null;
     public username:string = "";
     constructor() {
         super("cookie");
