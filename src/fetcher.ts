@@ -9,7 +9,7 @@ import Article from "./structure/article";
 import Cafe from "./structure/cafe";
 import Comment from "./structure/comment";
 
-const articleURL:string = "http://cafe.naver.com/ArticleList.nhn";
+const articleURL:string = "https://cafe.naver.com/ArticleList.nhn";
 const commentURL:string = "https://m.cafe.naver.com/CommentView.nhn";
 
 export default class Fetcher {
@@ -43,7 +43,7 @@ export default class Fetcher {
             id: arid,
             title: $(el).children("td:nth-child(2)").find(".m-tcol-c").text(),
             username: $(el).children("td:nth-child(3)").find(".m-tcol-c").text(),
-            link: "http://cafe.naver.com/" + clickscript.split(",")[8].split("'")[1] + "/" + arid,
+            link: "https://cafe.naver.com/" + clickscript.split(",")[8].split("'")[1] + "/" + arid,
             userid: clickscript.split(",")[1].split("\'")[1],
             flags: Article.flag(
                 $(el).find(".list-i-upload").length > 0,
@@ -61,6 +61,15 @@ export default class Fetcher {
             resolve(articleList);
         });
         */
+    }
+    public static async getMember(cafeid:number,id:string, isNickname = true) {
+        const params = {
+            "keywordSearch.keywordType" : isNickname ? 2 : 1,
+            "keywordSearch.keyword" : id,
+        }
+        const $ = await this.getWeb(
+            `https://cafe.naver.com/CafeMemberAllViewIframe.nhn?keywordSearch.clubid=${cafeid}&m=listKeyword`,params,true);
+        console.log($.html().toString());
     }
     public static async getComments(cafeid:number,articleid:number):Promise<Comment[]> {
         const params:object = {

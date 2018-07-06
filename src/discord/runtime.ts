@@ -18,7 +18,7 @@ export default class Runtime {
     constructor() {
         this.plugins.push(new Ping(),new Auth());
     }
-    public async start() {
+    public async start():Promise<string> {
         // load config
         await this.cfg.import(true).catch((err) => null);
         // init client
@@ -30,7 +30,7 @@ export default class Runtime {
         });
         this.client.on("message",this.onMessage.bind(this));
         // client login (ignore)
-        this.client.login(this.cfg.token);
+        return Promise.resolve(await this.client.login(this.cfg.token));
     }
     protected async onMessage(msg:Discord.Message) {
         let chain = msg.content;

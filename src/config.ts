@@ -19,19 +19,23 @@ export default class Config {
     public readonly configName:string;
     // private readonly saveTo:string = "./config/config.json";
     protected readonly saveTo:string; // save location
-    protected readonly dirpath:string;
+    public static get dirpath():string {
+        let rootDir = path.resolve(process.cwd());
+        if (!rootDir.endsWith("ncc_discord_auth")) {
+            rootDir = path.resolve(".");
+            if (rootDir.endsWith("build")) {
+                rootDir = path.resolve("..");
+            }
+        }
+        return path.resolve(rootDir,"config");
+    }
     /**
      * Create constructor
      * @param _name Name of config
      * @param _version Version
      */
     public constructor(_name:string,_version:number = Config.appVersion) {
-        this.dirpath = path.resolve(".");
-        if (this.dirpath.endsWith("build")) {
-            this.dirpath = path.resolve("..");
-        }
-        this.dirpath = path.resolve(this.dirpath,"config");
-        this.saveTo = path.resolve(this.dirpath,`${_name}.json`);
+        this.saveTo = path.resolve(Config.dirpath,`${_name}.json`);
         // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
         this.blacklist = [];
@@ -113,9 +117,9 @@ export default class Config {
         }
     }
     protected async checkDir():Promise<boolean> {
-        return Promise.resolve(await fs.access(this.dirpath,fs.constants.R_OK | fs.constants.W_OK)
+        return Promise.resolve(await fs.access(Config.dirpath,fs.constants.R_OK | fs.constants.W_OK)
             .then(() => true)
-            .catch((err) => fs.mkdir(this.dirpath))
+            .catch((err) => fs.mkdir(Config.dirpath))
             .then(() => true)
             .catch((err) => Promise.resolve(false)));
     }

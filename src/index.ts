@@ -16,15 +16,16 @@ async function init() {
     });
     client.login(cfg.token);
     */
+   await Fetcher.getMember(26686242,"끼로");
+   /*
     const cafe:Cafe = await Fetcher.parseNaver("https://cafe.naver.com/sdbx/7433");
     const ncc:Ncc = new Ncc();
     const session = await ncc.login();
     const room:Room = await session.createRoom(cafe,[{id:"naverid"}]);
-    /* session.sendText(message.room,
-        values(message.room.users).map(user => user.nickname).join(', ')); */
     console.log(`https://talk.cafe.naver.com/channels/${room.id}`);
     await session.sendText(room,"반가워");
     await session.deleteRoom(room);
     console.log("Hello World");
+    */
 }
 init();
