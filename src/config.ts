@@ -1,6 +1,5 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import fetcher from "./fetcher";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version

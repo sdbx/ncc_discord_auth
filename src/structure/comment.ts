@@ -1,16 +1,11 @@
-export default class Comment {
-    public content:string;
-    public userid:string;
-    public nickname:string;
-    public timestamp:number;
+import Profile from "./profile";
 
-    public constructor(con:{content:string,userid:string,nickname:string,timestamp:number}) {
-        this.content = con.content;
-        this.userid = con.userid;
-        this.nickname = con.nickname;
-        this.timestamp = (con.timestamp == null) ? Date.now() : con.timestamp;
-    }
-    public getTimeDiffer() {
-        return new Date().getTime() - this.timestamp;
-    }
+export default interface Comment extends Profile {
+    content:string;
+    timestamp:number;
+    imageurl?:string;
+    stickerurl?:string;
+}
+export function getTimeDiffer(cmt:Comment) {
+    return new Date().getTime() - cmt.timestamp;
 }

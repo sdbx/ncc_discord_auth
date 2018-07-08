@@ -1,5 +1,5 @@
 export default interface Cafe {
-    url:string;
-    id:number;
-    article:number;
+    cafeId:number, // 2773845
+    cafeName?:string, // sdbx
+    cafeDesc?:string, // sdbx : programming cafe
 }

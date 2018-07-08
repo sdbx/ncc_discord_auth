@@ -159,8 +159,8 @@ declare module "node-ncc-es6" {
         password:string;
         username:string;
         constructor (username:string, password:string);
-        setCookieJar(cookieJar:CookieJar);
-        getCookieJar():CookieJar;
+        setCookieJar(cookieJar:CookieJar.Serialized);
+        getCookieJar():CookieJar.Serialized;
         validateLogin():Promise<string>;
         login(captcha?:{key:string,value:string}):Promise<void>;
         logout():Promise<void>;

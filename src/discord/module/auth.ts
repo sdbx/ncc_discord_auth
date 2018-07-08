@@ -1,6 +1,5 @@
 import * as Discord from "discord.js";
 import Config from "../../config";
-import Fetcher from "../../fetcher";
 import Plugin, { CmdParam } from "../plugin";
 
 const expId = /(아이디|아디|id|ID)로/g;
