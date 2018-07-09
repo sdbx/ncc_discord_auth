@@ -1,19 +1,23 @@
 import * as Discord from "discord.js";
 import Config from "../config";
-import Plugin, { CmdParam } from "./plugin";
+import Plugin, { WordPiece } from "./plugin";
 
+import Ncc from "../ncc/ncc";
 import Auth from "./module/auth";
 import Ping from "./module/ping";
 
 const expDest = /.+?(을|를|좀)\s+/i;
 const expCmd = /[\w가-힣]+(줘|해)/ig;
 const expCmdSuffix = /(해|줘|해줘)/ig;
-const expCmdFilter = /[가-힣\w]+/i;
-const expSet = /(설정|세팅|정|바꿔)/ig;
-const expTo = /(으로|로)/ig;
+
+const queryCmd = /\s+\S+/ig;
+const safeCmd = /(".+?")|('.+?')/ig;
+const ends_str:string[][] = ["을/를","에게/한테","으로/로","에서","해줘/해/줘"].map((value) => value.split("/"));
+const ends_type = ["dest","for","to","from","do"];
 export default class Runtime {
     private cfg = new Bot();
     private client:Discord.Client;
+    private ncc:Ncc;
     private plugins:Plugin[] = [];
     constructor() {
         this.plugins.push(new Ping(),new Auth());
@@ -23,20 +27,85 @@ export default class Runtime {
         await this.cfg.import(true).catch((err) => null);
         // init client
         this.client = new Discord.Client();
+        // create ncc - not authed
+        this.ncc = new Ncc();
         // init plugins
-        await this.plugins.forEach(async (value) => {
-            await value.init(this.client)
-            this.client.on("ready",value.ready.bind(value));
-        });
+        for (const plugin of this.plugins) {
+            plugin.init(this.client, this.ncc);
+            this.client.on("ready", plugin.ready.bind(plugin));
+        }
         this.client.on("message",this.onMessage.bind(this));
         // client login (ignore)
         return Promise.resolve(await this.client.login(this.cfg.token));
     }
     protected async onMessage(msg:Discord.Message) {
-        let chain = msg.content;
+        const text = msg.content;
         const prefix = this.cfg.prefix;
-        const params:CmdParam = {} as CmdParam;
-        if (prefix.test(chain)) {
+        if (!prefix.test(text)) {
+            await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
+            return Promise.resolve();
+        }
+        let chain = msg.content;
+        // zero, remove \" or \'..
+        chain = chain.replace(/\\('|")/igm,"");
+        chain = chain.replace(prefix,"");
+        // first, replace "" or '' to easy
+        const safeList:string[] = [];
+        while (safeCmd.test(chain)) {
+            safeList.push(chain.match(safeCmd)[0]);
+            chain = chain.replace(safeCmd,"${" + (safeList.length - 1) + "}");
+        }
+        // second, chain..
+        let pieces:WordPiece[] = [];
+        let cacheWord = [];
+        for (const piece of chain.match(queryCmd)) {
+            const split = ends_str.map((value, index) => {
+                let check:WordPiece = null;
+                for (const _value of value) {
+                    if (piece.endsWith(_value)) {
+                        // match suffix
+                        check = {
+                            type: ends_type[index],
+                            str: piece.substring(0,piece.lastIndexOf(_value)),
+                        };
+                        break;
+                    }
+                }
+                // return replaced string(remove suffix)
+                return check;
+            }).filter((value) => value != null);
+            let part;
+            // select correct data
+            if (split.length >= 1) {
+                part = split[0].str;
+            } else {
+                part = piece;
+            }
+            safeList.forEach((value, index) => {
+                part = part.replace(new RegExp("\\$\\{" + index + "\\}", "i"), "");
+            });
+            cacheWord.push(part);
+            if (split.length >= 1) {
+                // commit
+                pieces.push({
+                    type: split[0].type,
+                    str: cacheWord.join("").trim(),
+                } as WordPiece);
+                cacheWord = [];
+            }
+        }
+        const _cmds = pieces.reverse().filter((v) => v.type === "do");
+        // cmd exists?
+        let cmd:string = null;
+        if (_cmds.length >= 1) {
+            cmd = _cmds[0].str;
+            pieces = pieces.reverse().filter((v) => v.type !== "do");
+        } else {
+            // no exists :(
+            cmd = cacheWord.join("").trim();
+        }
+        await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, cmd, pieces)));
+        /*
             params.say = chain.match(prefix)[0];
             chain = chain.replace(prefix,"");
             // test destination
@@ -81,8 +150,9 @@ export default class Runtime {
             // dispatch command
             await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg,params)));
         } else {
-            await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
+            
         }
+        */
     }
     private filterEmpty(value:string):boolean {
         return value.length >= 1;

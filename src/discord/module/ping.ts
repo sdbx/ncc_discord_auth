@@ -1,16 +1,15 @@
 import * as Discord from "discord.js";
-import Plugin, { CmdParam } from "../plugin";
+import Plugin, { WordPiece } from "../plugin";
 
 export default class Ping extends Plugin {
-    public async init(cl:Discord.Client) {
-        return super.init(cl);
-    }
     public async ready() {
         return super.ready();
     }
-    public async onCommand(msg:Discord.Message, param:CmdParam):Promise<void> {
-        if (param.cmd === "핑") {
+    public async onCommand(msg:Discord.Message, command:string, options:WordPiece[]):Promise<void> {
+        if (command === "핑") {
             msg.reply(`퐁! \`${this.client.ping}\``);
+        } else {
+            msg.channel.send(JSON.stringify({cmd:command, opt:options}));
         }
         return Promise.resolve();
     }

@@ -1,16 +1,20 @@
 import * as Discord from "discord.js";
 import Config from "../config";
+import Ncc from "../ncc/ncc";
 
 export default abstract class Plugin {
     protected config:Config;
     protected client:Discord.Client;
+    protected ncc:Ncc;
+
     /**
      * on plugin load
      * @param cl client
+     * @param ncc nccapi
      */
-    public async init(cl:Discord.Client):Promise<void> {
+    public init(cl:Discord.Client, nc:Ncc):void {
         this.client = cl;
-        return Promise.resolve();
+        this.ncc = nc;
     }
     /**
      * on discord ready
@@ -32,7 +36,7 @@ export default abstract class Plugin {
     public async reload():Promise<void> {
         return Promise.resolve();
     }
-    public abstract async onCommand(msg:Discord.Message, param:CmdParam):Promise<void>;
+    public abstract async onCommand(msg:Discord.Message, command:string, options:WordPiece[]):Promise<void>;
     public async changeConfig(key:string, value:string):Promise<void> {
         if (this.config == null) {
             // ignore
@@ -130,9 +134,7 @@ export default abstract class Plugin {
         return Promise.resolve(config);
     }
 }
-export interface CmdParam {
-    say:string,
-    dest:string[],
-    cmd:string,
-    etc:string[],
+export interface WordPiece {
+    type:string,
+    str:string,
 }

@@ -1,10 +1,11 @@
+import * as Discord from "discord.js";
 import { Room } from "node-ncc-es6";
 import Runtime from "./discord/runtime";
 import NcFetch from "./ncc/ncfetch";
 import Cafe from "./structure/cafe";
 async function init() {
-    // const run:Runtime = new Runtime();
-    // await run.start();
+    const run:Runtime = new Runtime();
+    await run.start();
     /*
     const cfg = new Bot();
     await cfg.import(true).catch((err) => null);
@@ -15,6 +16,7 @@ async function init() {
     });
     client.login(cfg.token);
     */
+
    // await Fetcher.getMember(26686242,"끼로");
     const ncc = new NcFetch();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());

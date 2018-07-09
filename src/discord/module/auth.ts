@@ -1,6 +1,6 @@
 import * as Discord from "discord.js";
 import Config from "../../config";
-import Plugin, { CmdParam } from "../plugin";
+import Plugin, { WordPiece } from "../plugin";
 
 const expId = /(아이디|아디|id|ID)로/g;
 const expNick = /(닉네임|닉|이름)(로|으로)/g;
@@ -14,7 +14,8 @@ export default class Auth extends Plugin {
         super.ready();
         await this.config.import(true).catch((err) => null);
     }
-    public async onCommand(msg:Discord.Message, param:CmdParam):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, options:WordPiece[]):Promise<void> {
+        /*
         if (param.cmd === "인증") {
             const userid = msg.author.id;
             let useFixedName = false;
@@ -55,6 +56,7 @@ export default class Auth extends Plugin {
                 });
             }
         }
+        */
         return Promise.resolve();
     }
     private async queueAuth(info:AuthInfo) {

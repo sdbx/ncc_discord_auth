@@ -9,9 +9,17 @@ import Config from "../config";
 export default class NcCredent {
     protected credit:Credentials;
     protected readonly cookiePath;
+    protected inited:boolean;
     constructor() {
+        this.inited = false;
         this.credit = new Credentials("id","pw");
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie");
+    }
+    /**
+     * This is not mean "auth is vaild.".
+     */
+    public get available():boolean {
+        return this.inited;
     }
     /**
      * Validate login
@@ -41,6 +49,7 @@ export default class NcCredent {
         const name = await this.validateLogin();
         if (name != null) {
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
+            await this.onLogin(name);
         }
         return Promise.resolve(name);
     }
@@ -58,8 +67,14 @@ export default class NcCredent {
         const result:string = await this.validateLogin();
         if (result != null) {
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
+            await this.onLogin(result);
         }
         return Promise.resolve(result);
+    }
+    protected async onLogin(username:string):Promise<void> {
+        console.log("Login. - ncc");
+        this.inited = true;
+        return Promise.resolve();
     }
     /*
     public async login():Promise<Session> {

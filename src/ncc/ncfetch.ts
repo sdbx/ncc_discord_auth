@@ -26,7 +26,7 @@ export default class NcFetch extends NcCredent {
         /**
          * Check cookie status
          */
-        if (option.auth && (!new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl) || this.validateLogin() == null)) {
+        if (option.auth && (!this.available || !new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl) || this.validateLogin() == null)) {
             console.log("Cookie is invaild");
             return Promise.reject();
         }
@@ -306,7 +306,7 @@ export default class NcFetch extends NcCredent {
         return Promise.resolve(out);
         // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&page=1&boardtype=L&articleid=7446&referrerAllArticles=true
     }
-    public async getMember(cafeid:number, id:string, isNickname = true) {
+    public async getMember(cafeid:number, id:string, isNickname = true):Promise<Profile[]> {
         const url_params = {
             "keywordSearch.clubid": cafeid.toString(),
             "m": "listKeyword",
