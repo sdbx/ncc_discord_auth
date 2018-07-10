@@ -36,7 +36,8 @@ export default class Runtime {
         }
         this.client.on("message",this.onMessage.bind(this));
         // client login (ignore)
-        return Promise.resolve(await this.client.login(this.cfg.token));
+        this.client.login(this.cfg.token)
+        return Promise.resolve("");
     }
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;

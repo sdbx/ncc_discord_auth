@@ -5,6 +5,7 @@ import * as read from "read";
 import * as request from "request-promise-native";
 import { CookieJar } from "tough-cookie";
 import Config from "../config";
+import * as Log from "../log";
 
 export default class NcCredent {
     protected credit:Credentials;
@@ -48,6 +49,7 @@ export default class NcCredent {
         await this.credit.login();
         const name = await this.validateLogin();
         if (name != null) {
+            this.credit.username = name;
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(name);
         }
@@ -66,13 +68,14 @@ export default class NcCredent {
         this.credit.setCookieJar(JSON.parse(cookieStr));
         const result:string = await this.validateLogin();
         if (result != null) {
+            this.credit.username = result;
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(result);
         }
         return Promise.resolve(result);
     }
     protected async onLogin(username:string):Promise<void> {
-        console.log("Login. - ncc");
+        Log.v("ncc", "Login.");
         this.inited = true;
         return Promise.resolve();
     }

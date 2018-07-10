@@ -1,5 +1,6 @@
 import * as Discord from "discord.js";
 import Config from "../config";
+import * as Log from "../log";
 import Ncc from "../ncc/ncc";
 
 export default abstract class Plugin {
@@ -20,7 +21,7 @@ export default abstract class Plugin {
      * on discord ready
      */
     public async ready():Promise<void> {
-        console.log(`${this.constructor.name} ready.`);
+        Log.d(`${this.constructor.name} ready.`);
         return Promise.resolve();
     }
     /**

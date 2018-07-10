@@ -3,6 +3,7 @@ import * as encoding from "encoding";
 import * as Entities from "html-entities";
 import * as querystring from "querystring";
 import * as request from "request-promise-native";
+import * as Log from "../log";
 import Article from "../structure/article";
 import Cafe from "../structure/cafe";
 import Comment from "../structure/comment";
@@ -27,7 +28,7 @@ export default class NcFetch extends NcCredent {
          * Check cookie status
          */
         if (option.auth && (!this.available || !new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl) || this.validateLogin() == null)) {
-            console.log("Cookie is invaild");
+            Log.e("Cookie is invaild");
             return Promise.reject();
         }
         /**
@@ -141,9 +142,6 @@ export default class NcFetch extends NcCredent {
                     cafeName: cluburl,
                 } as Article;
             }).get();
-        for (const article of articleList) {
-            console.log(article);
-        }
         return Promise.resolve<Article[]>(articleList);
     }
     /**
@@ -164,10 +162,10 @@ export default class NcFetch extends NcCredent {
         }
 
         if ($("title").text().indexOf("로그인") >= 0) {
-            console.log("로그인이 안되어 있습니다.");
+            Log.e("로그인이 안되어 있습니다.");
             return Promise.reject("로그인 안 됨");
         } else if ($(".error_content").length > 0) {
-            console.log($(".error_content_body h2").text());
+            Log.e($(".error_content_body h2").text());
             return Promise.reject($(".error_content_body h2").text());
         }
         // console.log( $('.u_cbox_comment').html());
@@ -217,7 +215,7 @@ export default class NcFetch extends NcCredent {
         }).get();
 
         for (const comment of comments) {
-            console.log(comment.userid + " / " + comment.nickname + " / " + comment.content + " / " + comment.timestamp);
+            Log.json("Comment", comment);
         }
         return Promise.resolve<Comment[]>(comments);
         // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
@@ -345,7 +343,6 @@ export default class NcFetch extends NcCredent {
                 $(el).children("div").map(parser).get();
             });
         }
-        console.log("a");
         return Promise.resolve(members);
     }
     /**
