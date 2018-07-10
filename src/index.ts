@@ -1,6 +1,7 @@
 import * as Discord from "discord.js";
 import { Room } from "node-ncc-es6";
 import Runtime from "./discord/runtime";
+import * as Log from "./log";
 import NcFetch from "./ncc/ncfetch";
 import Cafe from "./structure/cafe";
 async function init() {
@@ -26,6 +27,7 @@ async function init() {
         const ar = await ncc.getArticleDetail(26686242, 7382);
         const ac = await ncc.getMember(26686242, "끼로",true);
         html = "";
+        Log.w(JSON.stringify(ar,null,4));
     }
     console.log(html);
    /*

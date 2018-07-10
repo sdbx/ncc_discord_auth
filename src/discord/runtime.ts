@@ -11,7 +11,7 @@ const expCmd = /[\w가-힣]+(줘|해)/ig;
 const expCmdSuffix = /(해|줘|해줘)/ig;
 
 const queryCmd = /\s+\S+/ig;
-const safeCmd = /(".+?")|('.+?')/ig;
+const safeCmd = /(".+?")|('.+?')/i;
 const ends_str:string[][] = ["을/를","에게/한테","으로/로","에서","해줘/해/줘"].map((value) => value.split("/"));
 const ends_type = ["dest","for","to","from","do"];
 export default class Runtime {
@@ -52,7 +52,8 @@ export default class Runtime {
         // first, replace "" or '' to easy
         const safeList:string[] = [];
         while (safeCmd.test(chain)) {
-            safeList.push(chain.match(safeCmd)[0]);
+            const value = chain.match(safeCmd)[0];
+            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")));
             chain = chain.replace(safeCmd,"${" + (safeList.length - 1) + "}");
         }
         // second, chain..
@@ -82,7 +83,7 @@ export default class Runtime {
                 part = piece;
             }
             safeList.forEach((value, index) => {
-                part = part.replace(new RegExp("\\$\\{" + index + "\\}", "i"), "");
+                part = part.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value);
             });
             cacheWord.push(part);
             if (split.length >= 1) {
