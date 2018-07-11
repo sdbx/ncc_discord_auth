@@ -1,3 +1,4 @@
+import chalk, { Chalk } from "chalk";
 import * as fs from "fs-extra";
 import Session, { Credentials } from "node-ncc-es6";
 import * as path from "path";
@@ -96,7 +97,7 @@ export default class NcCredent {
     */
     private read(prompt:string,silent:boolean):Promise<string> {
         return new Promise((res,rej) => {
-            read({prompt,silent},(err, pw:string) => err != null ? rej(err) : res(pw));
+            read({prompt:"", silent},(err, pw:string) => err != null ? rej(err) : res(pw));
         });
     }
 }

@@ -1,8 +1,10 @@
 import * as _caller from "caller";
 import chalk, { Chalk } from "chalk";
-import * as cjk from "cjk-regex";
 import * as Hook from "console-hook";
+import * as Inquirer from "inquirer";
 import * as path from "path";
+import * as readline from "readline";
+import { Readable, Writable } from "stream";
 import * as Util from "util";
 import * as Log from "./log";
 
@@ -12,6 +14,7 @@ const numberLimit = 3;
 const totalBlank = 5; // some whitespace
 const guidePtrn = 10; // show gray text size
 let contentLimit = -1;
+let ui:Inquirer.ui.BottomBar;
 // 1: 8color 2: 256color 3: 0xFFFFFF color
 /*
 const chalk = new _chark.constructor({
@@ -87,6 +90,16 @@ export function json(title:string, obj:object) {
  * @param msg Message (Title, Description)
  */
 export function custom(themeH:string, theme256H:string, theme8C:Chalk, tag:string, msg:{arg1:string, arg2?:string}) {
+    const design = style(themeH,theme256H,theme8C);
+    raw(design.header, design.num, design.content, design.hlight, tag, msg);
+}
+/**
+ * Gen style
+ * @param themeH A hex of 0xFFFFFF colors
+ * @param theme256H A hex of 256 colors
+ * @param theme8C Chalk object of 8 colors
+ */
+function style(themeH:string, theme256H:string, theme8C:Chalk) {
     let header:Chalk;
     let num:Chalk;
     let content:Chalk;
@@ -113,7 +126,12 @@ export function custom(themeH:string, theme256H:string, theme8C:Chalk, tag:strin
             hlight = theme8C.gray;
         }
     }
-    raw(header, num, content, hlight, tag, msg);
+    return {
+        header,
+        num,
+        content,
+        hlight
+    }
 }
 /**
  * Trace raw
@@ -151,7 +169,7 @@ export function raw(headerColor:Chalk, numberColor:Chalk, contentColor:Chalk,
             lines += 1;
             const useHeader =  lines % guidePtrn === 0 || (index === 0 && _i === 0);
             let numText = "";
-            if (!useNum || index === 0) {
+            if (!useNum || (index === 0 && _i === 0)) {
                 numText = defaultH;
             } else if (_i === 0) {
                 numText = (index + 1).toString();
@@ -166,7 +184,7 @@ export function raw(headerColor:Chalk, numberColor:Chalk, contentColor:Chalk,
         _log(numberColor, "",numberColor, "END",numberColor, "");
     }
 }
-export function hook() {
+export async function hook() {
     const _hook = Hook(console, true);
     _hook.attach("log", (method, args) => {
         const str = Util.format.apply(this, args);
@@ -179,18 +197,67 @@ export function hook() {
             Log.e(args[0]);
         }
     });
+    ui = new Inquirer.ui.BottomBar();
+    await read("");
 }
-
-function _log(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
+export async function read(title:string, need = false, hide = false):Promise<string> {
+    const design = style("#b8e3f9","#afd7ff",chalk.bgBlack.white);
+    const format = formatLog(
+        design.header, title,
+        design.num, "IME",
+        design.content, null
+    );
+    ui.updateBottomBar(format);
+    if (need) {
+        const mutable = new Mutable(); 
+        mutable.muted = false;
+        const mutableStream = new Writable(mutable);
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+            terminal: true
+        });
+        rl.on("line",(input) => console.log(input));
+        mutableStream.pipe
+        /*
+        const prompt = Inquirer.createPromptModule();
+        return prompt([{
+            type: hide ? "password" : "input",
+            name: "data"
+        }]).then((answers) => answers["data"] as string);
+        */
+       return Promise.resolve("ok");
+    } else {
+        return Promise.resolve("ok");
+    }
+}
+export function removeReset(ansi:string) {
+    return ansi.replace(/(.\[39m.\[49m|.\[0m])$/i, "");
+}
+function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
     headerMsg = cutstr(headerMsg,prefixLimit);
     numberMsg = cutstr(numberMsg,numberLimit);
     contentMsg = cutstr(contentMsg,contentLimit);
-    const format = [
-        headerColor(`${headerMsg.padStart(prefixLimit - unicodeLength(headerMsg))} `),
-        numberColor(` ${numberMsg.padStart(numberLimit - unicodeLength(numberMsg))} `),
-        contentColor(` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} \n`)
-    ].join("");
-    process.stdout.write(format);
+    // totalBlank = 5;
+    const format = [];
+    if (headerMsg != null) {
+        format.push(headerColor(`${headerMsg.padStart(prefixLimit - unicodeLength(headerMsg))} `));
+    }
+    if (numberMsg != null) {
+        format.push(numberColor(` ${numberMsg.padStart(numberLimit - unicodeLength(numberMsg))} `));
+    }
+    if (contentMsg != null) {
+        format.push(contentColor(` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} `));
+    }
+    return format.join("");
+}
+function _log(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
+    const format = formatLog(headerColor,headerMsg,numberColor,numberMsg,contentColor,contentMsg);
+    if (ui != null) {
+        ui.log.write(format + "\n");
+    } else {
+        process.stdout.write(format + "\n");
+    }
 }
 function caller() {
     let dp = 1;
@@ -201,7 +268,7 @@ function caller() {
     } while ((deeper as string).endsWith("/log.js"));
     let out:string = path.resolve(deeper).replace(path.resolve(__dirname) + "/","");
     if (out.length >= prefixLimit) {
-        out = `~${out.substr(out.lastIndexOf("/"))}`;
+        out = `~${out.substr(out.lastIndexOf("/") + 1)}`;
     }
     return out;
 }
@@ -216,6 +283,9 @@ function unicodeLength(str:string) {
 function cutstr(str:string, end:number) {
     let ln = 0;
     let k = 0;
+    if (str == null) {
+        str = "";
+    }
     for (const char of str.split("")) {
         const cn = char.charCodeAt(0);
         ln += (cn >= 32 && cn <= 126) ? 1 : 2;
@@ -225,4 +295,16 @@ function cutstr(str:string, end:number) {
         }
     }
     return str;
+}
+class Mutable {
+    public muted = false;
+    private readable:Readable = new Readable();
+    public write(chunk, encoding:string, callback:() => any) {
+        if (!this.muted) {
+            console.log(chunk);
+            // ui.write(chunk);
+            // process.stdout.write(chunk, encoding);
+        }
+        callback();
+    }
 }

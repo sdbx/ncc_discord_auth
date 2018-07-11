@@ -1,14 +1,15 @@
+import chalk from "chalk";
 import * as Discord from "discord.js";
 import { Room } from "node-ncc-es6";
+import * as readline from "readline";
 import Runtime from "./discord/runtime";
 import * as Log from "./log";
 import Ncc from "./ncc/ncc";
 import Cafe from "./structure/cafe";
-Log.hook();
 async function init() {
+    await Log.hook();
     const run:Runtime = new Runtime();
     await run.start();
-    console.log("test");
     /*
     const cfg = new Bot();
     await cfg.import(true).catch((err) => null);
@@ -19,12 +20,12 @@ async function init() {
     });
     client.login(cfg.token);
     */
-
+    console.log("Test");
+    await Log.read("Test",true,false);
    // await Fetcher.getMember(26686242,"끼로");
-
+    return;
     const ncc = new Ncc();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
-    let html;
     if (loaded != null) {
         Log.d(`name: ${loaded}`);
         const ar = await ncc.getArticleDetail(26686242, 7382);
