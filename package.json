@@ -62,7 +62,6 @@
     "caller": "^1.0.1",
     "chalk": "^2.4.1",
     "cheerio": "^1.0.0-rc.2",
-    "cjk-regex": "^2.0.0",
     "console-hook": "0.0.2",
     "discord.js": "^11.3.2",
     "encoding": "^0.1.12",
