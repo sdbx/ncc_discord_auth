@@ -3,7 +3,7 @@ import * as path from "path";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version
-    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName";
+    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name";
     public version:number; // config version
     public blacklist:string[]; // blacklist for config
     /*
@@ -15,9 +15,9 @@ export default class Config {
     public articleCfg:IArticleCfg = {} as any;
     */
 
-    public readonly configName:string;
+    public configName:string;
     // private readonly saveTo:string = "./config/config.json";
-    protected readonly saveTo:string; // save location
+    protected saveTo:string; // save location
     public static get dirpath():string {
         let rootDir = path.resolve(process.cwd());
         if (!rootDir.endsWith("ncc_discord_auth")) {
@@ -34,12 +34,18 @@ export default class Config {
      * @param _version Version
      */
     public constructor(_name:string,_version:number = Config.appVersion) {
-        this.saveTo = path.resolve(Config.dirpath,`${_name}.json`);
         // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
         this.blacklist = [];
-        this.configName = _name;
+        this.name = _name;
         // console.log(`${_name}'s config: ${this.saveTo}`);
+    }
+    public set name(n:string) {
+        this.configName = n;
+        this.saveTo = path.resolve(Config.dirpath, `${n}.json`);
+    }
+    public get name():string {
+        return this.configName;
     }
     /**
      * export config to file

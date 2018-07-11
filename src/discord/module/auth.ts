@@ -10,10 +10,6 @@ const textAuthTime = "남은 시간";
 export default class Auth extends Plugin {
     protected config = new AuthConfig();
     private tokens = [];
-    public async ready():Promise<void> {
-        super.ready();
-        await this.config.import(true).catch((err) => null);
-    }
     public async onCommand(msg:Discord.Message, command:string, options:WordPiece[]):Promise<void> {
         /*
         if (param.cmd === "인증") {
@@ -73,7 +69,6 @@ interface AuthInfo {
     token:number,
 }
 class AuthConfig extends Config {
-    public textSuccess = "$user님 인증 완료다냐!"
     public timeout = 600;
     public commentURL = "https://cafe.naver.com/sdbx/7433"
     constructor() {

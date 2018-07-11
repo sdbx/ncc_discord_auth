@@ -74,6 +74,7 @@
     "read": "^1.0.7",
     "request-promise-native": "^1.0.5",
     "sha.js": "^2.4.10",
+    "sprintf-js": "^1.1.1",
     "tough-cookie": "^2.4.3"
   },
   "devDependencies": {

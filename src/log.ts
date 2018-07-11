@@ -183,7 +183,7 @@ export function raw(headerColor:Chalk, numberColor:Chalk, contentColor:Chalk,
         _log(numberColor, "",numberColor, "END",numberColor, "");
     }
 }
-export async function hook() {
+export function hook() {
     const _hook = Hook(console, true);
     _hook.attach("log", (method, args) => {
         const str = Util.format.apply(this, args);

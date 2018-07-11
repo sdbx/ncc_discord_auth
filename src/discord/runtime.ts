@@ -2,8 +2,11 @@ import * as Discord from "discord.js";
 import Config from "../config";
 import Plugin, { WordPiece } from "./plugin";
 
+import { e, i } from "../log";
 import Ncc from "../ncc/ncc";
+import Lang from "./lang";
 import Auth from "./module/auth";
+import Login from "./module/login";
 import Ping from "./module/ping";
 
 const expDest = /.+?(을|를|좀)\s+/i;
@@ -16,11 +19,12 @@ const ends_str:string[][] = ["을/를","에게/한테","으로/로","에서","�
 const ends_type = ["dest","for","to","from","do"];
 export default class Runtime {
     private cfg = new Bot();
+    private lang = new Lang();
     private client:Discord.Client;
     private ncc:Ncc;
     private plugins:Plugin[] = [];
     constructor() {
-        this.plugins.push(new Ping(),new Auth());
+        this.plugins.push(new Ping(),new Auth(), new Login());
     }
     public async start():Promise<string> {
         // load config
@@ -29,9 +33,21 @@ export default class Runtime {
         this.client = new Discord.Client();
         // create ncc - not authed
         this.ncc = new Ncc();
+        // init lang
+        this.lang = new Lang();
+        // ncc test auth by cookie
+        try {
+            if (await this.ncc.loadCredit() != null) {
+                i("Runtime-ncc","login!");
+            } else {
+                i("Runtime-ncc", "Cookie invalid :(");
+            }
+        } catch (err) {
+            e(err);
+        }
         // init plugins
         for (const plugin of this.plugins) {
-            plugin.init(this.client, this.ncc);
+            plugin.init(this.client, this.ncc, this.lang);
             this.client.on("ready", plugin.ready.bind(plugin));
         }
         this.client.on("message",this.onMessage.bind(this));

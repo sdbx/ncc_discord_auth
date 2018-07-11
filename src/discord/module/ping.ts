@@ -9,7 +9,7 @@ export default class Ping extends Plugin {
         if (command === "핑") {
             msg.reply(`퐁! \`${this.client.ping}\``);
         } else {
-            msg.channel.send(JSON.stringify({cmd:command, opt:options}));
+            // msg.channel.send(JSON.stringify({cmd:command, opt:options}));
         }
         return Promise.resolve();
     }

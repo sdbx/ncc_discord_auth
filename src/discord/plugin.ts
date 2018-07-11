@@ -2,26 +2,32 @@ import * as Discord from "discord.js";
 import Config from "../config";
 import * as Log from "../log";
 import Ncc from "../ncc/ncc";
+import Lang from "./lang";
 
 export default abstract class Plugin {
     protected config:Config;
     protected client:Discord.Client;
     protected ncc:Ncc;
+    protected lang:Lang;
 
     /**
      * on plugin load
      * @param cl client
      * @param ncc nccapi
      */
-    public init(cl:Discord.Client, nc:Ncc):void {
+    public init(cl:Discord.Client, nc:Ncc, ln:Lang):void {
         this.client = cl;
         this.ncc = nc;
+        this.lang = ln;
     }
     /**
      * on discord ready
      */
     public async ready():Promise<void> {
-        Log.d(`${this.constructor.name} ready.`);
+        Log.d(this.constructor.name, "bot ready.");
+        if (this.config != null) {
+            await this.config.import(true).catch((err) => null);
+        }
         return Promise.resolve();
     }
     /**
@@ -53,6 +59,22 @@ export default abstract class Plugin {
         } else {
             return Promise.reject("잘못된 값입니다.");
         }
+    }
+    protected toLangString(value:string | number | boolean) {
+        let data:string;
+        const type = typeof value;
+        if (value === null) {
+            data = this.lang.valNull;
+        } else if (type === "boolean") {
+            data = value ? this.lang.valTrue : this.lang.valFalse;
+        } else if (type === "string") {
+            data = value as string;
+        } else if (type === "number") {
+            data = (value as number).toString(10);
+        } else {
+            data = "";
+        }
+        return data;
     }
     /**
      * Reflection config change & reloading

@@ -7,10 +7,10 @@ import * as Log from "./log";
 import Ncc from "./ncc/ncc";
 import Cafe from "./structure/cafe";
 async function init() {
-    await Log.hook();
+    Log.hook();
     const run:Runtime = new Runtime();
     await run.start();
-
+    /*
     const ncc = new Ncc();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
     if (loaded != null) {
@@ -25,5 +25,6 @@ async function init() {
             Log.d("Hello World");
         }
     }
+    */
 }
 init();
