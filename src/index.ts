@@ -10,20 +10,7 @@ async function init() {
     await Log.hook();
     const run:Runtime = new Runtime();
     await run.start();
-    /*
-    const cfg = new Bot();
-    await cfg.import(true).catch((err) => null);
-    const client = new Discord.Client();
-    client.on("ready", async () => {console.log(`Ready on ${client.user.tag}`)});
-    client.on("message",(msg) => {
-        console.log(msg.content);
-    });
-    client.login(cfg.token);
-    */
-    console.log("Test");
-    await Log.read("Test",true,false);
-   // await Fetcher.getMember(26686242,"끼로");
-    return;
+
     const ncc = new Ncc();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
     if (loaded != null) {

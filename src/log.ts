@@ -1,10 +1,9 @@
 import * as _caller from "caller";
 import chalk, { Chalk } from "chalk";
 import * as Hook from "console-hook";
+import * as Reverser from "esrever";
 import * as Inquirer from "inquirer";
 import * as path from "path";
-import * as readline from "readline";
-import { Readable, Writable } from "stream";
 import * as Util from "util";
 import * as Log from "./log";
 
@@ -197,36 +196,48 @@ export async function hook() {
             Log.e(args[0]);
         }
     });
-    ui = new Inquirer.ui.BottomBar();
-    await read("");
+    // ui = new Inquirer.ui.BottomBar();
 }
-export async function read(title:string, need = false, hide = false):Promise<string> {
+export function r(title:string, content:string) {
+    custom("#b8e3f9", "#afd7ff", chalk.bgBlack.white, "IME", {arg1:title, arg2:content});
+}
+export async function read(title:string, hide:boolean, need = true, content?:string):Promise<string> {
+    if (ui == null) {
+        ui = new Inquirer.ui.BottomBar();
+    }
+    contentLimit = Math.max(5, process.stdout.columns - prefixLimit - numberLimit - totalBlank);
     const design = style("#b8e3f9","#afd7ff",chalk.bgBlack.white);
+    content = content == null ? "" : Reverser.reverse(cutstr(Reverser.reverse(content), contentLimit - 1));
     const format = formatLog(
         design.header, title,
         design.num, "IME",
-        design.content, null
-    );
-    ui.updateBottomBar(format);
+        design.content, content
+    ,true, chalk.bgWhite.black.underline);
+    if (ui != null) {
+        ui.updateBottomBar(format);
+    }
     if (need) {
+        /*
+        Method 1: Design ugly, but stable!
         const mutable = new Mutable(); 
         mutable.muted = false;
         const mutableStream = new Writable(mutable);
         const rl = readline.createInterface({
             input: process.stdin,
-            output: process.stdout,
+            output: mutableStream,
             terminal: true
         });
         rl.on("line",(input) => console.log(input));
-        mutableStream.pipe
-        /*
-        const prompt = Inquirer.createPromptModule();
-        return prompt([{
-            type: hide ? "password" : "input",
-            name: "data"
-        }]).then((answers) => answers["data"] as string);
-        */
-       return Promise.resolve("ok");
+       */
+        // Method 2: Design directly
+        const stdin = process.stdin;
+        // stdin.setRawMode(true);
+        stdin.resume();
+        // stdin.setEncoding("utf-8");
+        return new Promise<string>((res,rej) => {
+            const ime = new IME(title,hide,res,rej);
+            process.stdin.on("data", ime.onData.bind(ime));
+        });
     } else {
         return Promise.resolve("ok");
     }
@@ -234,7 +245,7 @@ export async function read(title:string, need = false, hide = false):Promise<str
 export function removeReset(ansi:string) {
     return ansi.replace(/(.\[39m.\[49m|.\[0m])$/i, "");
 }
-function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
+function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string, paddingEnd:boolean = true, cursor:Chalk = null) {
     headerMsg = cutstr(headerMsg,prefixLimit);
     numberMsg = cutstr(numberMsg,numberLimit);
     contentMsg = cutstr(contentMsg,contentLimit);
@@ -247,7 +258,21 @@ function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numbe
         format.push(numberColor(` ${numberMsg.padStart(numberLimit - unicodeLength(numberMsg))} `));
     }
     if (contentMsg != null) {
-        format.push(contentColor(` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} `));
+        let _cM = ` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} `;
+        if (!paddingEnd && length(_cM) < process.stdout.columns) {
+            _cM = _cM.trimRight();
+        }
+        if (cursor != null) {
+            const bl = _cM.match(/\s+/ig);
+            if (bl.length >= 1) {
+                const sizeSub = _cM.length - contentMsg.length - 1;
+                format.push(`${contentColor(_cM.substr(0, contentMsg.length + 1))}${cursor(" ")}${contentColor("".padEnd(sizeSub - 1))}`);
+            } else {
+                format.push(contentColor(_cM));
+            }
+        } else {
+            format.push(contentColor(_cM));
+        }
     }
     return format.join("");
 }
@@ -273,6 +298,12 @@ function caller() {
     return out;
 }
 function length(str:string) {
+    if (str == null) {
+        return 0;
+    }
+    if (str.match(/[ -~]/ig) == null) {
+        return str.length * 2;
+    }
     const asciis = str.match(/[ -~]/ig).length;
     const unicodes =  unicodeLength(str);
     return asciis + 2 * unicodes;
@@ -284,7 +315,7 @@ function cutstr(str:string, end:number) {
     let ln = 0;
     let k = 0;
     if (str == null) {
-        str = "";
+        return null;
     }
     for (const char of str.split("")) {
         const cn = char.charCodeAt(0);
@@ -296,15 +327,93 @@ function cutstr(str:string, end:number) {
     }
     return str;
 }
-class Mutable {
-    public muted = false;
-    private readable:Readable = new Readable();
-    public write(chunk, encoding:string, callback:() => any) {
-        if (!this.muted) {
-            console.log(chunk);
-            // ui.write(chunk);
-            // process.stdout.write(chunk, encoding);
+class IME {
+    public mute:boolean = false;
+    private readonly timeout = 30;
+    private resolve;
+    private reject;
+    private time = this.timeout;
+    private timer;
+    private title;
+    private hide;
+    private data:string[] = [];
+    constructor(title:string, hide:boolean, res:(value:string | PromiseLike<string>) => void,rej:(reason:any) => void) {
+        this.resolve = res;
+        this.reject = rej;
+        this.title = title;
+        this.hide = hide;
+        this.timer = setInterval(this.cancel,1000);
+    }
+    public cancel() {
+        if (this.time <= 0) {
+            this.finish(false,"Timeout");
+        } else {
+            this.time -= 1;
         }
-        callback();
+    }
+    public onData(key:Uint8Array) {
+        clearTimeout(this.timer);
+        let keycode = 0;
+        const ln = key.length - 1;
+        const str = key.toString();
+        key.forEach((_v, _i) => {
+            keycode += (_v << 16 * (ln - _i));
+        });
+        if (keycode >= 0xFFFFFF) {
+            str.split("").forEach((_v) => {
+                this.data.push(_v);
+            });
+            keycode = -1;
+        } else {
+            keycode &= 0xFFFFFF;
+        }
+        switch (keycode) {
+            case 0x1B: {
+                // Esc
+                this.finish(false, "Cancel.");
+                return;
+            } break;
+            case 0x7F: {
+                // Backspace
+                if (this.data.length >= 1) {
+                    this.data.pop();
+                }
+            } break;
+            case 0x4E00D9: {
+                // Del
+                if (this.data.length >= 1) {
+                    this.data = [];
+                }
+            } break;
+            case 0xD: {
+                // Return or enter
+                this.finish(true, this.data.join(""));
+                return;
+            } break;
+            default: {
+                if (keycode !== -1) {
+                    this.data.push(str);
+                }
+            }
+        }
+        this.time = this.timeout;
+        this.timer = setTimeout(this.cancel, 1000);
+        read(this.title, this.hide, false, (this.hide ? this.data.map(() => "*") : this.data).join(""));
+    }
+    public finish(success:boolean, data:string) {
+        r(this.title, (this.hide ? this.data.map(() => "*") : this.data).join(""));
+        ui.updateBottomBar("");
+        process.stdin.removeAllListeners("data");
+        process.stdin.pause();
+        if (ui != null) {
+            ui.close();
+            ui = null;
+            // ui.updateBottomBar("");
+        }
+        if (success) {
+            this.resolve(data);
+        } else {
+            this.reject(data);
+        }
     }
 }
