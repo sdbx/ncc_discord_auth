@@ -60,6 +60,7 @@
     "@types/node": "^10.5.1",
     "@types/read": "0.0.28",
     "@types/request-promise-native": "^1.0.15",
+    "@types/sprintf-js": "^1.1.0",
     "caller": "^1.0.1",
     "chalk": "^2.4.1",
     "cheerio": "^1.0.0-rc.2",

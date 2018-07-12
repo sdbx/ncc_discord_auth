@@ -57,7 +57,8 @@ export default class Config {
             const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
             Config.excludes.split(",").forEach(v => ignore.push(v));
 
-            const write:string = JSON.stringify(this,(key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
+            const write:string = JSON.stringify(this,
+                (key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
             return await fs.access(this.saveTo,fs.constants.W_OK)
                 .catch(err => {
                     if (err.code === "ENOENT") {

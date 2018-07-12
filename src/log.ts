@@ -245,7 +245,9 @@ export async function read(title:string, hide:boolean, need = true, content?:str
 export function removeReset(ansi:string) {
     return ansi.replace(/(.\[39m.\[49m|.\[0m])$/i, "");
 }
-function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string, paddingEnd:boolean = true, cursor:Chalk = null) {
+function formatLog(headerColor:Chalk, headerMsg:string,
+     numberColor:Chalk,numberMsg:string, contentColor:Chalk, contentMsg:string,
+      paddingEnd:boolean = true, cursor:Chalk = null) {
     headerMsg = cutstr(headerMsg,prefixLimit);
     numberMsg = cutstr(numberMsg,numberLimit);
     contentMsg = cutstr(contentMsg,contentLimit);
@@ -266,7 +268,8 @@ function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numbe
             const bl = _cM.match(/\s+/ig);
             if (bl.length >= 1) {
                 const sizeSub = _cM.length - contentMsg.length - 1;
-                format.push(`${contentColor(_cM.substr(0, contentMsg.length + 1))}${cursor(" ")}${contentColor("".padEnd(sizeSub - 1))}`);
+                format.push([contentColor(_cM.substr(0, contentMsg.length + 1)),
+                    cursor(" "),contentColor("".padEnd(sizeSub - 1))].join(""));
             } else {
                 format.push(contentColor(_cM));
             }
@@ -276,7 +279,8 @@ function formatLog(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numbe
     }
     return format.join("");
 }
-function _log(headerColor:Chalk, headerMsg:string, numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
+function _log(headerColor:Chalk, headerMsg:string,
+    numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
     const format = formatLog(headerColor,headerMsg,numberColor,numberMsg,contentColor,contentMsg);
     if (ui != null) {
         ui.log.write(format + "\n");

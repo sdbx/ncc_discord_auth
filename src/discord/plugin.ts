@@ -1,8 +1,10 @@
 import * as Discord from "discord.js";
+import { sprintf } from "sprintf-js";
 import Config from "../config";
 import * as Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
+import { CommandHelp, Keyword } from "./runtime";
 
 export default abstract class Plugin {
     protected config:Config;
@@ -43,7 +45,8 @@ export default abstract class Plugin {
     public async reload():Promise<void> {
         return Promise.resolve();
     }
-    public abstract async onCommand(msg:Discord.Message, command:string, options:WordPiece[]):Promise<void>;
+    public abstract async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void>;
+    public abstract get help():CommandHelp[];
     public async changeConfig(key:string, value:string):Promise<void> {
         if (this.config == null) {
             // ignore
@@ -59,6 +62,18 @@ export default abstract class Plugin {
         } else {
             return Promise.reject("잘못된 값입니다.");
         }
+    }
+    protected formatUser(user:Discord.User) {
+        return {
+            name:user.username,
+            mention:`<@${user.id}>`
+        }
+    }
+    protected format(value:string, ...args:any[]):string {
+        const pm = [];
+        pm.push(value);
+        args.forEach((v) => pm.push(v));
+        return sprintf.apply(null,pm);
     }
     protected toLangString(value:string | number | boolean) {
         let data:string;
@@ -128,7 +143,8 @@ export default abstract class Plugin {
                         const innerObj = obj[key];
                         if (Array.isArray(innerObj)) {
                             if (innerObj.every((_v) => typeof _v === "number")) {
-                                obj[key] = value.split(",").map((_v) => Number.parseInt(_v)).filter((_v) => Number.isSafeInteger(_v));
+                                obj[key] = value.split(",").map(
+                                    (_v) => Number.parseInt(_v)).filter((_v) => Number.isSafeInteger(_v));
                             } else {
                                 obj[key] = value.split(",");
                             }
@@ -156,8 +172,4 @@ export default abstract class Plugin {
         }
         return Promise.resolve(config);
     }
-}
-export interface WordPiece {
-    type:string,
-    str:string,
 }
