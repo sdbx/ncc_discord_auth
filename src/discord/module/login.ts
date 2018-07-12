@@ -1,11 +1,12 @@
 import * as Discord from "discord.js";
 import { sprintf } from "sprintf-js";
 import Config from "../../config";
-import Plugin, { WordPiece } from "../plugin";
+import Plugin from "../plugin";
+import { Keyword } from "../runtime";
 
 export default class Login extends Plugin {
-    protected config = new LoginConfig();
-    public async onCommand(msg:Discord.Message, command:string, options:WordPiece[]):Promise<void> {
+    protected global = new LoginConfig();
+    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
         const lang = this.lang.login;
         if (msg.channel.type === "dm") {
             if (command.endsWith("상태 알려")) {

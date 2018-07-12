@@ -16,7 +16,10 @@ export default class Lang extends Config {
         failAdmin_invalidToken: "토큰이 안맞다냥..",
         failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!"
     };
-    public textAuthSuccess = "%(mention)s님 인증 완료다냐!"
+
+    public paramFew = "%(param)s 파라메터가 필요하다냥!";
+    public helpTitle = "도움말이다냥!";
+    public helpNoExists = "%(help)s 명령어는 없다냥!";
 
     constructor() {
         super("lang");

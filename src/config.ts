@@ -3,9 +3,9 @@ import * as path from "path";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version
-    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name";
+    // tslint:disable-next-line
+    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name,subDir,sub";
     public version:number; // config version
-    public blacklist:string[]; // blacklist for config
     /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
     public cafe:ICafe = {} as any;
@@ -14,9 +14,10 @@ export default class Config {
     public roleName:string = "@everyone";
     public articleCfg:IArticleCfg = {} as any;
     */
-
     public configName:string;
+    public blacklist:string[]; // blacklist for config
     // private readonly saveTo:string = "./config/config.json";
+    protected subDir:string; // subdir
     protected saveTo:string; // save location
     public static get dirpath():string {
         let rootDir = path.resolve(process.cwd());
@@ -33,16 +34,25 @@ export default class Config {
      * @param _name Name of config
      * @param _version Version
      */
-    public constructor(_name:string,_version:number = Config.appVersion) {
+    public constructor(_name:string,_sub = null, _version = Config.appVersion) {
         // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
         this.blacklist = [];
+        this.subDir = _sub;
         this.name = _name;
         // console.log(`${_name}'s config: ${this.saveTo}`);
     }
+    public set sub(n:string) {
+        this.subDir = n;
+        this.name = this.name;
+    }
     public set name(n:string) {
         this.configName = n;
-        this.saveTo = path.resolve(Config.dirpath, `${n}.json`);
+        if (this.subDir != null) {
+            this.saveTo = path.resolve(Config.dirpath, this.subDir, `${n}.json`);
+        }else {
+            this.saveTo = path.resolve(Config.dirpath, `${n}.json`);
+        }
     }
     public get name():string {
         return this.configName;
@@ -99,7 +109,7 @@ export default class Config {
                 }
             }
             // clone!
-            this.clone(data);
+            this._clone(data);
         } else {
             console.error("Can't read config file");
             if (write) {
@@ -115,7 +125,7 @@ export default class Config {
             return Promise.resolve();
         }
     }
-    protected clone(source:any) {
+    protected _clone(source:any) {
         for (const key of Object.keys(this)) {
             if (this.hasOwnProperty(key) && source.hasOwnProperty(key)) {
                 this[key] = this.clone_chain(source[key],this[key]);

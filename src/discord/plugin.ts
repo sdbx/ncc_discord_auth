@@ -7,10 +7,11 @@ import Lang from "./lang";
 import { CommandHelp, Keyword } from "./runtime";
 
 export default abstract class Plugin {
-    protected config:Config;
+    protected global:Config;
     protected client:Discord.Client;
     protected ncc:Ncc;
     protected lang:Lang;
+    private subConfigs:Map<string,Config>;
 
     /**
      * on plugin load
@@ -21,14 +22,15 @@ export default abstract class Plugin {
         this.client = cl;
         this.ncc = nc;
         this.lang = ln;
+        this.subConfigs = new Map();
     }
     /**
      * on discord ready
      */
     public async ready():Promise<void> {
         Log.d(this.constructor.name, "bot ready.");
-        if (this.config != null) {
-            await this.config.import(true).catch((err) => null);
+        if (this.global != null) {
+            await this.global.import(true).catch((err) => null);
         }
         return Promise.resolve();
     }
@@ -48,20 +50,38 @@ export default abstract class Plugin {
     public abstract async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void>;
     public abstract get help():CommandHelp[];
     public async changeConfig(key:string, value:string):Promise<void> {
-        if (this.config == null) {
+        if (this.global == null) {
             // ignore
             return Promise.reject(null);
         }
         let split = key.split(".");
         if (split.length >= 2) {
-            if (split[0] === this.config.configName) {
+            if (split[0] === this.global.configName) {
                 split = split.slice(1);
-                return this.onConfigChange(this.config,split,value).then(() => this.config.export());
+                return this.onConfigChange(this.global, split, value).then(() => this.global.export());
             }
             return Promise.reject(null);
         } else {
             return Promise.reject("잘못된 값입니다.");
         }
+    }
+    /**
+     * Umran
+     * @param global class object 
+     * @param subName sub name :)
+     */
+    protected async config<T extends Config>(global:T,subName:string):Promise<T> {
+        if (this.subConfigs.has(subName)) {
+            return this.subConfigs.get(subName) as T;
+        }
+        const newI:T = new (global["constructor"] as any)() as T;
+        newI.name = subName;
+        newI.sub = global.name;
+        await newI.import(true).catch((err) => Log.e);
+        this.subConfigs.set(subName,newI);
+        // test.name = "test74";
+        // const subConfig = {...global}
+        return Promise.resolve(newI);
     }
     protected formatUser(user:Discord.User) {
         return {
