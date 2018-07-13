@@ -40,7 +40,7 @@
     "prefer-const": {"severity":"warn"},
     "triple-equals": [true, "allow-null-check","allow-undefined-check"],
     "no-var-requires": false,
-    "max-classes-per-file": 2,
+    "max-classes-per-file": {"severity":"off","options":[2]},
     "max-line-length": {"options":[120]}
   }
 }

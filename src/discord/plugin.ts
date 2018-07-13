@@ -1,17 +1,19 @@
 import * as Discord from "discord.js";
 import { sprintf } from "sprintf-js";
 import Config from "../config";
-import * as Log from "../log";
+import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
-import { CommandHelp, Keyword } from "./runtime";
+import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
 
+const timeout = 1 * 60 * 1000; // 1 is minutes
 export default abstract class Plugin {
     protected global:Config;
     protected client:Discord.Client;
     protected ncc:Ncc;
     protected lang:Lang;
     private subConfigs:Map<string,Config>;
+    private chains:Map<string,ChainData>;
 
     /**
      * on plugin load
@@ -23,6 +25,7 @@ export default abstract class Plugin {
         this.ncc = nc;
         this.lang = ln;
         this.subConfigs = new Map();
+        this.chains = new Map();
     }
     /**
      * on discord ready
@@ -34,7 +37,18 @@ export default abstract class Plugin {
         }
         return Promise.resolve();
     }
+    // abstract
     /**
+     * @todo on Command receive
+     * @param msg message!
+     * @param command command(suffix)
+     * @param options options
+     */
+    public abstract async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void>;
+    public abstract get help():CommandHelp[];
+    /**
+     * @todo on message received
+     * DO NOT SEND MESSAGE when BOT has spoken.
      * on message received(except command)
      * @param msg 
      */
@@ -47,8 +61,6 @@ export default abstract class Plugin {
     public async reload():Promise<void> {
         return Promise.resolve();
     }
-    public abstract async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void>;
-    public abstract get help():CommandHelp[];
     public async changeConfig(key:string, value:string):Promise<void> {
         if (this.global == null) {
             // ignore
@@ -66,12 +78,99 @@ export default abstract class Plugin {
         }
     }
     /**
+     * 체인 여부
+     * @param channel 채널 
+     * @param user 유저
+     */
+    public chaining(channel:string, user:string) {
+        return this.chains.has(`${channel}$${user}`);
+    }
+    public async callChain(message:Discord.Message, channel?:string, user?:string):Promise<boolean> {
+        if (channel === null) {
+            channel = message.channel.id;
+        }
+        if (user === null) {
+            user = message.author.id;
+        }
+        const id = `${channel}$${user}`;
+        if (this.chaining(channel, user)) {
+            const chainData = this.chains.get(id);
+            if (Date.now() - chainData.time >= timeout) {
+                this.chains.delete(id);
+                return Promise.resolve(false);
+            }
+            const chained = await this.onChainMessage(message, chainData.type, chainData.data);
+            if (chained.type === -1) {
+                // chain end.
+                Log.d("Chain", "chain end.");
+            } else {
+                this.chains.set(id, chained);
+            }
+            return Promise.resolve(true);
+        }
+        return Promise.resolve(false);
+    }
+    public async endChain(message:Discord.Message, type:number, data:object, channel?:string, user?:string) {
+        if (channel === null) {
+            channel = message.channel.id;
+        }
+        if (user === null) {
+            user = message.author.id;
+        }
+        if (this.chaining(channel, user)) {
+            this.chains.delete(`${channel}$${user}`);
+        }
+        await this.onChainEnd(message, type, data);
+        return Promise.resolve({
+            type: -1,
+            data: null,
+            time: -1,
+        } as ChainData);
+    }
+    /**
+     * 체인 중일때 메세지를 받았을 때
+     * @param message 메세지
+     * @param type 유형
+     * @param data 값
+     */
+    protected async onChainMessage(message:Discord.Message, type:number, data:object):Promise<ChainData> {
+        return this.endChain(message,type,data);
+    }
+    /**
+     * 체인을 끝내는 명령어를 받았을 때
+     * @param message 메세지
+     * @param type 유형
+     * @param data 값
+     */
+    protected async onChainEnd(message:Discord.Message, type:number, data:object):Promise<void> {
+        return Promise.resolve();
+    }
+    /**
+     * 연속된 명령 받기를 위해 체인에 id와 type과 data를 넣음
+     * @param channel 채널
+     * @param user 유저
+     * @param type 체인 타입
+     * @param data 값
+     */
+    protected startChain(channel:string, user:string, type:number, data:object = {}):void {
+        const id = `${channel}$${user}`;
+        if (!this.chains.has (id)) {
+            this.chains.set(id,{
+                type,
+                data,
+                time: Date.now(),
+            } as ChainData);
+        } else {
+            Log.w(this.constructor.name, `체인 실패 - 이미 ${channel} 안의 ${user} 에 대한 체인이 있음`);
+        }
+    }
+    /**
      * Umran
      * @param global class object 
      * @param subName sub name :)
      */
-    protected async config<T extends Config>(global:T,subName:string):Promise<T> {
-        if (this.subConfigs.has(subName)) {
+    protected async config<T extends Config>(global:T,subName:string):Promise < T > {
+        if (this.subConfigs.has (subName)) {
             return this.subConfigs.get(subName) as T;
         }
         const newI:T = new (global["constructor"] as any)() as T;
@@ -117,7 +216,7 @@ export default abstract class Plugin {
      * @param keys chain of depth
      * @param value data as string?
      */
-    protected async onConfigChange<T extends Config>(config:T,keys:string[], value:string):Promise<T> {
+    protected async onConfigChange<T extends Config>(config:T,keys:string[], value:string):Promise < T > {
         let obj:any = config;
         let error:string = null;
         let i = 0;

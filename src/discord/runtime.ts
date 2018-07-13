@@ -1,133 +1,16 @@
 import * as Discord from "discord.js";
-import Config from "../config";
-import Plugin from "./plugin";
-
 import { sprintf } from "sprintf-js";
-import * as Log from "../log";
+import Config from "../config";
+import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
-// import Auth from "./module/auth";
-// import Login from "./module/login";
 import Ping from "./module/ping";
-
-const expDest = /.+?(을|를|좀)\s+/i;
-const expCmd = /[\w가-힣]+(줘|해)/ig;
-const expCmdSuffix = /(해|줘|해줘)/ig;
+import Plugin from "./plugin";
+import { CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
 
 const queryCmd = /\s+\S+/ig;
 const safeCmd = /(".+?")|('.+?')/i;
-export enum ParamType {
-    thing = "이/가",
-    dest = "을/를/좀",
-    for = "에게/한테",
-    to = "으로/로",
-    from = "에서",
-    do = "해줘/해/줘",
-}
-export interface Keyword {
-    type:ParamType;
-    str:string;
-    query?:string[];
-    require?:boolean;
-}
-export class CommandHelp {
-    public cmds:string[]; // allow cmds
-    public params:Keyword[]; // parameter info
-    public description:string; // Description command
-    public complex:boolean = false; // receive only keyword is matching?
-    public constructor(commands:string, desc:string) {
-        this.cmds = commands.split(",");
-        this.description = desc;
-        this.params = [];
-    }
-    public addField(type:ParamType, content:string,require:boolean = true) {
-        this.params.push({
-            type,
-            str: content,
-            require,
-        });
-    }
-    public get title():string {
-        let out:string = "";
-        if (this.params.length >= 1) {
-            out = this.params.map((value,index) => {
-                const echo:string[] = [];
-                echo.push(value.require ? "<" : "[");
-                echo.push(value.str);
-                echo.push(` (${value.type.replace(/\//ig,",")})`);
-                echo.push(value.require ? ">" : "]");
-                return echo.join("");
-            }).join(" ");
-            out += " ";
-        }
-        out += this.cmds.join("|");
-        return out;
-    }
-    public check(command:string, options:Keyword[]) {
-        let cmdOk = false;
-        let optStatus:string = null;
-        for (const cmd of this.cmds) {
-            if (cmd === command || (this.complex && cmd.endsWith(" " + command))) {
-                cmdOk = true;
-                break;
-            }
-        }
-        const must = this.params.filter((_v) => _v.require);
-        const optional = this.params.filter((_v) => !_v.require);
 
-        const param_must:Map<ParamType, string> = new Map();
-        const param_opt:Map<ParamType, string> = new Map();
-
-        if (cmdOk) {
-            let dummy = false;
-            for (const paramP of options) {
-                // check - must
-                let _must = -1;
-                must.forEach((_v,_i) => {
-                    if (_must < 0 && paramP.type === _v.type) {
-                        _must = _i;
-                        param_must.set(paramP.type,paramP.str);
-                    }
-                });
-                if (_must >= 0) {
-                    must.splice(_must,1);
-                    continue;
-                }
-                // check - opt
-                let _opt = -1;
-                optional.forEach((_v,_i) => {
-                    if (_opt < 0 && paramP.type === _v.type) {
-                        _opt = _i;
-                        param_opt.set(paramP.type,paramP.str);
-                    }
-                });
-                if (_opt >= 0) {
-                    optional.splice(_opt,1);
-                    continue;
-                }
-                // cmd.. or dummy?
-                if (paramP.type !== ParamType.do) {
-                    dummy = true;
-                    if (this.complex) {
-                        param_opt.set(paramP.type,paramP.str);
-                    }
-                }
-            }
-            if (must.length >= 1) {
-                optStatus = must.map((_v) => _v.str).join(", ");
-            }
-            if (!this.complex && (optional.length >= 1 || dummy)) {
-                Log.i(command,"Strict mode: failed. But pass.");
-            }
-        }
-        return {
-            cmdOk,
-            optStatus,
-            requires:param_must,
-            chocies:param_opt,
-        }
-    }
-}
 export default class Runtime {
     private cfg = new Bot();
     private lang = new Lang();
@@ -173,8 +56,17 @@ export default class Runtime {
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;
         const prefix = this.cfg.prefix;
+        // onMessage should invoke everytime.
+        await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
+        // chain check
+        for (const plugin of this.plugins) {
+            if (await plugin.callChain(msg,msg.channel.id, msg.author.id)) {
+                // invoked chain.
+                return Promise.resolve();
+            }
+        }
+        // command check
         if (!prefix.test(text)) {
-            await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
             return Promise.resolve();
         }
         let chain = msg.content;
@@ -240,8 +132,6 @@ export default class Runtime {
             // no exists :(
             cmd = cacheWord.join("").trim();
         }
-        // send message to cmd
-        await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
         /*
           * hard coding!
         */

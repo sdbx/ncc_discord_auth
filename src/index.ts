@@ -3,7 +3,7 @@ import * as Discord from "discord.js";
 import { Room } from "node-ncc-es6";
 import * as readline from "readline";
 import Runtime from "./discord/runtime";
-import * as Log from "./log";
+import Log from "./log";
 import Ncc from "./ncc/ncc";
 import Cafe from "./structure/cafe";
 async function init() {

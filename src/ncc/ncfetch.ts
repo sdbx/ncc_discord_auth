@@ -3,7 +3,7 @@ import * as encoding from "encoding";
 import * as Entities from "html-entities";
 import * as querystring from "querystring";
 import * as request from "request-promise-native";
-import * as Log from "../log";
+import Log from "../log";
 import Article from "../structure/article";
 import Cafe from "../structure/cafe";
 import Comment from "../structure/comment";
@@ -27,8 +27,9 @@ export default class NcFetch extends NcCredent {
         /**
          * Check cookie status
          */
-        if (option.auth && (!this.available || !new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl) || this.validateLogin() == null)) {
-            Log.e("Cookie is invaild");
+        const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl);
+        if (option.auth && (!this.available || !isNaver || this.validateLogin() == null)) {
+            Log.e("ncc-getWeb : Cookie is invaild");
             return Promise.reject();
         }
         /**
@@ -56,7 +57,8 @@ export default class NcFetch extends NcCredent {
          */
         let post_body = null;
         if (post != null) {
-            post_body = encoding.convert(querystring.stringify(post, "&", "=", { encodeURIComponent: (v) => v }), "utf-8")
+            post_body = encoding.convert(
+                querystring.stringify(post, "&", "=", { encodeURIComponent: (v) => v }), "utf-8");
         }
         /**
          * Make referer and options.
@@ -181,7 +183,8 @@ export default class NcFetch extends NcCredent {
 
             let imgurl = null;
             if ($(el).find(".u_cbox_image_wrap").length >= 1) {
-                imgurl = this.orgURI($(el).find(".u_cbox_image_wrap").find("a").attr("class").match(/(http|https):\/\/.+\)/i)[0]);
+                imgurl = this.orgURI($(el).find(".u_cbox_image_wrap").find("a").attr("class")
+                .match(/(http|https):\/\/.+\)/i)[0]);
             }
 
             let stickerurl = null;
@@ -245,7 +248,8 @@ export default class NcFetch extends NcCredent {
         const contents = [];
         const whitelist = ["img","iframe", "embed", "br"];
         tbody.children().map((i,el) => {
-            const parsedContent = this.getTextsR(el, []).filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
+            const parsedContent = this.getTextsR(el, [])
+            .filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
                 if (whitelist.indexOf(value.tagName) >= 0) {
                     let type = "embed";
                     let data = value.attribs["src"];
@@ -302,7 +306,8 @@ export default class NcFetch extends NcCredent {
             imageURL: image,
         } as Article;
         return Promise.resolve(out);
-        // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&page=1&boardtype=L&articleid=7446&referrerAllArticles=true
+        // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&
+        // page=1&boardtype=L&articleid=7446&referrerAllArticles=true
     }
     public async getMember(cafeid:number, id:string, isNickname = true):Promise<Profile[]> {
         const url_params = {

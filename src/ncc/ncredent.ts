@@ -6,7 +6,7 @@ import * as read from "read";
 import * as request from "request-promise-native";
 import { CookieJar } from "tough-cookie";
 import Config from "../config";
-import * as Log from "../log";
+import Log from "../log";
 
 export default class NcCredent {
     protected credit:Credentials;
