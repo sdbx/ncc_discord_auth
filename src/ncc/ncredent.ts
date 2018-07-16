@@ -35,8 +35,8 @@ export default class NcCredent {
      * @returns naver username or null(error)
      */
     public async genCreditByConsole():Promise<string> {
-        const username = await Log.read("Username",false).catch(() => "id");
-        const password = await Log.read("Password",true).catch(() => "pw");
+        const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id");
+        const password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "pw");
         return this.requestCredent(username,password);
     }
     /**
