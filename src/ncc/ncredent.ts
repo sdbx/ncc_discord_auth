@@ -36,7 +36,7 @@ export default class NcCredent {
      */
     public async genCreditByConsole():Promise<string> {
         const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id");
-        const password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "pw");
+        const password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__");
         return this.requestCredent(username,password);
     }
     /**
@@ -49,6 +49,7 @@ export default class NcCredent {
         this.credit = new Credentials(username,password);
         await this.credit.login();
         const name = await this.validateLogin();
+        this.credit.password = "__";
         if (name != null) {
             this.credit.username = name;
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
@@ -76,7 +77,6 @@ export default class NcCredent {
         return Promise.resolve(result);
     }
     protected async onLogin(username:string):Promise<void> {
-        Log.v("ncc", "Login.");
         this.inited = true;
         return Promise.resolve();
     }

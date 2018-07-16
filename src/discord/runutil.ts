@@ -52,7 +52,7 @@ export class CommandHelp {
         let cmdOk = false;
         let optStatus:string = null;
         for (const cmd of this.cmds) {
-            if (cmd === command || (this.complex && cmd.endsWith(" " + command))) {
+            if (cmd === command || (this.complex && command.endsWith(" " + cmd))) {
                 cmdOk = true;
                 break;
             }
@@ -109,20 +109,24 @@ export class CommandHelp {
             cmdOk,
             optStatus,
             param_must,
-            param_opt
+            param_opt,
+            command.split(/\s/ig),
         );
     }
 }
 export class CommandStatus {
     public requires:Map<ParamType, string>;
     public options:Map<ParamType, string>;
+    public commands:string[];
     protected commandMatch:boolean;
     protected optionStatus:string;
-    constructor(cmdOk:boolean, optStatus:string, req:Map<ParamType, string>, choices:Map<ParamType, string>) {
+    constructor(cmdOk:boolean, optStatus:string, req:Map<ParamType, string>, 
+            choices:Map<ParamType, string>, cmds:string[]) {
         this.commandMatch = cmdOk;
         this.requires = req;
         this.options = choices;
         this.optionStatus = optStatus;
+        this.commands = cmds;
     }
     public get match() {
         return this.commandMatch && this.optionStatus == null;
@@ -144,6 +148,19 @@ export class CommandStatus {
         } else {
             return undefined;
         }
+    }
+    public getSubCmd(start:number, end:number) {
+        if (end >= this.commands.length || start > end) {
+            return null;
+        } else {
+            return this.commands.filter((_v,_i) => _i >= start && _i < end).join(" ");
+        }
+    }
+    public getLastCmd(depth:number = 1) {
+        if (depth >= 1 && this.commands.length <= 1) {
+            return null;
+        }
+        return this.commands[Math.max(0,this.commands.length - depth)];
     }
 }
 export interface ChainData {

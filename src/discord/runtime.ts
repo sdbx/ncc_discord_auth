@@ -141,41 +141,68 @@ export default class Runtime {
         await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, cmd, pieces)));
     }
     private async hardCodingCmd(msg:Discord.Message, cmd:string, pieces:Keyword[]):Promise<boolean> {
-        const dest = pieces.filter((_v) => _v.type === ParamType.dest);
         let result = false;
-        if (cmd.endsWith("명령어 알려") || (cmd === "알려" && dest.length >= 1 && dest[0].str.endsWith("명령어"))) {
-            let destcmd:string = null;
-            if (cmd.endsWith("명령어 알려") && cmd.length > 6) {
-                destcmd = cmd.substring(0,cmd.lastIndexOf("명령어")).trim();
-            } else if (dest.length >= 1 && dest[0].str.length >= 4) {
-                destcmd = dest[0].str.substring(0, dest[0].str.lastIndexOf("명령어")).trim();
-            }
-            const helps:CommandHelp[] = [];
-            this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
-                _v.forEach((__v,__i) => {
-                    if (destcmd != null && destcmd.length >= 1) {
-                        if (__v.cmds.indexOf(destcmd) >= 0) {
-                            helps.push(__v);
-                        }
-                    } else {
-                        helps.push(__v);
-                    }
-                });
-            });
-            if (helps.length === 0) {
-                await msg.channel.send(sprintf(this.lang.helpNoExists,{help:destcmd}));
+        // help
+        const helpCmd = new CommandHelp("알려,도움,도와","_",true);
+        helpCmd.addField(ParamType.dest, "명령어여야 하는 것",false);
+        const _help = helpCmd.test(cmd,pieces);
+        if (_help.match) {
+            let dest:string;
+            if (_help.exist(ParamType.dest)) {
+                dest = "*";
+                if (_help.get(ParamType.dest) !== "명령어") {
+                    dest = _help.get(ParamType.dest).trim();
+                }
             } else {
-                for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
-                    const richMsg = new Discord.RichEmbed();
-                    richMsg.setTitle(this.lang.helpTitle);
-                    richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
-                    for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
-                        richMsg.addField(helps[i * 20 + k].title, helps[i * 20 + k].description);
+                if (cmd.endsWith("도움") || cmd.endsWith("도와")) {
+                    const sub = _help.getSubCmd(0, _help.commands.length - 1);
+                    if (sub != null) {
+                        dest = sub;
+                    } else {
+                        dest = "*";
                     }
-                    await msg.channel.send(richMsg);
+                } else {
+                    const sub = _help.getLastCmd(2);
+                    if (sub != null && sub.endsWith("명령어")) {
+                        const sub2 = _help.getLastCmd(3);
+                        if (sub2 !== "명령어") {
+                            dest = sub2;
+                        } else {
+                            dest = "*";
+                        }
+                    } else if (sub != null) {
+                        dest = sub;
+                    }
                 }
             }
-            result = true;
+            if (dest != null) {
+                const helps:CommandHelp[] = [];
+                this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
+                    _v.forEach((__v,__i) => {
+                        if (dest !== "*") {
+                            if (__v.cmds.indexOf(dest) >= 0) {
+                                helps.push(__v);
+                            }
+                        } else {
+                            helps.push(__v);
+                        }
+                    });
+                });
+                if (helps.length === 0) {
+                    await msg.channel.send(sprintf(this.lang.helpNoExists,{help:dest}));
+                } else {
+                    for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
+                        const richMsg = new Discord.RichEmbed();
+                        richMsg.setTitle(this.lang.helpTitle);
+                        richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
+                        for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
+                            richMsg.addField(helps[i * 20 + k].title, helps[i * 20 + k].description);
+                        }
+                        await msg.channel.send(richMsg);
+                    }
+                }
+                result = true;
+            }
         }
         return Promise.resolve(result);
     }
@@ -185,7 +212,8 @@ export default class Runtime {
 }
 export function getNickname(msg:Discord.Message) {
     if (msg.channel.type !== "dm") {
-        return msg.guild.member(msg.author).nickname;
+        const gn = msg.guild.member(msg.author).nickname;
+        return gn != null ? gn : msg.author.username;
     } else {
         return msg.author.username;
     }
