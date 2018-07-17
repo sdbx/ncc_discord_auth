@@ -67,7 +67,13 @@ export default class NcCredent {
         if (cookieStr == null) {
             return Promise.resolve(null);
         }
-        this.credit.setCookieJar(JSON.parse(cookieStr));
+        try {
+            this.credit.setCookieJar(JSON.parse(cookieStr));
+        } catch (err) {
+            await fs.remove(this.cookiePath); 
+            Log.e(err);
+            return Promise.resolve(null);
+        }
         const result:string = await this.validateLogin();
         if (result != null) {
             this.credit.username = result;

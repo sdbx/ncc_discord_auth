@@ -7,12 +7,12 @@ import Log from "./log";
 import Ncc from "./ncc/ncc";
 import Cafe from "./structure/cafe";
 async function init() {
-    Log.hook();
+    // Log.hook();
     const run:Runtime = new Runtime();
     await run.start();
-    /*
     const ncc = new Ncc();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
+    /*
     if (loaded != null) {
         Log.d(`name: ${loaded}`);
         const ar = await ncc.getArticleDetail(26686242, 7382);

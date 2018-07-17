@@ -61,12 +61,43 @@ export default abstract class Plugin {
     public async reload():Promise<void> {
         return Promise.resolve();
     }
-    public async changeConfig(key:string, value:string):Promise<void> {
+    public async changeConfig(key:string, value:string):Promise<string> {
         if (this.global == null) {
             // ignore
             return Promise.reject(null);
         }
         let split = key.split(".");
+        let chain:object;
+        let error:string;
+        for (let i = 0; i < split.length; i += 1) {
+            const _value = split[i].replace(/\s+/ig,"");
+            const tag = _value.replace(/(<.*>|\[.*\])/ig, "");
+            if (i === 0) {
+                if (this.global == null || tag !== this.global.name) {
+                    break;
+                } else {
+                    const _sub = _value.match(/<.*>/);
+                    if (_sub != null && _sub.length === 1) {
+                        const sub = _sub[0].substring(1,_sub[0].length - 1);
+                        if (await this.config(this.global, sub, false).then((v) => v.has())) {
+                            chain = await this.config(this.global, sub, true);
+                            continue;
+                        }
+                    } else {
+                        chain = this.global;
+                        continue;
+                    }
+                    break;
+                }
+            } else {
+                const depth = Object.getOwnPropertyDescriptor(chain, tag);
+                if (depth != undefined && depth.configurable) {
+                    
+                } else {
+                    error = `${split.filter((__v, __i) => __i < i).join(".")}에서 ${tag}를 찾을 수 없음.`;
+                }
+            }
+        }
         if (split.length >= 2) {
             if (split[0] === this.global.configName) {
                 split = split.slice(1);
@@ -169,15 +200,17 @@ export default abstract class Plugin {
      * @param global class object 
      * @param subName sub name :)
      */
-    protected async config<T extends Config>(global:T,subName:string):Promise < T > {
-        if (this.subConfigs.has (subName)) {
+    protected async config<T extends Config>(global:T,subName:string,load = true):Promise<T> {
+        if (this.subConfigs.has(subName)) {
             return this.subConfigs.get(subName) as T;
         }
         const newI:T = new (global["constructor"] as any)() as T;
         newI.name = subName;
         newI.sub = global.name;
-        await newI.import(true).catch((err) => Log.e);
-        this.subConfigs.set(subName,newI);
+        if (load) {
+            await newI.import(load).catch(Log.e);
+            this.subConfigs.set(subName,newI);
+        }
         // test.name = "test74";
         // const subConfig = {...global}
         return Promise.resolve(newI);

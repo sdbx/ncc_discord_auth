@@ -69,6 +69,7 @@
     "encoding": "^0.1.12",
     "esrever": "^0.2.0",
     "fs-extra": "^6.0.1",
+    "hangul-js": "^0.2.4",
     "html-entities": "^1.2.1",
     "inquirer": "^6.0.0",
     "node-ncc-es6": "^0.3.3",

@@ -50,10 +50,16 @@ export class CommandHelp {
     }
     public test(command:string, options:Keyword[]) {
         let cmdOk = false;
+        let cmdPiece;
         let optStatus:string = null;
         for (const cmd of this.cmds) {
-            if (cmd === command || (this.complex && command.endsWith(" " + cmd))) {
+            if (cmd === command) {
                 cmdOk = true;
+                break;
+            }
+            if (this.complex && command.endsWith(" " + cmd)) {
+                cmdOk = true;
+                cmdPiece = command.substring(0,command.lastIndexOf(" " + cmd));
                 break;
             }
         }
@@ -99,7 +105,17 @@ export class CommandHelp {
                 }
             }
             if (must.length >= 1) {
-                optStatus = must.map((_v) => _v.str).join(", ");
+                if (this.complex && must.length === 1 && cmdPiece != null) {
+                    param_must.set(must[0].type, cmdPiece);
+                    must.splice(0,1);
+                    cmdPiece = null;
+                } else {
+                    optStatus = must.map((_v) => _v.str).join(", ");
+                }
+            }
+            if (this.complex && optional.length === 1 && cmdPiece != null) {
+                param_opt.set(optional[0].type, cmdPiece);
+                optional.slice(0,1);
             }
             if (!this.complex && (optional.length >= 1 || dummy)) {
                 Log.i(command,"Strict mode: failed. But pass.");
@@ -153,7 +169,8 @@ export class CommandStatus {
         if (end >= this.commands.length || start > end) {
             return null;
         } else {
-            return this.commands.filter((_v,_i) => _i >= start && _i < end).join(" ");
+            const filter = this.commands.filter((_v,_i) => _i >= start && _i < end);
+            return filter.length >= 1 ? filter.join(" ") : null;
         }
     }
     public getLastCmd(depth:number = 1) {

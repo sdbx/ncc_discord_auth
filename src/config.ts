@@ -14,9 +14,9 @@ export default class Config {
     public roleName:string = "@everyone";
     public articleCfg:IArticleCfg = {} as any;
     */
-    public configName:string;
     public blacklist:string[]; // blacklist for config
     // private readonly saveTo:string = "./config/config.json";
+    protected configName:string;
     protected subDir:string; // subdir
     protected saveTo:string; // save location
     public static get dirpath():string {
@@ -84,6 +84,10 @@ export default class Config {
             console.error("export - No directory");
             return Promise.reject("No directory");
         }
+    }
+    public async has():Promise<boolean> {
+        return await fs.access(this.saveTo,fs.constants.F_OK | fs.constants.R_OK)
+            .then(() => true).catch((err) => false);
     }
     /**
      * import config from file

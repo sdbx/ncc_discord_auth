@@ -1,4 +1,5 @@
 import * as Discord from "discord.js";
+import { EventEmitter } from "events";
 import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
@@ -11,15 +12,21 @@ import { CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
 const queryCmd = /\s+\S+/ig;
 const safeCmd = /(".+?")|('.+?')/i;
 
-export default class Runtime {
+export default class Runtime extends EventEmitter {
     private cfg = new Bot();
     private lang = new Lang();
     private client:Discord.Client;
     private ncc:Ncc;
     private plugins:Plugin[] = [];
     constructor() {
+        super();
         // ,new Auth(), new Login()
         this.plugins.push(new Ping());
+        // event register
+        this.plugins.forEach(((v,i) => {
+            this.on("ready",v.ready.bind(v));
+            this.on("message",v.onMessage.bind(v));
+        }));
     }
     public async start():Promise<string> {
         // load config
@@ -46,18 +53,25 @@ export default class Runtime {
         this.client.login(this.cfg.token)
         return Promise.resolve("");
     }
+    public async destroy() {
+        this.client.removeAllListeners();
+        await this.client.destroy();
+        this.ncc.chat.disconnect();
+        return Promise.resolve();
+    }
     protected async ready() {
         // init plugins
         for (const plugin of this.plugins) {
             plugin.init(this.client, this.ncc, this.lang);
-            await plugin.ready();
         }
+        this.emit("ready");
     }
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;
         const prefix = this.cfg.prefix;
         // onMessage should invoke everytime.
-        await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
+        this.emit("message",msg);
+        // await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
         // chain check
         for (const plugin of this.plugins) {
             if (await plugin.callChain(msg,msg.channel.id, msg.author.id)) {
@@ -142,41 +156,31 @@ export default class Runtime {
     }
     private async hardCodingCmd(msg:Discord.Message, cmd:string, pieces:Keyword[]):Promise<boolean> {
         let result = false;
-        // help
-        const helpCmd = new CommandHelp("알려,도움,도와","_",true);
-        helpCmd.addField(ParamType.dest, "명령어여야 하는 것",false);
+        const helpCmd = new CommandHelp("알려,도움,도와,도움말",this.lang.helpDesc,true);
+        helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
+        const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false);
+        setCmd.addField(ParamType.dest, "목적", true);
+        setCmd.addField(ParamType.to, "설정값", true);
+        /*
+            Help Command
+        */
         const _help = helpCmd.test(cmd,pieces);
-        if (_help.match) {
-            let dest:string;
+        if (!result && _help.match) {
+            let dest = "*";
             if (_help.exist(ParamType.dest)) {
-                dest = "*";
-                if (_help.get(ParamType.dest) !== "명령어") {
-                    dest = _help.get(ParamType.dest).trim();
+                dest = _help.get(ParamType.dest);
+                if (dest.endsWith("명령어")) {
+                    dest = dest.substring(0,dest.lastIndexOf("명령어") - 1).trim();
                 }
-            } else {
-                if (cmd.endsWith("도움") || cmd.endsWith("도와")) {
-                    const sub = _help.getSubCmd(0, _help.commands.length - 1);
-                    if (sub != null) {
-                        dest = sub;
-                    } else {
-                        dest = "*";
-                    }
-                } else {
-                    const sub = _help.getLastCmd(2);
-                    if (sub != null && sub.endsWith("명령어")) {
-                        const sub2 = _help.getLastCmd(3);
-                        if (sub2 !== "명령어") {
-                            dest = sub2;
-                        } else {
-                            dest = "*";
-                        }
-                    } else if (sub != null) {
-                        dest = sub;
-                    }
+                if (dest.length < 1) {
+                    dest = "*";
                 }
             }
             if (dest != null) {
                 const helps:CommandHelp[] = [];
+                if (dest === "*") {
+                    helps.push(helpCmd,setCmd);
+                }
                 this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
                     _v.forEach((__v,__i) => {
                         if (dest !== "*") {
@@ -203,6 +207,13 @@ export default class Runtime {
                 }
                 result = true;
             }
+        }
+        /**
+         * Config command
+         */
+        const _set = setCmd.test(cmd,pieces);
+        if (!result && _set.match) {
+            Log.json("설정",_set);
         }
         return Promise.resolve(result);
     }
