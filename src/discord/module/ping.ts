@@ -33,24 +33,20 @@ export default class Ping extends Plugin {
             if (join.exist(ParamType.dest)) {
                 param.words.push(join.get(ParamType.dest));
             }
-            this.startChain(channel.id, user.id, ChainType.JOIN);
+            this.startChain(channel.id, user.id, ChainType.JOIN, param);
         }
         return Promise.resolve();
     }
-    protected async onChainMessage(message:Discord.Message, type:number, data:object):Promise<ChainData> {
+    protected async onChainMessage(message:Discord.Message, type:number, data:ChainData):Promise<ChainData> {
         if (message.content === "끝") {
             return this.endChain(message,type,data);
         }
-        const output = {
-            type,
-            data: {words:[] as string[]},
-            time: Date.now(),
-        };
-        output.data.words.push(message.content);
-        return Promise.resolve(output);
+        data.time = Date.now();
+        data.data["words"].push(message.content);
+        return Promise.resolve(data);
     }
-    protected async onChainEnd(message:Discord.Message, type:number, data:object):Promise<void> {
-        await message.channel.send(data["words"].join(" "));
+    protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
+        await message.channel.send(data.data["words"].join(" "));
         return Promise.resolve();
     }
     

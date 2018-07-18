@@ -86,10 +86,10 @@ export default abstract class Plugin {
         return this.chains.has(`${channel}$${user}`);
     }
     public async callChain(message:Discord.Message, channel?:string, user?:string):Promise<boolean> {
-        if (channel === null) {
+        if (channel == null) {
             channel = message.channel.id;
         }
-        if (user === null) {
+        if (user == null) {
             user = message.author.id;
         }
         const id = `${channel}$${user}`;
@@ -99,7 +99,7 @@ export default abstract class Plugin {
                 this.chains.delete(id);
                 return Promise.resolve(false);
             }
-            const chained = await this.onChainMessage(message, chainData.type, chainData.data);
+            const chained = await this.onChainMessage(message, chainData.type, chainData);
             if (chained.type === -1) {
                 // chain end.
                 Log.d("Chain", "chain end.");
@@ -110,11 +110,11 @@ export default abstract class Plugin {
         }
         return Promise.resolve(false);
     }
-    public async endChain(message:Discord.Message, type:number, data:object, channel?:string, user?:string) {
-        if (channel === null) {
+    public async endChain(message:Discord.Message, type:number, data:ChainData, channel?:string, user?:string) {
+        if (channel == null) {
             channel = message.channel.id;
         }
-        if (user === null) {
+        if (user == null) {
             user = message.author.id;
         }
         if (this.chaining(channel, user)) {
@@ -133,7 +133,7 @@ export default abstract class Plugin {
      * @param type 유형
      * @param data 값
      */
-    protected async onChainMessage(message:Discord.Message, type:number, data:object):Promise<ChainData> {
+    protected async onChainMessage(message:Discord.Message, type:number, data:ChainData):Promise<ChainData> {
         return this.endChain(message,type,data);
     }
     /**
@@ -142,7 +142,7 @@ export default abstract class Plugin {
      * @param type 유형
      * @param data 값
      */
-    protected async onChainEnd(message:Discord.Message, type:number, data:object):Promise<void> {
+    protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
         return Promise.resolve();
     }
     /**
@@ -197,7 +197,7 @@ export default abstract class Plugin {
     protected toLangString(value:string | number | boolean) {
         let data:string;
         const type = typeof value;
-        if (value === null) {
+        if (value == null) {
             data = this.lang.valNull;
         } else if (type === "boolean") {
             data = value ? this.lang.valTrue : this.lang.valFalse;

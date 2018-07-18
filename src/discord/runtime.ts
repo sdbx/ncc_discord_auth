@@ -185,7 +185,8 @@ export default class Runtime {
 }
 export function getNickname(msg:Discord.Message) {
     if (msg.channel.type !== "dm") {
-        return msg.guild.member(msg.author).nickname;
+        const guildnick = msg.guild.member(msg.author).nickname;
+        return guildnick != null ? guildnick : msg.author.username;
     } else {
         return msg.author.username;
     }
