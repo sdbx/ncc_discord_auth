@@ -6,9 +6,24 @@ import Runtime from "./discord/runtime";
 import Log from "./log";
 import Ncc from "./ncc/ncc";
 import Cafe from "./structure/cafe";
+
+let run:Runtime;
+async function start() {
+    run = new Runtime();
+    run.on("restart",async () => {
+        run.removeAllListeners("restart");
+        await run.destroy();
+        Log.d("Main", "Restarting Runtime...");
+        setTimeout(start, 2000);
+    });
+    await run.start();
+}
+Log.hook();
+start();
+
+
 async function init() {
-    // Log.hook();
-    const run:Runtime = new Runtime();
+    run = new Runtime();
     await run.start();
     const ncc = new Ncc();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
@@ -27,4 +42,4 @@ async function init() {
     }
     */
 }
-init();
+// init();

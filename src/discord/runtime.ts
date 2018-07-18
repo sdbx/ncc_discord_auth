@@ -214,6 +214,30 @@ export default class Runtime extends EventEmitter {
         const _set = setCmd.test(cmd,pieces);
         if (!result && /* msg.channel.type === "dm" && */ _set.match) {
             let say:{str:string} = null;
+            /**
+             * Extremely Dangerous Setting 
+             */
+            if (msg.channel.type === "dm") {
+                let pass = true;
+                switch (_set.get(ParamType.dest)) {
+                    case "토큰" : {
+                        // CAUTION
+                        this.cfg.token = _set.get(ParamType.to);
+                    } break;
+                    case "말머리" : {
+                        this.cfg.prefix = new RegExp(_set.get(ParamType.to),"i");
+                    } break;
+                    default: {
+                        pass = false;
+                    }
+                }
+                if (pass) {
+                    await this.cfg.export().catch(Log.e);
+                    await msg.channel.send(_set.get(ParamType.dest) + " 설정 완료. 재로드합니다.");
+                    this.emit("restart");
+                    return Promise.resolve(true);
+                }
+            }
             for (const plugin of this.plugins) {
                 const req = await plugin.setConfig(
                     _set.get(ParamType.dest), _set.get(ParamType.to));
@@ -223,17 +247,6 @@ export default class Runtime extends EventEmitter {
                 }
             }
             if (say != null) {
-                /*
-                                const param = {
-                    config: configName,
-                    key: split.join("."),
-                    old: oldValue,
-                    value,
-                    to: Hangul.endsWithConsonant(value) ? "으로" : "로",
-                    str: null,
-                }
-                    public setSuccess = "%(config)s의 %(key)s을 %(old)s에서 %(value)s%(to)s 설정했다냥!";
-                */
                 if (say.hasOwnProperty("old")) {
                     const richMsg = new Discord.RichEmbed();
                     richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
@@ -264,7 +277,6 @@ export function getNickname(msg:Discord.Message) {
     }
 }
 class Bot extends Config {
-    public textWrong = "잘못됐다냥!";
     public token = "Bot token";
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {

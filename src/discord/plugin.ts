@@ -175,7 +175,9 @@ export default abstract class Plugin {
                     }
                     if (data != null) {
                         oldValue = depth;
-                        set(config,_path,data);
+                        if (data !== "null") {
+                            set(config,_path,data);
+                        }
                     }
                     break;
                 }
