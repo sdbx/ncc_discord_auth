@@ -5,6 +5,7 @@ import Plugin from "../plugin";
 import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "../runutil";
 
 export default class Ping extends Plugin {
+    protected global = new Test();
     private ping:CommandHelp;
     private join:CommandHelp;
     public async ready() {
@@ -13,7 +14,7 @@ export default class Ping extends Plugin {
         this.ping.addField(ParamType.from, "서버", false);
         this.ping.complex = true;
         this.join = new CommandHelp("이어", "아몰랑");
-        this.join.addField(ParamType.dest, "")
+        this.join.addField(ParamType.dest, "연결 말");
         this.join.complex = true;
         return out;
     }
@@ -54,14 +55,15 @@ export default class Ping extends Plugin {
         const out:CommandHelp[] = [];
         out.push(this.ping);
         out.push(this.join);
-        for (let i = 0; i < 5; i += 1) {
-            const cmd = new CommandHelp("테스트" + i, "테스트");
-            cmd.complex = true;
-            out.push(cmd);
-        }
         return out;
     }
 }
 enum ChainType {
     JOIN,
+}
+class Test extends Config {
+    public hanzo = "delicious";
+    constructor() {
+        super("jam");
+    }
 }

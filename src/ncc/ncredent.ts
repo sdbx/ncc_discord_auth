@@ -35,8 +35,8 @@ export default class NcCredent {
      * @returns naver username or null(error)
      */
     public async genCreditByConsole():Promise<string> {
-        const username = await Log.read("Username",false).catch(() => "id");
-        const password = await Log.read("Password",true).catch(() => "pw");
+        const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id");
+        const password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__");
         return this.requestCredent(username,password);
     }
     /**
@@ -49,6 +49,7 @@ export default class NcCredent {
         this.credit = new Credentials(username,password);
         await this.credit.login();
         const name = await this.validateLogin();
+        this.credit.password = "__";
         if (name != null) {
             this.credit.username = name;
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
@@ -66,7 +67,13 @@ export default class NcCredent {
         if (cookieStr == null) {
             return Promise.resolve(null);
         }
-        this.credit.setCookieJar(JSON.parse(cookieStr));
+        try {
+            this.credit.setCookieJar(JSON.parse(cookieStr));
+        } catch (err) {
+            await fs.remove(this.cookiePath); 
+            Log.e(err);
+            return Promise.resolve(null);
+        }
         const result:string = await this.validateLogin();
         if (result != null) {
             this.credit.username = result;
@@ -76,7 +83,6 @@ export default class NcCredent {
         return Promise.resolve(result);
     }
     protected async onLogin(username:string):Promise<void> {
-        Log.v("ncc", "Login.");
         this.inited = true;
         return Promise.resolve();
     }

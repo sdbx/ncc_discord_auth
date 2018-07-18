@@ -1,4 +1,5 @@
 import * as Discord from "discord.js";
+import { EventEmitter } from "events";
 import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
@@ -11,15 +12,21 @@ import { CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
 const queryCmd = /\s+\S+/ig;
 const safeCmd = /(".+?")|('.+?')/i;
 
-export default class Runtime {
+export default class Runtime extends EventEmitter {
     private cfg = new Bot();
     private lang = new Lang();
     private client:Discord.Client;
     private ncc:Ncc;
     private plugins:Plugin[] = [];
     constructor() {
+        super();
         // ,new Auth(), new Login()
         this.plugins.push(new Ping());
+        // event register
+        this.plugins.forEach(((v,i) => {
+            this.on("ready",v.ready.bind(v));
+            this.on("message",v.onMessage.bind(v));
+        }));
     }
     public async start():Promise<string> {
         // load config
@@ -46,18 +53,25 @@ export default class Runtime {
         this.client.login(this.cfg.token)
         return Promise.resolve("");
     }
+    public async destroy() {
+        this.client.removeAllListeners();
+        await this.client.destroy();
+        this.ncc.chat.disconnect();
+        return Promise.resolve();
+    }
     protected async ready() {
         // init plugins
         for (const plugin of this.plugins) {
             plugin.init(this.client, this.ncc, this.lang);
-            await plugin.ready();
         }
+        this.emit("ready");
     }
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;
         const prefix = this.cfg.prefix;
         // onMessage should invoke everytime.
-        await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
+        this.emit("message",msg);
+        // await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
         // chain check
         for (const plugin of this.plugins) {
             if (await plugin.callChain(msg,msg.channel.id, msg.author.id)) {
@@ -141,41 +155,112 @@ export default class Runtime {
         await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, cmd, pieces)));
     }
     private async hardCodingCmd(msg:Discord.Message, cmd:string, pieces:Keyword[]):Promise<boolean> {
-        const dest = pieces.filter((_v) => _v.type === ParamType.dest);
         let result = false;
-        if (cmd.endsWith("명령어 알려") || (cmd === "알려" && dest.length >= 1 && dest[0].str.endsWith("명령어"))) {
-            let destcmd:string = null;
-            if (cmd.endsWith("명령어 알려") && cmd.length > 6) {
-                destcmd = cmd.substring(0,cmd.lastIndexOf("명령어")).trim();
-            } else if (dest.length >= 1 && dest[0].str.length >= 4) {
-                destcmd = dest[0].str.substring(0, dest[0].str.lastIndexOf("명령어")).trim();
-            }
-            const helps:CommandHelp[] = [];
-            this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
-                _v.forEach((__v,__i) => {
-                    if (destcmd != null && destcmd.length >= 1) {
-                        if (__v.cmds.indexOf(destcmd) >= 0) {
-                            helps.push(__v);
-                        }
-                    } else {
-                        helps.push(__v);
-                    }
-                });
-            });
-            if (helps.length === 0) {
-                await msg.channel.send(sprintf(this.lang.helpNoExists,{help:destcmd}));
-            } else {
-                for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
-                    const richMsg = new Discord.RichEmbed();
-                    richMsg.setTitle(this.lang.helpTitle);
-                    richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
-                    for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
-                        richMsg.addField(helps[i * 20 + k].title, helps[i * 20 + k].description);
-                    }
-                    await msg.channel.send(richMsg);
+        const helpCmd = new CommandHelp("알려,도움,도와,도움말",this.lang.helpDesc,true);
+        helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
+        const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false);
+        setCmd.addField(ParamType.dest, "목적", true);
+        setCmd.addField(ParamType.to, "설정값", true);
+        /*
+            Help Command
+        */
+        const _help = helpCmd.test(cmd,pieces);
+        if (!result && _help.match) {
+            let dest = "*";
+            if (_help.exist(ParamType.dest)) {
+                dest = _help.get(ParamType.dest);
+                if (dest.endsWith("명령어")) {
+                    dest = dest.substring(0,dest.lastIndexOf("명령어") - 1).trim();
+                }
+                if (dest.length < 1) {
+                    dest = "*";
                 }
             }
-            result = true;
+            if (dest != null) {
+                const helps:CommandHelp[] = [];
+                if (dest === "*") {
+                    helps.push(helpCmd,setCmd);
+                }
+                this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
+                    _v.forEach((__v,__i) => {
+                        if (dest !== "*") {
+                            if (__v.cmds.indexOf(dest) >= 0) {
+                                helps.push(__v);
+                            }
+                        } else {
+                            helps.push(__v);
+                        }
+                    });
+                });
+                if (helps.length === 0) {
+                    await msg.channel.send(sprintf(this.lang.helpNoExists,{help:dest}));
+                } else {
+                    for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
+                        const richMsg = new Discord.RichEmbed();
+                        richMsg.setTitle(this.lang.helpTitle);
+                        richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
+                        for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
+                            richMsg.addField(helps[i * 20 + k].title, helps[i * 20 + k].description);
+                        }
+                        await msg.channel.send(richMsg);
+                    }
+                }
+                result = true;
+            }
+        }
+        /**
+         * Config command
+         */
+        const _set = setCmd.test(cmd,pieces);
+        if (!result && /* msg.channel.type === "dm" && */ _set.match) {
+            let say:{str:string} = null;
+            /**
+             * Extremely Dangerous Setting 
+             */
+            if (msg.channel.type === "dm") {
+                let pass = true;
+                switch (_set.get(ParamType.dest)) {
+                    case "토큰" : {
+                        // CAUTION
+                        this.cfg.token = _set.get(ParamType.to);
+                    } break;
+                    case "말머리" : {
+                        this.cfg.prefix = new RegExp(_set.get(ParamType.to),"i");
+                    } break;
+                    default: {
+                        pass = false;
+                    }
+                }
+                if (pass) {
+                    await this.cfg.export().catch(Log.e);
+                    await msg.channel.send(_set.get(ParamType.dest) + " 설정 완료. 재로드합니다.");
+                    this.emit("restart");
+                    return Promise.resolve(true);
+                }
+            }
+            for (const plugin of this.plugins) {
+                const req = await plugin.setConfig(
+                    _set.get(ParamType.dest), _set.get(ParamType.to));
+                if (req != null) {
+                    say = req;
+                    break;
+                }
+            }
+            if (say != null) {
+                if (say.hasOwnProperty("old")) {
+                    const richMsg = new Discord.RichEmbed();
+                    richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
+                    richMsg.setTitle("설정: " + say["config"]);
+                    richMsg.addField("경로",say["key"]);
+                    richMsg.addField("원래 값",say["old"]);
+                    richMsg.addField("새로운 값",say["value"]);
+                    // richMsg.setDescription(say.str);
+                    await msg.channel.send(richMsg);
+                } else {
+                    await msg.channel.send(say.str);
+                }
+                result = true;
+            }
         }
         return Promise.resolve(result);
     }
@@ -192,7 +277,6 @@ export function getNickname(msg:Discord.Message) {
     }
 }
 class Bot extends Config {
-    public textWrong = "잘못됐다냥!";
     public token = "Bot token";
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {

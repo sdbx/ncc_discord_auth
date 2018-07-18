@@ -50,10 +50,16 @@ export class CommandHelp {
     }
     public test(command:string, options:Keyword[]) {
         let cmdOk = false;
+        let cmdPiece;
         let optStatus:string = null;
         for (const cmd of this.cmds) {
-            if (cmd === command || (this.complex && cmd.endsWith(" " + command))) {
+            if (cmd === command) {
                 cmdOk = true;
+                break;
+            }
+            if (this.complex && command.endsWith(" " + cmd)) {
+                cmdOk = true;
+                cmdPiece = command.substring(0,command.lastIndexOf(" " + cmd));
                 break;
             }
         }
@@ -99,7 +105,17 @@ export class CommandHelp {
                 }
             }
             if (must.length >= 1) {
-                optStatus = must.map((_v) => _v.str).join(", ");
+                if (this.complex && must.length === 1 && cmdPiece != null) {
+                    param_must.set(must[0].type, cmdPiece);
+                    must.splice(0,1);
+                    cmdPiece = null;
+                } else {
+                    optStatus = must.map((_v) => _v.str).join(", ");
+                }
+            }
+            if (this.complex && optional.length === 1 && cmdPiece != null) {
+                param_opt.set(optional[0].type, cmdPiece);
+                optional.slice(0,1);
             }
             if (!this.complex && (optional.length >= 1 || dummy)) {
                 Log.i(command,"Strict mode: failed. But pass.");
@@ -109,20 +125,24 @@ export class CommandHelp {
             cmdOk,
             optStatus,
             param_must,
-            param_opt
+            param_opt,
+            command.split(/\s/ig),
         );
     }
 }
 export class CommandStatus {
     public requires:Map<ParamType, string>;
     public options:Map<ParamType, string>;
+    public commands:string[];
     protected commandMatch:boolean;
     protected optionStatus:string;
-    constructor(cmdOk:boolean, optStatus:string, req:Map<ParamType, string>, choices:Map<ParamType, string>) {
+    constructor(cmdOk:boolean, optStatus:string, req:Map<ParamType, string>, 
+            choices:Map<ParamType, string>, cmds:string[]) {
         this.commandMatch = cmdOk;
         this.requires = req;
         this.options = choices;
         this.optionStatus = optStatus;
+        this.commands = cmds;
     }
     public get match() {
         return this.commandMatch && this.optionStatus == null;
@@ -144,6 +164,20 @@ export class CommandStatus {
         } else {
             return undefined;
         }
+    }
+    public getSubCmd(start:number, end:number) {
+        if (end >= this.commands.length || start > end) {
+            return null;
+        } else {
+            const filter = this.commands.filter((_v,_i) => _i >= start && _i < end);
+            return filter.length >= 1 ? filter.join(" ") : null;
+        }
+    }
+    public getLastCmd(depth:number = 1) {
+        if (depth >= 1 && this.commands.length <= 1) {
+            return null;
+        }
+        return this.commands[Math.max(0,this.commands.length - depth)];
     }
 }
 export interface ChainData {

@@ -26,7 +26,7 @@ declare module "node-ncc-es6" {
         id:string;
         nickname:string;
         image:string;
-        cafe:Cafe
+        cafe:Cafe;
     }
     export class Cafe {
         canClose:boolean;
@@ -57,6 +57,7 @@ declare module "node-ncc-es6" {
         on(eventType:"message",callback:(message:Message) => void):this;
         on(eventType:"error",callback:(error:any) => void):this;
         connect(retries?:number, err?:any):Promise<void>;
+        disconnect():void;
         sendCommand(command:string,body:object):Promise<any>;
         /**
          * However, creating non-1to1 room isn't supported now. Be careful.

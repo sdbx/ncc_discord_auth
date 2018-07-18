@@ -105,31 +105,34 @@ namespace Log {
      * @param theme256H A hex of 256 colors
      * @param theme8C Chalk object of 8 colors
      */
-    function style(themeH:string, theme256H:string, theme8C:Chalk) {
+    function style(themeH:string, theme256H:string, theme8C:Chalk, inverse = false) {
         let header:Chalk;
         let num:Chalk;
         let content:Chalk;
         let hlight:Chalk;
+        const black = "#303030";
+        const numBlack = "#424242";
+        const numWhite = "#f0f0f0";
         switch (colorLevel) {
             case 3: {
-                header = chalk.bgHex(themeH).hex("#303030");
-                num = chalk.bgHex("#f0f0f0").hex("#424242");
-                content = chalk.bgHex("#303030").hex(themeH);
+                header = !inverse ? chalk.bgHex(themeH).hex(black) : chalk.bgHex(black).hex(themeH);
+                num = inverse ? chalk.bgHex(numBlack).hex(numWhite) : chalk.bgHex(numWhite).hex(numBlack);
+                content = inverse ? chalk.bgHex(themeH).hex(black) : chalk.bgHex(black).hex(themeH);
                 hlight = header.hex("#888888");
             }
             break;
             case 2: {
-                header = chalk.bgHex(theme256H).hex("#303030");
-                num = chalk.bgHex("#f0f0f0").hex("#424242");
-                content = chalk.bgHex("#303030").hex(theme256H);
+                header = !inverse ? chalk.bgHex(theme256H).hex(black) : chalk.bgHex(black).hex(themeH);
+                num = inverse ? chalk.bgHex(numBlack).hex(numWhite) : chalk.bgHex(numWhite).hex(numBlack);
+                content = inverse ? chalk.bgHex(theme256H).hex(black) : chalk.bgHex(black).hex(themeH);
                 hlight = header.hex("#a0a0a0");
             }
             break;
             default: {
-                header = theme8C.black;
+                header = chalk.bgBlack.white;
                 num = chalk.bgWhite.black;
-                content = theme8C.bgBlack;
-                hlight = theme8C.gray;
+                content = chalk.bgBlack.white;
+                hlight = chalk.bgBlack.gray;
             }
         }
         return {
@@ -203,26 +206,47 @@ namespace Log {
                 Log.e(args[0]);
             }
         });
+        ansi("2J");
+        ansi("0;0H");
+        ansi("?25l");
         // ui = new Inquirer.ui.BottomBar();
     }
     export function r(title:string, content:string) {
-        custom("#b8e3f9", "#afd7ff", chalk.bgBlack.white, "IME", {arg1:title, arg2:content});
+        custom("#ffcce3", "#ffcce3", chalk.bgBlack.white, "IME", {arg1:title, arg2:content});
     }
-    export async function read(title:string, hide:boolean, need = true, content?:string):Promise<string> {
+    export async function read(title:string, option = {hide:false, logResult:true},
+            content?:string, need = true):Promise<string> {
+
         if (ui == null) {
             ui = new Inquirer.ui.BottomBar();
         }
+        // update
         contentLimit = Math.max(5, process.stdout.columns - prefixLimit - numberLimit - totalBlank);
-        const design = style("#b8e3f9","#afd7ff",chalk.bgBlack.white);
-        content = content == null ? "" : Reverser.reverse(cutstr(Reverser.reverse(content), contentLimit - 1));
-        const format = formatLog(
-            design.header, title,
-            design.num, "IME",
-            design.content, content
-        ,true, chalk.bgWhite.black.underline);
-        if (ui != null) {
-            ui.updateBottomBar(format);
+        // design
+        const design_inv = style("#ffcce3","#ffcce3",chalk.bgBlack.white,true);
+        const design_nor = style("#ffcce3","#ffcce3",chalk.bgBlack.white);
+        const design_con = chalk.bgHex("#f78fb0").hex("#222222");
+
+        // hide password
+        let displayContent = "";
+        if (content != null) {
+            if (option.hide) {
+                displayContent = content.replace(/[\S\s]/ig,"*");
+            } else {
+                displayContent = content;
+            }
         }
+        const format = formatCursor(
+            design_nor.header, title,
+            design_inv.num, "IME",
+            design_inv.content, displayContent
+        , chalk.bgHex("#f7e1ea").hex("#e29ab9"));
+        if (ui != null) {
+            ui.updateBottomBar(format.echo);
+        }
+        // calc cursor
+        ansi("254D", `${format.cursor}C`);
+
         if (need) {
             /*
             Method 1: Design ugly, but stable!
@@ -238,23 +262,53 @@ namespace Log {
            */
             // Method 2: Design directly
             const stdin = process.stdin;
-            // stdin.setRawMode(true);
+            stdin.setRawMode(true);
             stdin.resume();
+            ansi("?25h");
             // stdin.setEncoding("utf-8");
             return new Promise<string>((res,rej) => {
-                const ime = new IME(title,hide,res,rej);
+                const ime = new IME(title,content,option.hide,option.logResult,res,rej);
                 process.stdin.on("data", ime.onData.bind(ime));
             });
         } else {
             return Promise.resolve("ok");
         }
     }
-    export function removeReset(ansi:string) {
-        return ansi.replace(/(.\[39m.\[49m|.\[0m])$/i, "");
+    export function removeReset(_ansi:string) {
+        return _ansi.replace(/(.\[39m.\[49m|.\[0m])$/i, "");
+    }
+    function formatCursor(headerColor:Chalk, headerMsg:string,
+            numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string,
+            cursorColor?:Chalk) {
+
+        const format:string[] = [];
+        headerMsg = cutstr(headerMsg,prefixLimit);
+        numberMsg = cutstr(numberMsg,numberLimit);
+        // content
+        contentMsg = Reverser.reverse(cutstr(Reverser.reverse(contentMsg), contentLimit - 1));
+        if (contentLimit - length(contentMsg) > 0) {
+            contentMsg = " " + contentMsg;
+        }
+        const suffix = "".padEnd(contentLimit - length(contentMsg) + 1);
+
+        format.push(headerColor(`${headerMsg.padStart(prefixLimit - unicodeLength(headerMsg))} `));
+        format.push(numberColor(` ${numberMsg.padStart(numberLimit - unicodeLength(numberMsg))} `));
+        format.push(contentColor(contentMsg));
+        if (cursorColor != null) {
+            format.push(cursorColor(" "));
+        } else {
+            format.push(contentColor(" "));
+        }
+        format.push(contentColor(suffix));
+        const ln = prefixLimit + numberLimit + 3 + length(contentMsg);
+        return {
+            cursor: ln,
+            echo: format.join(""),
+        };
     }
     function formatLog(headerColor:Chalk, headerMsg:string,
-         numberColor:Chalk,numberMsg:string, contentColor:Chalk, contentMsg:string,
-          paddingEnd:boolean = true, cursor:Chalk = null) {
+            numberColor:Chalk,numberMsg:string, contentColor:Chalk, contentMsg:string) {
+
         headerMsg = cutstr(headerMsg,prefixLimit);
         numberMsg = cutstr(numberMsg,numberLimit);
         contentMsg = cutstr(contentMsg,contentLimit);
@@ -267,22 +321,7 @@ namespace Log {
             format.push(numberColor(` ${numberMsg.padStart(numberLimit - unicodeLength(numberMsg))} `));
         }
         if (contentMsg != null) {
-            let _cM = ` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} `;
-            if (!paddingEnd && length(_cM) < process.stdout.columns) {
-                _cM = _cM.trimRight();
-            }
-            if (cursor != null) {
-                const bl = _cM.match(/\s+/ig);
-                if (bl.length >= 1) {
-                    const sizeSub = _cM.length - contentMsg.length - 1;
-                    format.push([contentColor(_cM.substr(0, contentMsg.length + 1)),
-                        cursor(" "),contentColor("".padEnd(sizeSub - 1))].join(""));
-                } else {
-                    format.push(contentColor(_cM));
-                }
-            } else {
-                format.push(contentColor(_cM));
-            }
+            format.push(contentColor(` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} `));
         }
         return format.join("");
     }
@@ -294,6 +333,9 @@ namespace Log {
         } else {
             process.stdout.write(format + "\n");
         }
+    }
+    function ansi(...code:string[]) {
+        process.stdout.write(code.map((_v) => "\x1B[" + _v).join(""));
     }
     function caller() {
         let dp = 1;
@@ -308,6 +350,10 @@ namespace Log {
         }
         return out;
     }
+    /**
+     * @return shell length
+     * @param str string
+     */
     function length(str:string) {
         if (str == null) {
             return 0;
@@ -342,6 +388,16 @@ namespace Log {
 
 export default Log;
 
+class Mutable {
+    public muted = false;
+    public write = (chunk, encoding, callback) => {
+        if (!this.muted) {
+            process.stdout.write(chunk, encoding);
+        }
+        callback();
+    } 
+}
+
 class IME {
     public mute:boolean = false;
     private readonly timeout = 30;
@@ -351,13 +407,22 @@ class IME {
     private timer;
     private title;
     private hide;
-    private data:string[] = [];
-    constructor(title:string, hide:boolean, res:(value:string | PromiseLike<string>) => void,rej:(reason:any) => void) {
+    private logR;
+    private data:string[];
+    constructor(title:string, defaultContent:string, hide:boolean, logR:boolean,
+        res:(value:string | PromiseLike<string>) => void,rej:(reason:any) => void) {
         this.resolve = res;
         this.reject = rej;
         this.title = title;
         this.hide = hide;
+        this.logR = logR;
+        this.data = []
         this.timer = setInterval(this.cancel,1000);
+        if (defaultContent != null) {
+            for (const letter of defaultContent.split("")) {
+                this.data.push(letter);
+            }
+        }
     }
     public cancel() {
         if (this.time <= 0) {
@@ -413,24 +478,31 @@ class IME {
         }
         this.time = this.timeout;
         this.timer = setTimeout(this.cancel, 1000);
-        Log.read(this.title, this.hide, false, (this.hide ? this.data.map(() => "*") : this.data).join(""));
+        Log.read(this.title, {hide:this.hide, logResult:this.logR}, this.data.join(""), false);
     }
     public finish(success:boolean, data:string) {
-        Log.r(this.title, (this.hide ? this.data.map(() => "*") : this.data).join(""));
         if (Log.ui != null) {
             Log.ui.updateBottomBar("");
         }
         process.stdin.removeAllListeners("data");
+        process.stdin.setRawMode(false);
         process.stdin.pause();
+        if (this.logR) {
+            Log.r(this.title,this.hide ? data.replace(/[\S\s]/ig,"*") : data);
+        }
         if (Log.ui != null) {
             Log.ui.close();
             Log.ui = null;
             // ui.updateBottomBar("");
         }
+        this.ansi("?25l");
         if (success) {
             this.resolve(data);
         } else {
             this.reject(data);
         }
+    }
+    private ansi(...code:string[]) {
+        process.stdout.write(code.map((_v) => "\x1B[" + _v).join(""));
     }
 }
