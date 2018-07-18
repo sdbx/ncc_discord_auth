@@ -5,6 +5,7 @@ import Plugin from "../plugin";
 import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "../runutil";
 
 export default class Ping extends Plugin {
+    protected global = new Test();
     private ping:CommandHelp;
     private join:CommandHelp;
     public async ready() {
@@ -63,4 +64,10 @@ export default class Ping extends Plugin {
 }
 enum ChainType {
     JOIN,
+}
+class Test extends Config {
+    public hanzo = "delicious";
+    constructor() {
+        super("jam");
+    }
 }

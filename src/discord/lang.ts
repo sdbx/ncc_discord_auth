@@ -2,8 +2,12 @@ import * as hangul from 'hangul-js';
 import Config from "../config";
 
 export default class Lang extends Config {
-    public valTrue = "true";
-    public valFalse = "false";
+    public valTrue = "ㅇ";
+    public valFalse = "ㄴ";
+
+    public nameString = "문자열";
+    public nameNumber = "숫자";
+    public nameBoolean = "논리";
     public valNull = "null";
 
     public ping = {
@@ -25,9 +29,23 @@ export default class Lang extends Config {
 
     public sudoNeed = "관리자(%(users)s) 명령어다냥!";
 
-    public setNotFound = "%(depth)s에서 %(path)s 찾을 수 없음!";
+    public setNotFound = "%(depth)s에서 %(name)s을 찾을 수 없어양!";
+    public setTypeError = "%(depth)s의 타입이 %(type)s이당!";
+    public setSuccess = "%(config)s의 %(key)s을 %(old)s에서 %(value)s%(to)s 설정했다냥!";
 
     constructor() {
         super("lang");
+    }
+    public getType(obj:any) {
+        switch (typeof obj) {
+            case "boolean": return this.nameBoolean; break;
+            case "function": return "Function"; break;
+            case "number": return this.nameNumber; break;
+            case "object": return "Object"; break;
+            case "string": return this.nameString; break;
+            case "symbol": return "Symbol"; break;
+            case "undefined" : return "Undefined"; break;
+        }
+        throw new Error(".");
     }
 }

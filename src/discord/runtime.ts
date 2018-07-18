@@ -212,8 +212,42 @@ export default class Runtime extends EventEmitter {
          * Config command
          */
         const _set = setCmd.test(cmd,pieces);
-        if (!result && _set.match) {
-            Log.json("설정",_set);
+        if (!result && /* msg.channel.type === "dm" && */ _set.match) {
+            let say:{str:string} = null;
+            for (const plugin of this.plugins) {
+                const req = await plugin.setConfig(
+                    _set.get(ParamType.dest), _set.get(ParamType.to));
+                if (req != null) {
+                    say = req;
+                    break;
+                }
+            }
+            if (say != null) {
+                /*
+                                const param = {
+                    config: configName,
+                    key: split.join("."),
+                    old: oldValue,
+                    value,
+                    to: Hangul.endsWithConsonant(value) ? "으로" : "로",
+                    str: null,
+                }
+                    public setSuccess = "%(config)s의 %(key)s을 %(old)s에서 %(value)s%(to)s 설정했다냥!";
+                */
+                if (say.hasOwnProperty("old")) {
+                    const richMsg = new Discord.RichEmbed();
+                    richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
+                    richMsg.setTitle("설정: " + say["config"]);
+                    richMsg.addField("경로",say["key"]);
+                    richMsg.addField("원래 값",say["old"]);
+                    richMsg.addField("새로운 값",say["value"]);
+                    // richMsg.setDescription(say.str);
+                    await msg.channel.send(richMsg);
+                } else {
+                    await msg.channel.send(say.str);
+                }
+                result = true;
+            }
         }
         return Promise.resolve(result);
     }
