@@ -26,7 +26,7 @@ declare module "node-ncc-es6" {
         id:string;
         nickname:string;
         image:string;
-        cafe:Cafe
+        cafe:Cafe;
     }
     export class Cafe {
         canClose:boolean;
