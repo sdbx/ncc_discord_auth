@@ -393,7 +393,8 @@ export default class NcFetch extends NcCredent {
         let nick = $(".ellipsis").text();
         // userid = nick.substring(nick.indexOf("(") + 1, nick.indexOf(")"));
         nick = nick.substring(0,nick.indexOf("("));
-        const image = $(".thumb").find("img").attr("src");
+        let image = $(".thumb").find("img").attr("src");
+        image = image.substring(0,image.indexOf("?") >= 0 ? image.indexOf("?") : image.length);
         const check = $(".m_info_area").find(".m-tcol-c");
         const level = $(check[0]).text().trim();
         const visit = Number.parseInt($(check[2]).find(".num").text());
