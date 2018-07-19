@@ -28,7 +28,7 @@ export default class NcFetch extends NcCredent {
          * Check cookie status
          */
         const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl);
-        if (option.auth && (!this.available || !isNaver || this.validateLogin() == null)) {
+        if (option.auth && (!isNaver || (!this.available && this.validateLogin() == null))) {
             Log.e("ncc-getWeb : Cookie is invaild");
             return Promise.reject();
         }
@@ -99,17 +99,43 @@ export default class NcFetch extends NcCredent {
         }
         const $ = await this.getWeb(purl, {});
         const src = $("#main-area > script").html();
+        const id = Number.parseInt(src.match(/clubid=[0-9]*/m)[0].split("=")[1]);
+        /*
         const title = $($(".d-none").get(0)).text();
         let skipMobile = $("#u_skipToMobileweb").attr("href");
         skipMobile = skipMobile.substr(skipMobile.lastIndexOf("/") + 1);
         return Promise.resolve({
-            cafeId: Number.parseInt(src.match(/clubid=[0-9]*/m)[0].split("=")[1]),
-            // article: Number.parseInt(src.match(/articleid=[0-9]*/m)[0].split("=")[1]),
+            cafeId: id,
             cafeName: skipMobile,
             cafeDesc: title,
         } as Cafe);
-        //  as Cafe
-    }  
+        */
+        return this.parseNaverDetail(id);
+    }
+    public async parseNaverDetail(cafeid:number):Promise<Cafe> {
+        const url = `${cafePrefix}/CafeProfileView.nhn?clubid=${cafeid.toString(10)}`;
+        const $ = await this.getWeb(url, {});
+        let members:string[] = $(".invite-padd02").map((index, element) => {
+            const o = $(element);
+            switch (index) {
+                case 0:
+                return o.text();
+                case 1:
+                return o.text();
+                case 2:
+                return o.find("img").length >= 1 ? o.find("img")[0].attribs["src"] : "";
+                default:
+                return null;
+            }
+        }).get();
+        members = members.filter((_v) => _v != null);
+        return Promise.resolve({
+            cafeId: cafeid,
+            cafeName: members[1].substr(members[1].lastIndexOf("/") + 1),
+            cafeDesc: members[0].trim(),
+            cafeImage: members[2].length <= 0 ? null : members[2],
+        } as Cafe);
+    }
     /**
      * Get recent articles (cookie X)
      * @param cafeid cafe id
@@ -309,7 +335,7 @@ export default class NcFetch extends NcCredent {
         // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&
         // page=1&boardtype=L&articleid=7446&referrerAllArticles=true
     }
-    public async getMember(cafeid:number, id:string, isNickname = true):Promise<Profile[]> {
+    public async getMemberPublic(cafeid:number, id:string, isNickname = true):Promise<Profile[]> {
         const url_params = {
             "keywordSearch.clubid": cafeid.toString(),
             "m": "listKeyword",
@@ -347,8 +373,45 @@ export default class NcFetch extends NcCredent {
             $("#main-area").find(".mem_list").map((i, el) => {
                 $(el).children("div").map(parser).get();
             });
+            for (let i = 0; i < members.length; i += 1) {
+                members[i] = await this.getMemberPrivate(cafeid, members[i].userid);
+            }
         }
         return Promise.resolve(members);
+    }
+    public async getMemberPrivate(cafeid:number,userid:string):Promise<Profile> {
+        const paramLevel = {
+            "m": "view",
+            "clubid": cafeid.toString(10),
+            "memberid": userid,
+        }
+        const $ = await this.getWeb(`${cafePrefix}/CafeMemberNetworkView.nhn`, paramLevel);
+        const cafe = await this.parseNaverDetail(cafeid);
+        if ($ == null) {
+            return Promise.reject("Error");
+        }
+        let nick = $(".ellipsis").text();
+        // userid = nick.substring(nick.indexOf("(") + 1, nick.indexOf(")"));
+        nick = nick.substring(0,nick.indexOf("("));
+        const image = $(".thumb").find("img").attr("src");
+        const check = $(".m_info_area").find(".m-tcol-c");
+        const level = $(check[0]).text().trim();
+        const visit = Number.parseInt($(check[2]).find(".num").text());
+        const article = Number.parseInt($(check[4]).find(".num").text());
+        const comment = Number.parseInt($(check[6]).find(".num").text());
+        return Promise.resolve({
+            profileurl:image,
+            nickname: nick,
+            userid,
+            cafeId:cafeid,
+            cafeDesc: cafe.cafeDesc,
+            cafeImage: cafe.cafeImage,
+            cafeName: cafe.cafeName,
+            numArticles:article,
+            numVisits: visit,
+            numComments : comment,
+            level,
+        } as Profile);
     }
     /**
      * Query string... at ('aa','bb','cc').split(",");

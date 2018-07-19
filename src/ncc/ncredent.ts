@@ -11,17 +11,24 @@ import Log from "../log";
 export default class NcCredent {
     protected credit:Credentials;
     protected readonly cookiePath;
-    protected inited:boolean;
+    private lastLogin:number;
     constructor() {
-        this.inited = false;
         this.credit = new Credentials("id","pw");
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie");
+        this.lastLogin = -1;
     }
     /**
      * This is not mean "auth is vaild.".
+     * But it means buffer!
      */
     public get available():boolean {
-        return this.inited;
+        return Date.now() - this.lastLogin <= 3600000;
+    }
+    public get username():string {
+        return this.credit.username;
+    }
+    public async availableAsync():Promise<boolean> {
+        return Promise.resolve(this.available || await this.validateLogin() != null);
     }
     /**
      * Validate login
@@ -73,6 +80,8 @@ export default class NcCredent {
             this.credit.username = name;
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(name);
+        } else {
+            this.lastLogin = -1;
         }
         return Promise.resolve(name);
     }
@@ -98,11 +107,12 @@ export default class NcCredent {
             this.credit.username = result;
             // await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(result);
+        } else {
+            this.lastLogin = -1;
         }
         return Promise.resolve(result);
     }
     protected async onLogin(username:string):Promise<void> {
-        this.inited = true;
         return Promise.resolve();
     }
     /*

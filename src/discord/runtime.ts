@@ -5,6 +5,7 @@ import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
+import Auth from "./module/auth";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
@@ -23,7 +24,7 @@ export default class Runtime extends EventEmitter {
     constructor() {
         super();
         // ,new Auth(), new Login()
-        this.plugins.push(new Ping(), new Login());
+        this.plugins.push(new Ping(), new Login(), new Auth());
     }
     public async start():Promise<string> {
         // load config

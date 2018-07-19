@@ -13,7 +13,7 @@ export default class Lang extends Config {
      * Module: ping
      */
     public ping = {
-        helpPing: "핑 날리는 거다냥!"
+        helpPing: "핑 날리는 거다냥!",
     }
     /**
      * Module: auth
@@ -29,8 +29,16 @@ export default class Lang extends Config {
         passwordDelete: "비밀번호 보낸 거 삭제해달라냥!",
         successAdmin: "%(user)s님 관리자인걸 환영한다냥!",
         failAdmin_invalidToken: "토큰이 안맞다냥..",
-        failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!"
+        failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!",
     };
+    /**
+     * Module: auth
+     */
+    public auth = {
+        authCmdDesc: "네이버 카페 회원인지 인증하는거다냥!",
+        nickNotFound: "%(nick)s(%(type)s) 회원을 찾을 수 없다냥..",
+        roomNotMaked: "방을 못만들었다냥! 실패다냥~",
+    }
     /**
      * Module: sample
      */
@@ -52,6 +60,8 @@ export default class Lang extends Config {
     // admin
     public sudoNeed = "관리자 명령어다냥!";
     public adminGranted = "%(mention)s님 인증완료.";
+    // notlogin
+    public noNaver = "네이버 계정으로 로그인 안되어 있다냥..";
 
     constructor() {
         super("lang");

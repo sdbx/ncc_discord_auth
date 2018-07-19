@@ -10,13 +10,13 @@ import Lang from "./lang";
 import { MainCfg } from "./runtime";
 import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
 
-const timeout = 1 * 60 * 1000; // 1 is minutes
 export default abstract class Plugin {
     protected config:Config;
     protected client:Discord.Client;
     protected ncc:Ncc;
     protected lang:Lang;
     protected global:MainCfg;
+    protected timeout = 1 * 60 * 1000; // 1 is minutes
     private subConfigs:Map<string,Config>;
     private chains:Map<string,ChainData>;
 
@@ -245,7 +245,7 @@ export default abstract class Plugin {
         const id = `${channel}$${user}`;
         if (this.chaining(channel, user)) {
             const chainData = this.chains.get(id);
-            if (Date.now() - chainData.time >= timeout) {
+            if (Date.now() - chainData.time >= this.timeout) {
                 this.chains.delete(id);
                 return Promise.resolve(false);
             }
