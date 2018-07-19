@@ -178,11 +178,13 @@ export default class Runtime extends EventEmitter {
         let result = false;
         const helpCmd = new CommandHelp("알려,도움,도와,도움말",this.lang.helpDesc,true);
         helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
-        const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false);
+        const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false, { reqAdmin:true });
         setCmd.addField(ParamType.dest, "목적", true);
         setCmd.addField(ParamType.to, "설정값", true);
-        const adminCmd = new CommandHelp("token","토큰 인증", false);
+        const adminCmd = new CommandHelp("token", "토큰 인증", false, { dmOnly:true });
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true);
+
+        const paramPair = helpCmd.check(msg.channel.type,this.global.isAdmin(msg.author.id));
         /*
             Help Command
         */
@@ -199,9 +201,12 @@ export default class Runtime extends EventEmitter {
                 }
             }
             if (dest != null) {
-                const helps:CommandHelp[] = [];
+                let helps:CommandHelp[] = [];
                 if (dest === "*") {
-                    helps.push(helpCmd,setCmd);
+                    /**
+                     * Add hard-coded commands
+                     */
+                    helps.push(helpCmd, setCmd, adminCmd);
                 }
                 this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
                     _v.forEach((__v,__i) => {
@@ -213,6 +218,11 @@ export default class Runtime extends EventEmitter {
                             helps.push(__v);
                         }
                     });
+                });
+                // filter permission
+                helps = helps.filter((_v) => {
+                    return !((_v.dmOnly && msg.channel.type !== "dm") 
+                    || (_v.reqAdmin && !this.global.isAdmin(msg.author.id)));
                 });
                 if (helps.length === 0) {
                     await msg.channel.send(sprintf(this.lang.helpNoExists,{help:dest}));
@@ -226,14 +236,14 @@ export default class Runtime extends EventEmitter {
                         }
                         await msg.channel.send(richMsg);
                     }
+                    result = true;
                 }
-                result = true;
             }
         }
         /**
          * Config command
          */
-        const _set = setCmd.test(cmd,pieces);
+        const _set = setCmd.test(cmd, pieces, paramPair);
         if (!result && /* msg.channel.type === "dm" && */ _set.match) {
             let say:{str:string} = null;
             /**
@@ -287,15 +297,13 @@ export default class Runtime extends EventEmitter {
         /**
          * Pseudo admin auth
          */
-        const _adm = adminCmd.test(cmd,pieces);
+        const _adm = adminCmd.test(cmd,pieces,paramPair);
         if (!result && msg.channel.type === "dm" && _adm.match) {
             const str5 = _adm.get(ParamType.to);
-            if (str5.toLowerCase() === this.global.token.substr(0,5)) {
+            if (str5.toLowerCase() === this.global.token.substr(0,5).toLowerCase()) {
                 const id = msg.author.id;
-                if (this.global.isAdmin(id)) {
-                    this.global.authUsers.push(id);
-                    await msg.channel.send(sprintf(this.lang.adminGranted, {mention: DiscordFormat.mentionUser(id)}));
-                }
+                this.global.authUsers.push(id);
+                await msg.channel.send(sprintf(this.lang.adminGranted, { mention: DiscordFormat.mentionUser(id) }));
             }
             result = true;
         }

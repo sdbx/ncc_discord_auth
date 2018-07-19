@@ -37,7 +37,7 @@ export default class NcCredent {
     public async genCreditByConsole():Promise<string> {
         const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id");
         const password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__");
-        return this.requestCredent(username,password);
+        return this.requestCredent(username,password).catch((err:LoginError) => null);
     }
     /**
      * get credentials from userid and password
@@ -45,10 +45,11 @@ export default class NcCredent {
      * @param username naver id
      * @param password naver passwork(unencrypt)
      */
-    public async requestCredent(username:string,password:string):Promise<string> {
+    public async requestCredent(username:string,password:string,
+            captcha?:{key:string,value:string}):Promise<string> {
         this.credit = new Credentials(username,password);
         let errorCase:string = null;
-        await this.credit.login().catch((err:Error) => errorCase = err.message);
+        await this.credit.login(captcha).catch((err:Error) => errorCase = err.message);
         if (errorCase != null) {
             const errorCode = {
                 pwd: false,
@@ -64,6 +65,7 @@ export default class NcCredent {
                     errorCode.captchaURL = pt[0].substring(0,pt[0].lastIndexOf("\""));
                 }
             }
+            return Promise.reject(errorCode);
         }
         const name = await this.validateLogin();
         this.credit.password = "__";
@@ -94,7 +96,7 @@ export default class NcCredent {
         const result:string = await this.validateLogin();
         if (result != null) {
             this.credit.username = result;
-            await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
+            // await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(result);
         }
         return Promise.resolve(result);

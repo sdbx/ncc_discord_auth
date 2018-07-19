@@ -18,7 +18,7 @@ async function start() {
     });
     await run.start();
 }
-// Log.hook();
+Log.hook();
 start();
 
 

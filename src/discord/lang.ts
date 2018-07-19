@@ -23,6 +23,8 @@ export default class Lang extends Config {
         naverRequest: "%(type)s%(suffix)s 입력해달라냥~",
         naverAlreadyOn: "이미 %(id)s로 로그인이 이미 됐다냥!",
         naverOn: "로그인 됐다냥!",
+        naverWrongPW: "아이디나 비번이 다르다냥!",
+        naverReqCaptcha: "캡챠를 입력해달라냥..",
         naverOff: "안됐다냥!",
         passwordDelete: "비밀번호 보낸 거 삭제해달라냥!",
         successAdmin: "%(user)s님 관리자인걸 환영한다냥!",
@@ -48,7 +50,7 @@ export default class Lang extends Config {
     public setTypeError = "%(depth)s의 타입이 %(type)s이당!";
     public setSuccess = "%(config)s의 %(key)s을 %(old)s에서 %(value)s%(to)s 설정했다냥!";
     // admin
-    public sudoNeed = "관리자(%(users)s) 명령어다냥!";
+    public sudoNeed = "관리자 명령어다냥!";
     public adminGranted = "%(mention)s님 인증완료.";
 
     constructor() {

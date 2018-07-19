@@ -1,8 +1,12 @@
 import * as Discord from "discord.js";
+import * as fs from "fs-extra";
 import * as Hangul from "hangul-js";
+import * as request from "request-promise-native";
 import { sprintf } from "sprintf-js";
+import * as tmp from "tmp-promise";
 import Config from "../../config";
 import Log from "../../log";
+import { LoginError } from "../../ncc/ncredent";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
 import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType, } from "../runutil";
@@ -12,6 +16,8 @@ export default class Login extends Plugin {
     protected config = new LoginConfig();
     // declare command.
     private naverLogin:CommandHelp;
+    // status
+    private status:CommandHelp;
     /**
      * Initialize command
      */
@@ -19,11 +25,12 @@ export default class Login extends Plugin {
         // super: load config
         super.ready();
         // CommandHelp: suffix, description
-        this.naverLogin = new CommandHelp("네이버 로그인", this.lang.sample.hello);
+        this.naverLogin = new CommandHelp("네이버 로그인", this.lang.sample.hello, true, {reqAdmin:true, dmOnly:true});
         // add parameter
         this.naverLogin.addField(ParamType.to,"네이버 아이디", false);
         // get parameter as complex
         this.naverLogin.complex = true;
+        this.status = new CommandHelp("상태 알려", "상태 확인", true, {reqAdmin:true});
         return Promise.resolve();
     }
     /**
@@ -32,8 +39,14 @@ export default class Login extends Plugin {
     public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
         // test command if match
         const lang = this.lang.login;
-        const testNaver = this.naverLogin.test(command,options);
-        if (testNaver.match && msg.channel.type === "dm") {
+        const paramPair = this.naverLogin.check(msg.channel.type, this.global.isAdmin(msg.author.id));
+        const testNaver = this.naverLogin.test(command,options,paramPair);
+        /**
+         * naver login
+         * I don't have server with https or TLS.... sh**.
+         * DO NOT FORGET ERASE PASSWORD
+         */
+        if (testNaver.match) {
             // check naver status
             const _naverID = await this.ncc.validateLogin();
             if (_naverID != null) {
@@ -61,6 +74,19 @@ export default class Login extends Plugin {
                 return Promise.resolve();
             }
         }
+        const _status = this.status.test(command,options,paramPair);
+        if (_status.match) {
+            const send = new Discord.RichEmbed();
+            const nState =
+                (this.ncc.available && await this.ncc.validateLogin() != null) ? lang.naverOn : lang.naverOff;
+            send.addField("네이버 로그인", nState);
+            send.addField("봇 관리자 여부", this.toLangString(this.global.authUsers.indexOf(msg.author.id) >= 0));
+            send.author = {
+                name: msg.author.username,
+                icon_url: msg.author.avatarURL,
+            }
+            await msg.channel.send(send);
+        }
         return Promise.resolve();
     }
     /**
@@ -78,23 +104,49 @@ export default class Login extends Plugin {
                 suffix: "를",
             }));
             typing.id = content;
-        } else {
+        } else if (typing.pw == null || typing.captcha != null) {
             // end chain
-            typing.pw = content;
-            const result = await this.ncc.requestCredent(typing.id,typing.pw).catch(Log.e);
-            if (result != null) {
-                await message.channel.send(lang.naverOn);
+            let captchaValue:{key:string,value:string} = null;
+            if (typing.pw == null) {
+                typing.pw = content;
             } else {
-                await message.channel.send(lang.naverOff);
+                captchaValue = {
+                    key: typing.captcha,
+                    value: content,
+                }
             }
-            return this.endChain(message,type,data);
+            const result:LoginError = await this.ncc.requestCredent(typing.id,typing.pw,captchaValue)
+                .then((username) => null).catch((err) => err);
+            if (result == null) {
+                await message.reply(lang.naverOn + "\n" + lang.passwordDelete);
+                // await message.channel.send(result.pwd ? lang.naverWrongPW : lang.naverOn);
+                return this.endChain(message, type, data);
+            } else {
+                if (result.captcha) {
+                    const url = result.captchaURL;
+                    typing.captcha = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"));
+                    const image:Buffer = await request.get(url, {encoding:null});
+
+                    const rich = new Discord.RichEmbed();
+                    rich.setTitle(lang.naverReqCaptcha);
+                    rich.attachFile(new Discord.Attachment(image,"captcha.png"));
+                    rich.setImage("attachment://captcha.png");
+                    await message.channel.send(rich);
+                } else {
+                    // pwd wrong
+                    await message.channel.send(lang.naverWrongPW);
+                    return this.endChain(message, type, data);
+                }
+            }    
+        } else {
+            // this should never happen.
+            Log.w("WTF", "login.ts - onChainMessage");
+            return this.endChain(message, type, data);
         }
         return Promise.resolve(data);
     }
     protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
         // on receive all data
-        const lang = this.lang.login;
-        await message.reply(lang.passwordDelete);
         return Promise.resolve();
     }
 }

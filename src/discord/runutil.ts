@@ -1,3 +1,4 @@
+import * as Discord from "discord.js";
 import Log from "../log";
 
 export enum ParamType {
@@ -19,11 +20,26 @@ export class CommandHelp {
     public params:Keyword[]; // parameter info
     public description:string; // Description command
     public complex:boolean; // receive only keyword is matching?
-    public constructor(commands:string, desc:string,complex:boolean = false) {
+    public reqAdmin:boolean; // require admin?
+    public dmOnly:boolean; // direct message only..
+    public constructor(commands:string, desc:string,complex:boolean = false,
+        options?:{reqAdmin?:boolean,dmOnly?:boolean}) {
         this.cmds = commands.split(",");
         this.description = desc;
         this.params = [];
         this.complex = complex;
+        if (options != undefined && options != null) {
+            this.reqAdmin = options.reqAdmin && true;
+            this.dmOnly = options.dmOnly && true;
+            if (this.reqAdmin) {
+                this.description += " (관리자)";
+            }
+            if (this.dmOnly) {
+                this.description += " (1:1챗)";
+            }
+        } else {
+            this.reqAdmin = this.dmOnly = false;
+        }
     }
     public addField(type:ParamType, content:string,require:boolean = true) {
         this.params.push({
@@ -48,19 +64,33 @@ export class CommandHelp {
         out += this.cmds.join("|");
         return out;
     }
-    public test(command:string, options:Keyword[]) {
+    public check(type:string,admin:boolean) {
+        return {
+            admin,
+            dm: type === "dm",
+        };
+    }
+    public test(command:string, options:Keyword[], checks?:{admin:boolean,dm:boolean}) {
         let cmdOk = false;
         let cmdPiece;
         let optStatus:string = null;
-        for (const cmd of this.cmds) {
-            if (cmd === command) {
-                cmdOk = true;
-                break;
-            }
-            if (this.complex && command.endsWith(" " + cmd)) {
-                cmdOk = true;
-                cmdPiece = command.substring(0,command.lastIndexOf(" " + cmd));
-                break;
+        if (checks == null && (this.reqAdmin || this.dmOnly)) {
+            // :(
+        } else if (this.reqAdmin && !checks.admin) {
+            // :(
+        } else if (this.dmOnly && !checks.dm) {
+            // :(
+        } else {
+            for (const cmd of this.cmds) {
+                if (cmd === command) {
+                    cmdOk = true;
+                    break;
+                }
+                if (this.complex && command.endsWith(" " + cmd)) {
+                    cmdOk = true;
+                    cmdPiece = command.substring(0, command.lastIndexOf(" " + cmd));
+                    break;
+                }
             }
         }
         const must = this.params.filter((_v) => _v.require);
