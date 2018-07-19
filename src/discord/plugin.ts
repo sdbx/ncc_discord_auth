@@ -7,14 +7,16 @@ import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
+import { MainCfg } from "./runtime";
 import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
 
 const timeout = 1 * 60 * 1000; // 1 is minutes
 export default abstract class Plugin {
-    protected global:Config;
+    protected config:Config;
     protected client:Discord.Client;
     protected ncc:Ncc;
     protected lang:Lang;
+    protected global:MainCfg;
     private subConfigs:Map<string,Config>;
     private chains:Map<string,ChainData>;
 
@@ -23,20 +25,21 @@ export default abstract class Plugin {
      * @param cl client
      * @param ncc nccapi
      */
-    public init(cl:Discord.Client, nc:Ncc, ln:Lang):void {
+    public init(cl:Discord.Client, nc:Ncc, ln:Lang, mainConfig:MainCfg):void {
         this.client = cl;
         this.ncc = nc;
         this.lang = ln;
         this.subConfigs = new Map();
         this.chains = new Map();
+        this.global = mainConfig;
     }
     /**
      * on discord ready
      */
     public async ready():Promise<void> {
         Log.d(this.constructor.name, "bot ready.");
-        if (this.global != null) {
-            await this.global.import(true).catch((err) => null);
+        if (this.config != null) {
+            await this.config.import(true).catch((err) => null);
         }
         return Promise.resolve();
     }
@@ -48,7 +51,15 @@ export default abstract class Plugin {
      * @param options options
      */
     public abstract async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void>;
-    public abstract get help():CommandHelp[];
+    public get help():CommandHelp[] {
+        const out:CommandHelp[] = [];
+        for (const [key,value] of Object.entries(this)) {
+            if (this.hasOwnProperty(key) && value instanceof CommandHelp) {
+                out.push(value);
+            }
+        }
+        return out;
+    }
     /**
      * @todo on message received
      * DO NOT SEND MESSAGE when BOT has spoken.
@@ -70,11 +81,11 @@ export default abstract class Plugin {
      * @param value data
      */
     public async setConfig(key:string, value:string):Promise<{str:string}> {
-        if (this.global == null) {
+        if (this.config == null) {
             // ignore
             return Promise.resolve(null);
         }
-        if (this.global == null || !key.startsWith(this.global.name)) {
+        if (this.config == null || !key.startsWith(this.config.name)) {
             return Promise.resolve(null);
         }
         const split = key.split(".");
@@ -88,18 +99,18 @@ export default abstract class Plugin {
             if (_sub != null && _sub.length === 1) {
                 sub = _sub[0].substring(1,_sub[0].length - 1);
             }
-            if (tag !== this.global.name) {
+            if (tag !== this.config.name) {
                 return Promise.reject(null);
             } else if (sub != null) {
-                if (await this.config(this.global, sub, false).then((v) => v.has())) {
-                    config = await this.config(this.global, sub, true);
-                    configName = this.global.name + "-" + sub;
+                if (await this.sub(this.config, sub, false).then((v) => v.has())) {
+                    config = await this.sub(this.config, sub, true);
+                    configName = this.config.name + "-" + sub;
                 } else {
                     key = sub + ".";
                 }
             } else {
-                config = this.global;
-                configName = this.global.name;
+                config = this.config;
+                configName = this.config.name;
             }
         }
         let errorMsg;
@@ -177,6 +188,7 @@ export default abstract class Plugin {
                         oldValue = depth;
                         if (data !== "null") {
                             set(config,_path,data);
+                            await this.onSave();
                         }
                     }
                     break;
@@ -198,13 +210,22 @@ export default abstract class Plugin {
             }
         } else {
             const param = {
-                depth: this.global.name,
+                depth: this.config.name,
                 name: key.indexOf(".") >= 1 ? key.substring(0,key.indexOf(".")) : this.lang.valNull,
                 str: null,
             };
             param.str = sprintf(this.lang.setNotFound, param);
             return Promise.resolve(param);
         }
+    }
+    public async onSave() {
+        if (this.config != null) {
+            await this.config.export();
+            const proArr = [];
+            this.subConfigs.forEach((_value) => proArr.push(_value.export()));
+            await Promise.all(proArr);
+        }
+        return Promise.resolve();
     }
     /**
      * 체인 여부
@@ -283,7 +304,7 @@ export default abstract class Plugin {
      */
     protected startChain(channel:string, user:string, type:number, data:object = {}):void {
         const id = `${channel}$${user}`;
-        if (!this.chains.has (id)) {
+        if (!this.chains.has(id)) {
             this.chains.set(id,{
                 type,
                 data,
@@ -298,7 +319,7 @@ export default abstract class Plugin {
      * @param global class object 
      * @param subName sub name :)
      */
-    protected async config<T extends Config>(global:T,subName:string,load = true):Promise<T> {
+    protected async sub<T extends Config>(global:T,subName:string,load = true):Promise<T> {
         if (this.subConfigs.has(subName)) {
             return this.subConfigs.get(subName) as T;
         }

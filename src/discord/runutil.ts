@@ -130,6 +130,80 @@ export class CommandHelp {
         );
     }
 }
+export class DiscordFormat {
+    public static mentionUser(userid:string) {
+        return `<@${userid}>`;
+    }
+    public static mentionChannel(channelid:string) {
+        return `<#${channelid}>`;
+    }
+    public static emoji(emojiName:string, emojiId:string, animated = false) {
+        return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`;
+    }
+
+    private _italic = false;
+    private _bold = false;
+    private _underline = false;
+    private _namu = false;
+    private _block = false;
+    private _blockBig = false;
+    private readonly _content:string;
+    public constructor(str:string) {
+        this._content = str;
+    }
+    public get normal() {
+        this._italic = this._bold = this._underline = this._namu = false;
+        return this;
+    }
+    public get italic() {
+        this._italic = true;
+        return this;
+    }
+    public get bold() {
+        this._bold = true;
+        return this;
+    }
+    public get underline() {
+        this._underline = true;
+        return this;
+    }
+    public get namu() {
+        this._namu = true;
+        return this;
+    }
+    public get block() {
+        this._block = true;
+        return this;
+    }
+    public get blockBig() {
+        this._blockBig = true;
+        return this;
+    }
+    public toString() {
+        let format = "%s";
+        if (this._underline) {
+            format = format.replace("%s","__%s__");
+        }
+        if (this._namu) {
+            format = format.replace("%s","~~%s~~");
+        }
+        if (this._italic) {
+            format = format.replace("%s","*%s*");
+        }
+        if (this._bold) {
+            format = format.replace("%s","**%s**");
+        }
+        if (this._block || this._blockBig) {
+            format = "%s";
+            if (this._block) {
+                format = format.replace("%s", "`%s`");
+            } else {
+                format = format.replace("%s","```%s```");
+            }
+        }
+        return format.replace("%s",this._content);
+    }
+}
 export class CommandStatus {
     public requires:Map<ParamType, string>;
     public options:Map<ParamType, string>;
@@ -152,6 +226,9 @@ export class CommandStatus {
             return sprintf(msg,{param:this.optionStatus});
         }
         return null;
+    }
+    public has(key:ParamType) {
+        return this.exist(key);
     }
     public exist(key:ParamType) {
         return this.requires.has(key) || this.options.has(key);

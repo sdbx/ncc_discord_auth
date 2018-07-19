@@ -5,38 +5,38 @@ import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
+import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
-import { CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
+import { CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "./runutil";
 
 const queryCmd = /\s+\S+/ig;
 const safeCmd = /(".+?")|('.+?')/i;
 
 export default class Runtime extends EventEmitter {
-    private cfg = new Bot();
-    private lang = new Lang();
+    private global:MainCfg;
+    private lang:Lang;
     private client:Discord.Client;
     private ncc:Ncc;
     private plugins:Plugin[] = [];
+    private lastSaved:number;
     constructor() {
         super();
         // ,new Auth(), new Login()
-        this.plugins.push(new Ping());
-        // event register
-        this.plugins.forEach(((v,i) => {
-            this.on("ready",v.ready.bind(v));
-            this.on("message",v.onMessage.bind(v));
-        }));
+        this.plugins.push(new Ping(), new Login());
     }
     public async start():Promise<string> {
         // load config
-        await this.cfg.import(true).catch((err) => null);
+        this.global = new MainCfg();
+        await this.global.import(true).catch((err) => null);
         // init client
         this.client = new Discord.Client();
         // create ncc - not authed
         this.ncc = new Ncc();
         // init lang
         this.lang = new Lang();
+        // save time: now
+        this.lastSaved = Date.now();
         // ncc test auth by cookie
         try {
             if (await this.ncc.loadCredit() != null) {
@@ -47,32 +47,47 @@ export default class Runtime extends EventEmitter {
         } catch (err) {
             Log.e(err);
         }
+        // event register
+        this.plugins.forEach(((v,i) => {
+            this.on("ready",v.ready.bind(v));
+            this.on("message",v.onMessage.bind(v));
+            this.on("save",v.onSave.bind(v));
+        }));
+        // client register
         this.client.on("ready",this.ready.bind(this));
         this.client.on("message",this.onMessage.bind(this));
+        // ncc login
+
         // client login (ignore)
-        this.client.login(this.cfg.token)
+        this.client.login(this.global.token)
         return Promise.resolve("");
     }
     public async destroy() {
         this.client.removeAllListeners();
         await this.client.destroy();
         this.ncc.chat.disconnect();
+        // may save failed.
+        this.emit("save");
         return Promise.resolve();
     }
     protected async ready() {
         // init plugins
         for (const plugin of this.plugins) {
-            plugin.init(this.client, this.ncc, this.lang);
+            plugin.init(this.client, this.ncc, this.lang,this.global);
         }
         this.emit("ready");
     }
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;
-        const prefix = this.cfg.prefix;
+        const prefix = this.global.prefix;
         // onMessage should invoke everytime.
         this.emit("message",msg);
         // await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
         // chain check
+        if (msg.author.id === this.client.user.id) {
+            // Self say.
+            return Promise.resolve();
+        }
         for (const plugin of this.plugins) {
             if (await plugin.callChain(msg,msg.channel.id, msg.author.id)) {
                 // invoked chain.
@@ -81,6 +96,11 @@ export default class Runtime extends EventEmitter {
         }
         // command check
         if (!prefix.test(text)) {
+            // save configs 10 minutes inverval when normal...
+            if (Date.now() - this.lastSaved >= 600000) {
+                this.lastSaved = Date.now();
+                this.emit("save");
+            }
             return Promise.resolve();
         }
         let chain = msg.content;
@@ -161,6 +181,8 @@ export default class Runtime extends EventEmitter {
         const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false);
         setCmd.addField(ParamType.dest, "목적", true);
         setCmd.addField(ParamType.to, "설정값", true);
+        const adminCmd = new CommandHelp("token","토큰 인증", false);
+        adminCmd.addField(ParamType.to, "토큰 앞 5자리", true);
         /*
             Help Command
         */
@@ -222,17 +244,17 @@ export default class Runtime extends EventEmitter {
                 switch (_set.get(ParamType.dest)) {
                     case "토큰" : {
                         // CAUTION
-                        this.cfg.token = _set.get(ParamType.to);
+                        this.global.token = _set.get(ParamType.to);
                     } break;
                     case "말머리" : {
-                        this.cfg.prefix = new RegExp(_set.get(ParamType.to),"i");
+                        this.global.prefix = new RegExp(_set.get(ParamType.to),"i");
                     } break;
                     default: {
                         pass = false;
                     }
                 }
                 if (pass) {
-                    await this.cfg.export().catch(Log.e);
+                    await this.global.export().catch(Log.e);
                     await msg.channel.send(_set.get(ParamType.dest) + " 설정 완료. 재로드합니다.");
                     this.emit("restart");
                     return Promise.resolve(true);
@@ -262,6 +284,21 @@ export default class Runtime extends EventEmitter {
                 result = true;
             }
         }
+        /**
+         * Pseudo admin auth
+         */
+        const _adm = adminCmd.test(cmd,pieces);
+        if (!result && msg.channel.type === "dm" && _adm.match) {
+            const str5 = _adm.get(ParamType.to);
+            if (str5.toLowerCase() === this.global.token.substr(0,5)) {
+                const id = msg.author.id;
+                if (this.global.isAdmin(id)) {
+                    this.global.authUsers.push(id);
+                    await msg.channel.send(sprintf(this.lang.adminGranted, {mention: DiscordFormat.mentionUser(id)}));
+                }
+            }
+            result = true;
+        }
         return Promise.resolve(result);
     }
     private filterEmpty(value:string):boolean {
@@ -276,11 +313,12 @@ export function getNickname(msg:Discord.Message) {
         return msg.author.username;
     }
 }
-class Bot extends Config {
-    public token = "Bot token";
+export class MainCfg extends Config {
+    public token = "_";
+    public authUsers:string[] = [];
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {
-        super("bot");
+        super("main");
         this.blacklist.push("prefix");
     }
     public get prefix():RegExp {
@@ -288,5 +326,8 @@ class Bot extends Config {
     }
     public set prefix(value:RegExp) {
         this.prefixRegex = value.toString();
+    }
+    public isAdmin(id:string) {
+        return this.authUsers.indexOf(id) >= 0;
     }
 }

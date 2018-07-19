@@ -47,7 +47,24 @@ export default class NcCredent {
      */
     public async requestCredent(username:string,password:string):Promise<string> {
         this.credit = new Credentials(username,password);
-        await this.credit.login();
+        let errorCase:string = null;
+        await this.credit.login().catch((err:Error) => errorCase = err.message);
+        if (errorCase != null) {
+            const errorCode = {
+                pwd: false,
+                captcha: false,
+            } as LoginError;
+            if (errorCase.indexOf("Invalid username or password") >= 0) {
+                errorCode.pwd = true;
+            }
+            if (errorCase.indexOf("캡차이미지") >= 0) {
+                errorCode.captcha = true;
+                const pt = errorCase.match(/https.+?"/i);
+                if (pt != null) {
+                    errorCode.captchaURL = pt[0].substring(0,pt[0].lastIndexOf("\""));
+                }
+            }
+        }
         const name = await this.validateLogin();
         this.credit.password = "__";
         if (name != null) {
@@ -106,4 +123,9 @@ export default class NcCredent {
             read({prompt:"", silent},(err, pw:string) => err != null ? rej(err) : res(pw));
         });
     }
+}
+export interface LoginError {
+    pwd:boolean;
+    captcha:boolean;
+    captchaURL?:string;
 }
