@@ -63,7 +63,17 @@ export default class Auth extends Plugin {
             }
             const guildCfg = await this.sub(this.config, msg.guild.id);
             const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
-            const member = await this.ncc.getMemberPublic(cafeID.cafeId, param, type === PType.NICK);
+            let member;
+            try {
+                if (type === PType.NICK) {
+                    member = await this.ncc.getMemberByNick(cafeID.cafeId, param);
+                } else {
+                    member = await this.ncc.getMemberById(cafeID.cafeId, param);
+                }
+            } catch (err) {
+                Log.e(err);
+                member = null;
+            }
             if (member == null) {
                 await msg.channel.send(sprintf(this.lang.auth.nickNotFound, {
                     nick: param,
@@ -71,7 +81,7 @@ export default class Auth extends Plugin {
                 }));
                 return Promise.resolve();
             }
-            await this.ncc.getNicknameHas(cafeID.cafeId, member.nickname);
+            await this.ncc.getMemberByNick(cafeID.cafeId, member.nickname);
             const room:Room = await this.ncc.chat.createRoom(
                 { id: cafeID.cafeId }, [{ id: member.userid }],
                 {name: "안뇽", isPublic: false}).catch((err) => {Log.e(err); return null;})
