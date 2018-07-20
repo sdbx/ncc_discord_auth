@@ -38,6 +38,7 @@ export default class Lang extends Config {
         authCmdDesc: "네이버 카페 회원인지 인증하는거다냥!",
         nickNotFound: "%(nick)s(%(type)s) 회원을 찾을 수 없다냥..",
         roomNotMaked: "방을 못만들었다냥! 실패다냥~",
+        onlyGroup: "그룹만 사용할 수 있다냥!",
     }
     /**
      * Module: sample

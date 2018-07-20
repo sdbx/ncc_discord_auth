@@ -305,6 +305,7 @@ export default class Runtime extends EventEmitter {
                 const id = msg.author.id;
                 this.global.authUsers.push(id);
                 await msg.channel.send(sprintf(this.lang.adminGranted, { mention: DiscordFormat.mentionUser(id) }));
+                await this.global.export().catch(err => Log.e); 
             }
             result = true;
         }

@@ -78,7 +78,7 @@ export default class Login extends Plugin {
         if (_status.match) {
             const send = new Discord.RichEmbed();
             const nState =
-                (this.ncc.available && await this.ncc.validateLogin() != null) ? lang.naverOn : lang.naverOff;
+                await this.ncc.availableAsync() ? lang.naverOn : lang.naverOff;
             send.addField("네이버 로그인", nState);
             send.addField("봇 관리자 여부", this.toLangString(this.global.authUsers.indexOf(msg.author.id) >= 0));
             send.author = {

@@ -321,7 +321,7 @@ export default abstract class Plugin {
      */
     protected async sub<T extends Config>(global:T,subName:string,load = true):Promise<T> {
         if (this.subConfigs.has(subName)) {
-            return this.subConfigs.get(subName) as T;
+            return Promise.resolve(this.subConfigs.get(subName) as T);
         }
         const newI:T = new (global["constructor"] as any)() as T;
         newI.name = subName;

@@ -57,16 +57,21 @@ export default class Auth extends Plugin {
                     type = PType.NICK;
                 }
             }
-            const cafeID = await this.ncc.parseNaver(this.config.commentURL);
-            const members = await this.ncc.getMemberPublic(cafeID.cafeId, param, type === PType.NICK);
-            if (members.length !== 1) {
+            if (msg.channel.type === "dm") {
+                await msg.channel.send(this.lang.auth.onlyGroup);
+                return Promise.resolve();
+            }
+            const guildCfg = await this.sub(this.config, msg.guild.id);
+            const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
+            const member = await this.ncc.getMemberPublic(cafeID.cafeId, param, type === PType.NICK);
+            if (member == null) {
                 await msg.channel.send(sprintf(this.lang.auth.nickNotFound, {
                     nick: param,
                     type: type === PType.NICK ? "닉네임" : "아이디",
                 }));
                 return Promise.resolve();
             }
-            const member = members[0];
+            await this.ncc.getNicknameHas(cafeID.cafeId, member.nickname);
             const room:Room = await this.ncc.chat.createRoom(
                 { id: cafeID.cafeId }, [{ id: member.userid }],
                 {name: "안뇽", isPublic: false}).catch((err) => {Log.e(err); return null;})
@@ -117,6 +122,7 @@ interface AuthInfo {
 class AuthConfig extends Config {
     public timeout = 600;
     public commentURL = "https://cafe.naver.com/sdbx/7433"
+    public proxyGuild = "416203365295587338";
     constructor() {
         super("auth");
     }

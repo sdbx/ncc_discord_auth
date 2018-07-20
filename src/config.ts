@@ -1,5 +1,6 @@
 import * as fs from "fs-extra";
 import * as path from "path";
+import Log from "./log";
 
 export default class Config {
     public static readonly appVersion:number = 2; // app version
@@ -62,71 +63,61 @@ export default class Config {
      * @returns success? (reject,resolve)
      */
     public async export():Promise<void> {
-        if (await this.checkDir()) {
-            // make blacklist
-            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
-            Config.excludes.split(",").forEach(v => ignore.push(v));
-
-            const write:string = JSON.stringify(this,
-                (key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
-            return await fs.access(this.saveTo,fs.constants.W_OK)
-                .catch(err => {
-                    if (err.code === "ENOENT") {
-                        return null;
-                    } else {
-                        throw err;
-                    }
-                })
-                .then(() => fs.writeFile(this.saveTo,write,{encoding:"utf-8"}))
-                .then(() => Promise.resolve())
-                .catch(err => Promise.reject(err));
-        } else {
-            console.error("export - No directory");
-            return Promise.reject("No directory");
+        const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
+        Config.excludes.split(",").forEach(v => ignore.push(v));
+        const write:string = JSON.stringify(this,
+            (key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
+        try {
+            await fs.ensureFile(this.saveTo);
+            await fs.writeFile(this.saveTo,write,{encoding:"utf-8"});
+            return Promise.resolve();
+        } catch (err) {
+            Log.e(err);
+            return Promise.reject();
         }
     }
-    public async has():Promise<boolean> {
-        return await fs.access(this.saveTo,fs.constants.F_OK | fs.constants.R_OK)
-            .then(() => true).catch((err) => false);
+    public async has(_path = this.saveTo):Promise<boolean> {
+        return fs.ensureFile(this.saveTo).then(() => true).catch(() => false);
     }
     /**
      * import config from file
      * @returns success? (reject,resolve)
      */
     public async import(write:boolean = false):Promise<void> {
-        const error:any = await fs.access(this.saveTo,fs.constants.F_OK | fs.constants.R_OK)
-                        .then(() => null)
-                        .catch((err:any) => err);
+        const exists = await this.has();
         let file_version = Number.MAX_SAFE_INTEGER;
-        if (error == null) {
+        if (exists) {
             // load data
             const text:string = await fs.readFile(this.saveTo,{encoding:"utf-8"});
-            const data:any = JSON.parse(text);
-            file_version = data.version;
-            // remove non-cloneable
-            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
-            Config.excludes.split(",").forEach(v => ignore.push(v));
-            ignore.push("version");
-            for (const [key,value] of Object.entries(ignore)) {
-                if (ignore.indexOf(key) >= 0) {
-                    delete data[key];
+            try {
+                const data:any = JSON.parse(text);
+                file_version = data.version;
+                // remove non-cloneable
+                const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
+                Config.excludes.split(",").forEach(v => ignore.push(v));
+                ignore.push("version");
+                for (const [key,value] of Object.entries(ignore)) {
+                    if (ignore.indexOf(key) >= 0) {
+                        delete data[key];
+                    }
                 }
-            }
-            // clone!
-            this._clone(data);
-        } else {
-            console.error("Can't read config file");
-            if (write) {
-                return await this.export().then(() => Promise.resolve()).catch((err) => Promise.reject(err));
-            } else {
-                return Promise.reject(error);
+                // clone!
+                this._clone(data);
+                // update if app version is higher or write
+                if (file_version < this.version || write) {
+                    return this.export();
+                } else {
+                    return Promise.resolve();
+                }
+            } catch (err) {
+                Log.e(err);
             }
         }
-        // update if app version is higher or write
-        if (file_version < this.version || write) {
-            return await this.export().then(() => Promise.resolve()).catch((err) => Promise.reject(err));
+        console.error("Can't read config file");
+        if (write) {
+            return await this.export();
         } else {
-            return Promise.resolve();
+            return Promise.reject();
         }
     }
     protected _clone(source:any) {
@@ -137,14 +128,14 @@ export default class Config {
         }
     }
     protected async checkDir():Promise<boolean> {
-        return Promise.resolve(await fs.access(Config.dirpath,fs.constants.R_OK | fs.constants.W_OK)
-            .then(() => true)
-            .catch((err) => fs.mkdir(Config.dirpath))
-            .then(() => true)
-            .catch((err) => Promise.resolve(false)));
+        return fs.access(Config.dirpath,fs.constants.R_OK | fs.constants.W_OK)
+        .then(() => true)
+        .catch((err) => fs.mkdir(Config.dirpath))
+        .then(() => true)
+        .catch((err) => Promise.resolve(false));
     }
     protected clone_chain<T>(source:any,dest:T):T {
-        if (source == null || !(dest instanceof Object) || dest == null) {
+        if (source == null || Array.isArray(dest) || !(dest instanceof Object) || dest == null) {
             // primitive type
             return source as T;
         }

@@ -2,6 +2,7 @@ declare module "node-ncc-es6" {
     import { CookieJar } from "tough-cookie";
     import { EventEmitter } from "events";
     import { Stream } from "stream";
+    import { Request } from "request";
     
     export class Room {
         cafe:Cafe;
@@ -58,7 +59,7 @@ declare module "node-ncc-es6" {
         on(eventType:"error",callback:(error:any) => void):this;
         connect(retries?:number, err?:any):Promise<void>;
         disconnect():void;
-        sendCommand(command:string,body:object):Promise<any>;
+        sendCommand(command:string,body:object):Promise<Request>;
         /**
          * However, creating non-1to1 room isn't supported now. Be careful.
          * @param cafe Cafe id

@@ -28,7 +28,7 @@ export default class NcFetch extends NcCredent {
          * Check cookie status
          */
         const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl);
-        if (option.auth && (!isNaver || (!this.available && this.validateLogin() == null))) {
+        if (option.auth && (!isNaver || !await this.availableAsync())) {
             Log.e("ncc-getWeb : Cookie is invaild");
             return Promise.reject();
         }
@@ -335,7 +335,11 @@ export default class NcFetch extends NcCredent {
         // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&
         // page=1&boardtype=L&articleid=7446&referrerAllArticles=true
     }
-    public async getMemberPublic(cafeid:number, id:string, isNickname = true):Promise<Profile[]> {
+    public async getMemberPublic(cafeid:number, id:string, isNickname = true):Promise<Profile> {
+        if (!isNickname) {
+            // direct
+            // return Promise.resolve(await this.getMemberPrivate(cafeid, id));
+        }
         const url_params = {
             "keywordSearch.clubid": cafeid.toString(),
             "m": "listKeyword",
@@ -377,7 +381,7 @@ export default class NcFetch extends NcCredent {
                 members[i] = await this.getMemberPrivate(cafeid, members[i].userid);
             }
         }
-        return Promise.resolve(members);
+        return Promise.resolve(members.length >= 1 ? members[0] : null);
     }
     public async getMemberPrivate(cafeid:number,userid:string):Promise<Profile> {
         const paramLevel = {
@@ -413,6 +417,18 @@ export default class NcFetch extends NcCredent {
             numComments : comment,
             level,
         } as Profile);
+    }
+    public async getNicknameHas(cafeid:number,nick:string) {
+        // http://cafe.naver.com/static/js/mycafe/javascript/nickNameValidationChk-1516327387000-7861.js
+        const param = {
+            "clubid": cafeid.toString(10),
+            "memberid": this.username,
+            "nickname": this.encodeURI_KR(nick),
+        }
+        const $ = await this.getWeb(`${cafePrefix}/CafeMemberNicknameCheckAjax.nhn`,{},{conv:true, auth:true},param,
+                    `${cafePrefix}/CafeMemberInfo.nhn?clubid=${cafeid.toString(10)}&memberid=${this.username}`);
+        const text = $("body").text();
+        Log.d(text);
     }
     /**
      * Query string... at ('aa','bb','cc').split(",");
