@@ -170,10 +170,19 @@ export default class Runtime extends EventEmitter {
         /*
           * hard coding!
         */
-        if (await this.hardCodingCmd(msg,cmd,pieces)) {
+        try {
+            if (await this.hardCodingCmd(msg, cmd, pieces)) {
+                return;
+            }
+        } catch (err) {
+            Log.e(err);
             return;
         }
-        await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, cmd, pieces)));
+        try {
+            await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, cmd, pieces)));
+        } catch  (err) {
+            Log.e(err);
+        }
     }
     private async hardCodingCmd(msg:Discord.Message, cmd:string, pieces:Keyword[]):Promise<boolean> {
         let result = false;

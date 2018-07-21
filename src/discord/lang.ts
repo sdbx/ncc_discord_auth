@@ -39,6 +39,9 @@ export default class Lang extends Config {
         nickNotFound: "%(nick)s(%(type)s) 회원을 찾을 수 없다냥..",
         roomNotMaked: "방을 못만들었다냥! 실패다냥~",
         onlyGroup: "그룹만 사용할 수 있다냥!",
+        proxyFailed: "인증용 채팅방이 존재하지 않는다냥.",
+        authing: "이미 인증중이냥, 네카채를 확인해달라냥~",
+        authed: "인증 완료",
     }
     /**
      * Module: sample

@@ -15,7 +15,7 @@ import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "../ru
 export default class Auth extends Plugin {
     protected config = new AuthConfig();
     protected timeout = 10 * 60 * 1000; // 10 is minutes
-    protected timestamps:Map<string,number> = new Map();
+    protected invites:Map<InvitePair,Discord.Invite> = new Map();
     // declare command.
     private authNaver:CommandHelp;
     /**
@@ -28,6 +28,13 @@ export default class Auth extends Plugin {
         this.authNaver = new CommandHelp("인증", this.lang.auth.authCmdDesc);
         this.authNaver.addField(ParamType.to, "(ID) 아이디|(닉) 닉네임", true);
         this.authNaver.complex = true;
+        // bind
+        this.client.on("guildMemberAdd", this.onGuildMemeberAdd.bind(this));
+        for (const [id,guild] of this.client.guilds) {
+            const cfg = await this.sub(this.config, id);
+            cfg.guildName = guild.name;
+            await cfg.export();
+        }
         return Promise.resolve();
     }
     /**
@@ -35,11 +42,13 @@ export default class Auth extends Plugin {
      */
     public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
         // test command if match
+        const user = msg.author;
+        const channel = msg.channel;
         const testAuth = this.authNaver.test(command,options);
         if (testAuth.match) {
             // check naver
             if (!await this.ncc.availableAsync()) {
-                await msg.channel.send(this.lang.noNaver);
+                await channel.send(this.lang.noNaver);
                 return Promise.resolve();
             }
             let type;
@@ -57,13 +66,14 @@ export default class Auth extends Plugin {
                     type = PType.NICK;
                 }
             }
-            if (msg.channel.type === "dm") {
-                await msg.channel.send(this.lang.auth.onlyGroup);
+            if (channel.type === "dm") {
+                await channel.send(this.lang.auth.onlyGroup);
                 return Promise.resolve();
             }
+            // search nickname
             const guildCfg = await this.sub(this.config, msg.guild.id);
             const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
-            let member;
+            let member:Profile;
             try {
                 if (type === PType.NICK) {
                     member = await this.ncc.getMemberByNick(cafeID.cafeId, param);
@@ -75,22 +85,58 @@ export default class Auth extends Plugin {
                 member = null;
             }
             if (member == null) {
-                await msg.channel.send(sprintf(this.lang.auth.nickNotFound, {
+                await channel.send(sprintf(this.lang.auth.nickNotFound, {
                     nick: param,
                     type: type === PType.NICK ? "닉네임" : "아이디",
                 }));
                 return Promise.resolve();
             }
-            await this.ncc.getMemberByNick(cafeID.cafeId, member.nickname);
+            // create instant link
+            if (!this.client.channels.has(guildCfg.proxyChannel)
+                || this.client.channels.get(guildCfg.proxyChannel).type !== "text") {
+                await channel.send(this.lang.auth.proxyFailed);
+                return Promise.resolve();
+            }
+            const proxyC = this.client.channels.get(guildCfg.proxyChannel) as Discord.TextChannel;
+            if (!proxyC.permissionsFor(proxyC.guild.client.user).has("CREATE_INSTANT_INVITE")) {
+                await channel.send(this.lang.auth.proxyFailed);
+                return Promise.resolve();
+            }
+            const invite = await proxyC.createInvite({
+                temporary: true,
+                maxAge: 600,
+                maxUses: 3,
+                unique: true,
+            }, user.id);
+            const uniqueU = {
+                guild: msg.guild.id,
+                user: user.id,
+                naverid: member.userid,
+            } as InvitePair;
+            if (this.invites.has(uniqueU)) {
+                if (Date.now() < this.invites.get(uniqueU).expiresTimestamp) {
+                    await channel.send(this.lang.auth.authing);
+                    return Promise.resolve();
+                } else {
+                    try {
+                        this.invites.get(uniqueU).delete("Reassign");
+                    } catch (err) {
+                        Log.e(err);
+                    }
+                    this.invites.delete(uniqueU);
+                }
+            }
+            this.invites.set(uniqueU,invite);
+
             const room:Room = await this.ncc.chat.createRoom(
                 { id: cafeID.cafeId }, [{ id: member.userid }],
-                {name: "안뇽", isPublic: false}).catch((err) => {Log.e(err); return null;})
+                {name: "안뇽", isPublic: false}).catch((err) => {Log.e(err); return null;});
             if (room == null) {
-                await msg.channel.send(this.lang.auth.roomNotMaked);
+                await channel.send(this.lang.auth.roomNotMaked);
                 return Promise.resolve();
             }
             const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`;
-            await this.ncc.chat.sendText(room, "반가워");
+            await this.ncc.chat.sendText(room, invite.url);
             await this.ncc.chat.deleteRoom(room);
             // image
             if (member.profileurl == null) {
@@ -111,7 +157,68 @@ export default class Auth extends Plugin {
                 rich.addField("총 게시글 수", member.numArticles);
                 rich.addField("총 댓글 수", member.numComments);
             }
-            await msg.channel.send(roomURL,rich);
+            await channel.send(roomURL,rich);
+        }
+        return Promise.resolve();
+    }
+    protected async onGuildMemeberAdd(member:Discord.GuildMember) {
+        const user = member.user;
+        if (this.invites.size >= 1) {
+            let invitesG;
+            try {
+                invitesG = await member.guild.fetchInvites();
+            } catch (err) {
+                Log.e(err);
+            }
+            const removes = [];
+            if (invitesG == null) {
+                // permission denied.
+                return;
+            }
+            for (const [tag, _invite] of this.invites) {
+                const invite:Discord.Invite = invitesG.find("code", _invite.code);
+                if (invite == null) {
+                    continue;
+                }
+                if (Date.now() >= invite.expiresTimestamp) {
+                    removes.push(tag);
+                    continue;
+                }
+                this.invites.set(tag, invite);
+                if (user.id === tag.user && invite.uses >= 1) {
+                    const cfg = await this.sub(this.config, tag.guild);
+                    if (member.guild.channels.has(cfg.proxyChannel)) {
+                        // Destinations guild
+                        const destG = this.client.guilds.get(tag.guild);
+                        const sudoG = member.guild;
+                        const destRs = destG.roles.filter((v) => v.name === cfg.destRole);
+                        if (destRs.size === 1) {
+                            try {
+                                for (const [k, v] of destRs) {
+                                    if (destG.member(user) != null && !destG.member(user).roles.has(v.id)) {
+                                        await destG.member(user).addRole(v, `nc ${tag.naverid} authed.`);
+                                        await sudoG.member(user).kick("Authed");
+                                        const dm = await user.createDM();
+                                        await dm.send(this.lang.auth.authed);
+                                        // await user.setNote(tag.naverid);
+                                        delete tag.guild;
+                                        cfg.users.push(tag as UserPair);
+                                        await cfg.export();
+                                    }
+                                }
+                            } catch (err) {
+                                Log.e(err);
+                            }
+                        }
+                    }
+                    try {
+                        await invite.delete("Used.");
+                    } catch (err) {
+                        Log.e(err);
+                    } 
+                }
+            }
+            removes.forEach((v) => this.invites.delete(v));
         }
         return Promise.resolve();
     }
@@ -129,10 +236,22 @@ interface AuthInfo {
     timestamp:number,
     token:number,
 }
+interface InvitePair extends UserPair {
+    guild:string,
+}
+interface UserPair {
+    user:string,
+    naverid:string,
+}
 class AuthConfig extends Config {
+    public guildName = "Sample";
     public timeout = 600;
-    public commentURL = "https://cafe.naver.com/sdbx/7433"
-    public proxyGuild = "416203365295587338";
+    public commentURL = "https://cafe.naver.com/sdbx/7433";
+    public destRole = "destRole";
+    public users:UserPair[] = [];
+    public proxyChannel = "1234";
+    // proxy oauth
+    // https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=35
     constructor() {
         super("auth");
     }
