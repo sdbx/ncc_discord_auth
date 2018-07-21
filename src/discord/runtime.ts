@@ -186,7 +186,7 @@ export default class Runtime extends EventEmitter {
     }
     private async hardCodingCmd(msg:Discord.Message, cmd:string, pieces:Keyword[]):Promise<boolean> {
         let result = false;
-        const helpCmd = new CommandHelp("알려,도움,도와,도움말",this.lang.helpDesc,true);
+        const helpCmd = new CommandHelp("도움,도와,도움말",this.lang.helpDesc,true);
         helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
         const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false, { reqAdmin:true });
         setCmd.addField(ParamType.dest, "목적", true);

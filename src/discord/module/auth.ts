@@ -18,6 +18,7 @@ export default class Auth extends Plugin {
     protected invites:Map<InvitePair,Discord.Invite> = new Map();
     // declare command.
     private authNaver:CommandHelp;
+    private infoNaver:CommandHelp;
     /**
      * Initialize command
      */
@@ -28,6 +29,10 @@ export default class Auth extends Plugin {
         this.authNaver = new CommandHelp("인증", this.lang.auth.authCmdDesc);
         this.authNaver.addField(ParamType.to, "(ID) 아이디|(닉) 닉네임", true);
         this.authNaver.complex = true;
+        // info
+        this.infoNaver = new CommandHelp("알려", "네이버 정보 갯");
+        this.infoNaver.addField(ParamType.dest, "네이버", true);
+        this.infoNaver.complex = true;
         // bind
         this.client.on("guildMemberAdd", this.onGuildMemberAdd.bind(this));
         for (const [id,guild] of this.client.guilds) {
@@ -45,6 +50,7 @@ export default class Auth extends Plugin {
         const user = msg.author;
         const channel = msg.channel;
         const testAuth = this.authNaver.test(command,options);
+        const testInfo = this.infoNaver.test(command,options);
         if (testAuth.match) {
             // check naver
             if (!await this.ncc.availableAsync()) {
@@ -138,26 +144,41 @@ export default class Auth extends Plugin {
             const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`;
             await this.ncc.chat.sendText(room, invite.url);
             await this.ncc.chat.deleteRoom(room);
-            // image
-            if (member.profileurl == null) {
-                member.profileurl = "https://ssl.pstatic.net/static/m/cafe/mobile/cafe_profile_c77.png";
-            }
-            const image:Buffer = await request.get(member.profileurl, { encoding: null });
-            // rich message
-            const rich = new Discord.RichEmbed();
-            rich.setFooter(cafeID.cafeDesc == null ? "네이버 카페" : cafeID.cafeDesc, cafeID.cafeImage);
-            rich.attachFile(new Discord.Attachment(image,"profile.png"));
-            rich.setThumbnail("attachment://profile.png");
-            rich.setAuthor(getNickname(msg), msg.author.avatarURL);
-            rich.addField("네이버 ID",member.userid);
-            rich.addField("네이버 닉네임", member.nickname);
-            if (member.level != null) {
-                rich.addField("등급", member.level);
-                rich.addField("총 방문 수", member.numVisits);
-                rich.addField("총 게시글 수", member.numArticles);
-                rich.addField("총 댓글 수", member.numComments);
-            }
+
+            const rich = await this.getRichByProfile(member, getNickname(msg), msg.author.avatarURL);
             await channel.send(roomURL,rich);
+        } else if (testInfo.match) {
+            let dest = testInfo.get(ParamType.dest);
+            if (dest.endsWith(" 네이버")) {
+                dest = dest.substring(0, dest.lastIndexOf(" "));
+                if (dest.endsWith("의")) {
+                    dest = dest.substring(0, dest.lastIndexOf("의"));
+                }
+                const guildCfg = await this.sub(this.config, msg.guild.id);
+                const cafe = await this.ncc.parseNaver(guildCfg.commentURL);
+                const members = await this.getUsers(msg.guild, dest);
+                for (const member of members) {
+                    const gu = guildCfg.users.filter((v) => v.user === member.user.id);
+                    let naver:Profile;
+                    try {
+                        if (gu.length === 1) {
+                            naver = await this.ncc.getMemberById(cafe.cafeId, gu[0].naverid);
+                        } else {
+                            naver = await this.ncc.getMemberByNick(cafe.cafeId, dest);
+                        }
+                    } catch (err) {
+                        Log.w(err);
+                    }
+                    if (naver == null) {
+                        await channel.send(sprintf(this.lang.auth.nickNotFound, {
+                            nick: dest,
+                            type: "",
+                        }));
+                    } else {
+                        await channel.send(await this.getRichByProfile(naver, member.nickname, member.user.avatarURL));
+                    }
+                }
+            }
         }
         return Promise.resolve();
     }
@@ -221,6 +242,40 @@ export default class Auth extends Plugin {
             removes.forEach((v) => this.invites.delete(v));
         }
         return Promise.resolve();
+    }
+    private async getRichByProfile(member:Profile, name:string, icon:string) {
+        // image
+        if (member.profileurl == null) {
+            member.profileurl = "https://ssl.pstatic.net/static/m/cafe/mobile/cafe_profile_c77.png";
+        }
+        const image:Buffer = await request.get(member.profileurl, { encoding: null });
+        // rich message
+        const rich = new Discord.RichEmbed();
+        rich.setFooter(member.cafeDesc == null ? "네이버 카페" : member.cafeDesc, member.cafeImage);
+        rich.attachFile(new Discord.Attachment(image, "profile.png"));
+        rich.setThumbnail("attachment://profile.png");
+        if (name != null) {
+            rich.setAuthor(name, icon);
+        }
+        rich.addField("네이버 ID", member.userid);
+        rich.addField("네이버 닉네임", member.nickname);
+        if (member.level != null) {
+            rich.addField("등급", member.level);
+            rich.addField("총 방문 수", member.numVisits);
+            rich.addField("총 게시글 수", member.numArticles);
+            rich.addField("총 댓글 수", member.numComments);
+        }
+        return Promise.resolve(rich);
+    }
+    private getUsers(guild:Discord.Guild, nick:string):Discord.GuildMember[] {
+        const out = [];
+        for (const [gKey,gMember] of guild.members) {
+            const _nick = gMember.nickname == null ? gMember.user.username : gMember.nickname;
+            if (_nick === nick) {
+                out.push(gMember);
+            }
+        }
+        return out;
     }
 }
 enum PType {
