@@ -66,7 +66,12 @@ namespace Log {
         } else if (typeof error === "object") {
             show = JSON.stringify(error,null,2);
         } else {
-            show = error.toString();
+            if (error != null) {
+                // wtf
+                show = error.toString();
+            } else {
+                show = "";
+            }
         }
         custom("#ff715b", "#ff5f5f", chalk.bgRed.red, "ERR", {arg1:title, arg2:show});
     }
@@ -154,9 +159,15 @@ namespace Log {
     export function raw(headerColor:Chalk, numberColor:Chalk, contentColor:Chalk,
         headerSemiColor:Chalk, defaultH:string, content:{arg1:string, arg2?:string}) {
         const prefix = content.arg2 == null ? caller() : content.arg1;
-        const message = content.arg2 == null ? content.arg1 : content.arg2;
+        let message = content.arg2 == null ? content.arg1 : content.arg2;
         // set content width
         contentLimit = Math.max(5, process.stdout.columns - prefixLimit - numberLimit - totalBlank);
+        if (message == null) {
+            message = "";
+        }
+        if (message.split == null) {
+            message = "";
+        }
         // [20](prefix) [3](num) [1](|) [40+](content)
         const sends = message.split("\n").map((str) => {
             const out:string[] = [];

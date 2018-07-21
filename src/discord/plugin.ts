@@ -277,6 +277,10 @@ export default abstract class Plugin {
             time: -1,
         } as ChainData);
     }
+    public async onDestroy() {
+        await this.onSave();
+        return Promise.resolve();
+    }
     /**
      * 체인 중일때 메세지를 받았을 때
      * @param message 메세지
@@ -319,15 +323,15 @@ export default abstract class Plugin {
      * @param global class object 
      * @param subName sub name :)
      */
-    protected async sub<T extends Config>(global:T,subName:string,load = true):Promise<T> {
-        if (this.subConfigs.has(subName)) {
+    protected async sub<T extends Config>(global:T,subName:string,save = true):Promise<T> {
+        if (save && this.subConfigs.has(subName)) {
             return Promise.resolve(this.subConfigs.get(subName) as T);
         }
         const newI:T = new (global["constructor"] as any)() as T;
         newI.name = subName;
         newI.sub = global.name;
-        if (load) {
-            await newI.import(load).catch(Log.e);
+        await newI.import(true).catch(Log.e);
+        if (save) {
             this.subConfigs.set(subName,newI);
         }
         // test.name = "test74";

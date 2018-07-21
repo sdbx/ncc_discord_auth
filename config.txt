@@ -1,0 +1,3 @@
+1. main.json -> token(디스코드 토큰)
+2. auth-<guild-id>.json -> proxyChannel(검사 전용 채널), commentURL(네이버카페 링크), destRole(변경해줄 권한 이름)
+3. artialert-<guild-id>.json -> cafeURL(네이버카페 링크), toPostChannel(알림 올릴 채널 ID)

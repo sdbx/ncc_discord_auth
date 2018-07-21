@@ -30,7 +30,7 @@ export default class NcFetch extends NcCredent {
          */
         const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl);
         if (option.useAuth && (!isNaver || !await this.availableAsync())) {
-            Log.e("ncc-getWeb : Cookie is invaild");
+            Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`);
             return Promise.reject();
         }
         /**

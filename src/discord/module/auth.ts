@@ -298,10 +298,10 @@ interface UserPair {
     user:string,
     naverid:string,
 }
-class AuthConfig extends Config {
+export class AuthConfig extends Config {
     public guildName = "Sample";
     public timeout = 600;
-    public commentURL = "https://cafe.naver.com/sdbx/7433";
+    public commentURL = "cafeURL";
     public destRole = "destRole";
     public users:UserPair[] = [];
     public proxyChannel = "1234";

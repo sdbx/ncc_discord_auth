@@ -5,6 +5,7 @@ import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
+import ArtiNoti from "./module/artinoti";
 import Auth from "./module/auth";
 import Login from "./module/login";
 import Ping from "./module/ping";
@@ -24,7 +25,7 @@ export default class Runtime extends EventEmitter {
     constructor() {
         super();
         // ,new Auth(), new Login()
-        this.plugins.push(new Ping(), new Login(), new Auth());
+        this.plugins.push(new Ping(), new Login(), new Auth(), new ArtiNoti());
     }
     public async start():Promise<string> {
         // load config
@@ -65,10 +66,18 @@ export default class Runtime extends EventEmitter {
     }
     public async destroy() {
         this.client.removeAllListeners();
-        await this.client.destroy();
-        this.ncc.chat.disconnect();
+        try {
+            await this.client.destroy();
+            for (const plugin of this.plugins) {
+                await plugin.onDestroy();
+            }
+            this.ncc.chat.disconnect();
+        } catch (err) {
+            Log.e(err);
+            process.exit(-1);
+        }
         // may save failed.
-        this.emit("save");
+        // this.emit("save");
         return Promise.resolve();
     }
     protected async ready() {
@@ -193,6 +202,7 @@ export default class Runtime extends EventEmitter {
         setCmd.addField(ParamType.to, "설정값", true);
         const adminCmd = new CommandHelp("token", "토큰 인증", false, { dmOnly:true });
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true);
+        const saveCmd = new CommandHelp("저장", "저장", true,{reqAdmin:true});
 
         const paramPair = helpCmd.check(msg.channel.type,this.global.isAdmin(msg.author.id));
         /*
@@ -316,6 +326,14 @@ export default class Runtime extends EventEmitter {
                 await msg.channel.send(sprintf(this.lang.adminGranted, { mention: DiscordFormat.mentionUser(id) }));
                 await this.global.export().catch(err => Log.e); 
             }
+            result = true;
+        }
+        /**
+         * Save
+         */
+        const _save = saveCmd.test(cmd,pieces,paramPair);
+        if (!result && _save.match) {
+            this.emit("save");
             result = true;
         }
         return Promise.resolve(result);

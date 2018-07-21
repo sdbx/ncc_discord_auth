@@ -44,6 +44,12 @@ export default class Lang extends Config {
         authed: "인증 완료",
     }
     /**
+     * Module: artinoti
+     */
+    public noti = {
+        toggleDesc: "이 채널에서 알림 수신을 끄거나 킨다냥",
+    }
+    /**
      * Module: sample
      */
     public sample = {
