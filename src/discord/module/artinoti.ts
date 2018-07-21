@@ -22,7 +22,7 @@ export default class ArtiNoti extends Plugin {
         // super: load config
         super.ready();
         // CommandHelp: suffix, description
-        this.toggle = new CommandHelp("알림 전환", this.lang.sample.hello);
+        this.toggle = new CommandHelp("알림 전환", this.lang.noti.toggleDesc, true, {reqAdmin:true});
         // get parameter as complex
         this.toggle.complex = true;
         // setinterval
@@ -36,7 +36,8 @@ export default class ArtiNoti extends Plugin {
      */
     public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
         // test command if match
-        const testToggle = this.toggle.test(command,options);
+        const paramPair = this.toggle.check(msg.channel.type, this.global.isAdmin(msg.author.id));
+        const testToggle = this.toggle.test(command,options,paramPair);
         if (testToggle.match) {
             const cfg = await this.sub(this.config, msg.guild.id);
             if (cfg.toPostChannel.indexOf(msg.channel.id) >= 0) {

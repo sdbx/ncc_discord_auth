@@ -89,28 +89,30 @@ export default class Config {
         if (exists) {
             // load data
             const text:string = await fs.readFile(this.saveTo,{encoding:"utf-8"});
+            let data;
             try {
-                const data:any = JSON.parse(text);
-                file_version = data.version;
-                // remove non-cloneable
-                const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
-                Config.excludes.split(",").forEach(v => ignore.push(v));
-                ignore.push("version");
-                for (const [key,value] of Object.entries(ignore)) {
-                    if (ignore.indexOf(key) >= 0) {
-                        delete data[key];
-                    }
-                }
-                // clone!
-                this._clone(data);
-                // update if app version is higher or write
-                if (file_version < this.version || write) {
-                    return this.export();
-                } else {
-                    return Promise.resolve();
-                }
+                data = JSON.parse(text);
             } catch (err) {
-                Log.e(err);
+                Log.w("Config","JSON parse error.")
+                data = {};
+            }
+            file_version = data.version;
+            // remove non-cloneable
+            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
+            Config.excludes.split(",").forEach(v => ignore.push(v));
+            ignore.push("version");
+            for (const [key, value] of Object.entries(ignore)) {
+                if (ignore.indexOf(key) >= 0) {
+                    delete data[key];
+                }
+            }
+            // clone!
+            this._clone(data);
+            // update if app version is higher or write
+            if (file_version < this.version || write) {
+                return this.export();
+            } else {
+                return Promise.resolve();
             }
         }
         console.error("Can't read config file");

@@ -54,6 +54,20 @@ export default class Lang extends Config {
         toggleDesc: "이 채널에서 알림 수신을 끄거나 킨다냥",
     }
     /**
+     * Module: cast
+     */
+    public cast = {
+        castDesc: "선택한 채널에 네이버 카페 채팅을 중계합니다.",
+        castParam: "네이버 카페 채팅(talk.~) 주소",
+        linkFail: "링크가 안맞다냥. https://talk.cafe.naver.com/channels/<숫자> 링크가 필요하댱!",
+        roomFail: "방을 찾을 수 없다냥!",
+        webhookFail: "웹훅을 할 수 없다냥!",
+        webhookSuccess: "웹훅 설정 끝났댱!",
+        sendImage: "이미지를 보냈습니다.",
+        fallbackNick: "시스템 메세지",
+        optoutMessage: "<opt-out 된 회원의 메세지 입니다>"
+    }
+    /**
      * Module: sample
      */
     public sample = {

@@ -7,6 +7,7 @@ import Ncc from "../ncc/ncc";
 import Lang from "./lang";
 import ArtiNoti from "./module/artinoti";
 import Auth from "./module/auth";
+import Cast from "./module/cast";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
@@ -15,7 +16,7 @@ import { CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from ".
 const queryCmd = /\s+\S+/ig;
 const safeCmd = /(".+?")|('.+?')/i;
 const presetCfgs:{[key:string]: string[]} = {
-    "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL"],
+    "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL", "cast<%g>.cafeURL"],
     "프록시 채널" : ["auth<%g>.proxyChannel"],
     "인증 그룹" : ["auth<%g>.destRole"],
 }
@@ -30,7 +31,8 @@ export default class Runtime extends EventEmitter {
     constructor() {
         super();
         // ,new Auth(), new Login()
-        this.plugins.push(new Ping(), new Login(), new Auth(), new ArtiNoti());
+        this.plugins.push(
+            new Ping(), new Login(), new Auth(), new ArtiNoti(), new Cast());
     }
     public async start():Promise<string> {
         // load config
@@ -398,7 +400,7 @@ export default class Runtime extends EventEmitter {
     }
 }
 export function getNickname(msg:Discord.Message) {
-    if (msg.channel.type !== "dm") {
+    if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
         const guildnick = msg.guild.member(msg.author).nickname;
         return guildnick != null ? guildnick : msg.author.username;
     } else {

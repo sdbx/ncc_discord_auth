@@ -153,7 +153,8 @@ declare module "node-ncc-es6" {
         sent:boolean;
         target:Array<User>;
         time:Date;
-        type:["text","invite","leave","changeName","changeMaster","join","reject","create","sticker","image","tvcast"];
+        type:"text" | "invite" | "leave" | "changeName" | "changeMaster" | "join" | 
+            "reject" | "create" | "sticker" | "image" | "tvcast";
         user:User;
     }
     export class Credentials extends EventEmitter {

@@ -8,7 +8,7 @@ import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamTyp
 
 export default class Sample extends Plugin {
     // declare config file: use save data
-    protected config:Config = new Config("sample");
+    protected config = new Config("sample");
     // declare command.
     private sample:CommandHelp;
     /**

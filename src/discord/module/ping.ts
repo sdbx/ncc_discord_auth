@@ -16,19 +16,9 @@ export default class Ping extends Plugin {
         const channel = msg.channel;
         const user = msg.author;
         const check = this.ping.test(command,options);
-        Log.json("Commands",check);
         if (check.match) {
             await msg.reply(`퐁! \`${this.client.ping}\` ${check.get(ParamType.from)}`);
-        } else {
-            await msg.channel.send(JSON.stringify({cmd:command, opt:options}));
         }
-        /* if (join.match) {
-            const param = {words: [] as string[]};
-            if (join.exist(ParamType.dest)) {
-                param.words.push(join.get(ParamType.dest));
-            }
-            this.startChain(channel.id, user.id, ChainType.JOIN, param);
-        } */
         return Promise.resolve();
     }
     protected async onChainMessage(message:Discord.Message, type:number, data:ChainData):Promise<ChainData> {
@@ -42,12 +32,6 @@ export default class Ping extends Plugin {
     protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
         await message.channel.send(data.data["words"].join(" "));
         return Promise.resolve();
-    }
-    
-    public get help():CommandHelp[] {
-        const out:CommandHelp[] = [];
-        out.push(this.ping);
-        return out;
     }
 }
 enum ChainType {
