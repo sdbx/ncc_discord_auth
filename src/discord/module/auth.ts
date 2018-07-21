@@ -29,7 +29,7 @@ export default class Auth extends Plugin {
         this.authNaver.addField(ParamType.to, "(ID) 아이디|(닉) 닉네임", true);
         this.authNaver.complex = true;
         // bind
-        this.client.on("guildMemberAdd", this.onGuildMemeberAdd.bind(this));
+        this.client.on("guildMemberAdd", this.onGuildMemberAdd.bind(this));
         for (const [id,guild] of this.client.guilds) {
             const cfg = await this.sub(this.config, id);
             cfg.guildName = guild.name;
@@ -161,7 +161,7 @@ export default class Auth extends Plugin {
         }
         return Promise.resolve();
     }
-    protected async onGuildMemeberAdd(member:Discord.GuildMember) {
+    protected async onGuildMemberAdd(member:Discord.GuildMember) {
         const user = member.user;
         if (this.invites.size >= 1) {
             let invitesG;
