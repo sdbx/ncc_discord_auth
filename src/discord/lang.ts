@@ -41,7 +41,11 @@ export default class Lang extends Config {
         onlyGroup: "그룹만 사용할 수 있다냥!",
         proxyFailed: "인증용 채팅방이 존재하지 않는다냥.",
         authing: "이미 인증중이냥, 네카채를 확인해달라냥~",
-        authed: "인증 완료",
+        nccmessage: `%(user)s 님이 이 아이디로 디스코드 인증을 요청한다냥.
+        %(link)s
+        님이 보낸 요청이 맞다면 채팅을 쳐주거나 링크를 클릭해달라냥.
+        주인님이 보낸 요청이 아니라면 나가달라냥.`,
+        authed: "인증 완료다냥!",
     }
     /**
      * Module: artinoti

@@ -14,6 +14,11 @@ import { CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from ".
 
 const queryCmd = /\s+\S+/ig;
 const safeCmd = /(".+?")|('.+?')/i;
+const presetCfgs:{[key:string]: string[]} = {
+    "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL"],
+    "프록시 채널" : ["auth<%g>.proxyChannel"],
+    "인증 그룹" : ["auth<%g>.destRole"],
+}
 
 export default class Runtime extends EventEmitter {
     private global:MainCfg;
@@ -197,9 +202,9 @@ export default class Runtime extends EventEmitter {
         let result = false;
         const helpCmd = new CommandHelp("도움,도와,도움말",this.lang.helpDesc,true);
         helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
-        const setCmd = new CommandHelp("설정",this.lang.sudoNeed, false, { reqAdmin:true });
+        const setCmd = new CommandHelp("설정,보여",this.lang.sudoNeed, false, { reqAdmin:true });
         setCmd.addField(ParamType.dest, "목적", true);
-        setCmd.addField(ParamType.to, "설정값", true);
+        setCmd.addField(ParamType.to, "설정값", false);
         const adminCmd = new CommandHelp("token", "토큰 인증", false, { dmOnly:true });
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true);
         const saveCmd = new CommandHelp("저장", "저장", true,{reqAdmin:true});
@@ -265,16 +270,27 @@ export default class Runtime extends EventEmitter {
          */
         const _set = setCmd.test(cmd, pieces, paramPair);
         if (!result && /* msg.channel.type === "dm" && */ _set.match) {
-            let say:{str:string} = null;
+            /**
+             * option set
+             */
+            if (!_set.has(ParamType.to)) {
+                if (cmd.endsWith("보여")) {
+                    _set.options.set(ParamType.to,"1");
+                } else {
+                    return Promise.resolve(false);
+                }
+            }
             /**
              * Extremely Dangerous Setting 
              */
-            if (msg.channel.type === "dm") {
+            if (msg.channel.type === "dm" && !cmd.endsWith("보여")) {
                 let pass = true;
+                let reboot = false;
                 switch (_set.get(ParamType.dest)) {
                     case "토큰" : {
                         // CAUTION
                         this.global.token = _set.get(ParamType.to);
+                        reboot = true;
                     } break;
                     case "말머리" : {
                         this.global.prefix = new RegExp(_set.get(ParamType.to),"i");
@@ -284,34 +300,44 @@ export default class Runtime extends EventEmitter {
                     }
                 }
                 if (pass) {
+                    result = true;
+                }
+                if (reboot) {
                     await this.global.export().catch(Log.e);
                     await msg.channel.send(_set.get(ParamType.dest) + " 설정 완료. 재로드합니다.");
                     this.emit("restart");
                     return Promise.resolve(true);
                 }
             }
-            for (const plugin of this.plugins) {
-                const req = await plugin.setConfig(
-                    _set.get(ParamType.dest), _set.get(ParamType.to));
-                if (req != null) {
-                    say = req;
+            const richE:Discord.RichEmbed[] = [];
+            const from = _set.get(ParamType.dest);
+            const to = _set.get(ParamType.to);
+            if (from === "프리셋" && cmd.endsWith("보여")) {
+                const rich = new Discord.RichEmbed();
+                for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
+                    rich.addField(presetK, presetFrom.join("\n").replace(/%g/ig, msg.guild.id));
+                }
+                await msg.channel.send(rich);
+                return Promise.resolve(true);
+            }
+            for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
+                if (presetK === from) {
+                    // preset execute
+                    for (let preFrom of presetFrom) {
+                        preFrom = preFrom.replace(/%g/ig,msg.guild.id);
+                        richE.push(await this.setConfig(preFrom,to,cmd.endsWith("보여")));
+                    }
+                    result = true;
                     break;
                 }
             }
-            if (say != null) {
-                if (say.hasOwnProperty("old")) {
-                    const richMsg = new Discord.RichEmbed();
-                    richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
-                    richMsg.setTitle("설정: " + say["config"]);
-                    richMsg.addField("경로",say["key"]);
-                    richMsg.addField("원래 값",say["old"]);
-                    richMsg.addField("새로운 값",say["value"]);
-                    // richMsg.setDescription(say.str);
-                    await msg.channel.send(richMsg);
-                } else {
-                    await msg.channel.send(say.str);
+            if (!result) {
+                richE.push(await this.setConfig(from,to,cmd.endsWith("보여")));
+            }
+            for (const rich of richE) {
+                if (rich != null) {
+                    await msg.channel.send(rich);
                 }
-                result = true;
             }
         }
         /**
@@ -337,6 +363,35 @@ export default class Runtime extends EventEmitter {
             result = true;
         }
         return Promise.resolve(result);
+    }
+    private async setConfig(key:string, value:string, see = false):Promise<Discord.RichEmbed> {
+        let say:object;
+        for (const plugin of this.plugins) {
+            const req = await plugin.setConfig(
+                key, value, see);
+            if (req != null) {
+                say = req;
+                break;
+            }
+        }
+        if (say != null) {
+            if (say.hasOwnProperty("old")) {
+                const richMsg = new Discord.RichEmbed();
+                richMsg.setTitle("설정: " + say["config"]);
+                richMsg.addField("경로", say["key"]);
+                richMsg.addField("원래 값", say["old"]);
+                if (!see) {
+                    richMsg.addField("새로운 값", say["value"]);
+                }
+                // richMsg.setDescription(say.str);
+                return Promise.resolve(richMsg);
+            } else {
+                const richMsg = new Discord.RichEmbed();
+                richMsg.setDescription(say["str"]);
+                return Promise.resolve(richMsg);
+            }
+        }
+        return Promise.resolve(null);
     }
     private filterEmpty(value:string):boolean {
         return value.length >= 1;

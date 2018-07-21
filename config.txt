@@ -1,3 +1,8 @@
 1. main.json -> token(디스코드 토큰)
 2. auth-<guild-id>.json -> proxyChannel(검사 전용 채널), commentURL(네이버카페 링크), destRole(변경해줄 권한 이름)
 3. artialert-<guild-id>.json -> cafeURL(네이버카페 링크), toPostChannel(알림 올릴 채널 ID)
+============================
+1. <prefix>님 네이버 카페를 <주소>로 설정해줘
+2. <prefix>님 프록시 채널를 <인증채널>로 설정해줘
+3. <prefix>님 인증 그룹을 <roles>로 설정해줘
+4. <prefix>님 알림 전환해줘(채널 안에서)

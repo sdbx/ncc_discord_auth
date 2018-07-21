@@ -1,5 +1,5 @@
 import * as Discord from "discord.js";
-import { Room } from "node-ncc-es6";
+import { Message, Room } from "node-ncc-es6";
 import * as request from "request-promise-native";
 import { sprintf } from "sprintf-js";
 import Config from "../../config";
@@ -16,6 +16,7 @@ export default class Auth extends Plugin {
     protected config = new AuthConfig();
     protected timeout = 10 * 60 * 1000; // 10 is minutes
     protected invites:Map<InvitePair,Discord.Invite> = new Map();
+    protected ncc_listen;
     // declare command.
     private authNaver:CommandHelp;
     private infoNaver:CommandHelp;
@@ -33,6 +34,9 @@ export default class Auth extends Plugin {
         this.infoNaver = new CommandHelp("알려", "네이버 정보 갯");
         this.infoNaver.addField(ParamType.dest, "네이버", true);
         this.infoNaver.complex = true;
+        // ncc-listen
+        this.ncc_listen = this.onNccMessage.bind(this);
+        this.ncc.on("message", this.ncc_listen);
         // bind
         this.client.on("guildMemberAdd", this.onGuildMemberAdd.bind(this));
         for (const [id,guild] of this.client.guilds) {
@@ -108,6 +112,20 @@ export default class Auth extends Plugin {
                 await channel.send(this.lang.auth.proxyFailed);
                 return Promise.resolve();
             }
+            /**
+             * Create room first
+             */
+            const room:Room = await this.ncc.chat.createRoom(
+                { id: cafeID.cafeId }, [{ id: member.userid }],
+                {name: "디스코드 인증", isPublic: false}).catch((err) => {Log.e(err); return null;});
+            if (room == null) {
+                await channel.send(this.lang.auth.roomNotMaked);
+                return Promise.resolve();
+            }
+            const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`;
+            /**
+             * Create Invite
+             */
             const invite = await proxyC.createInvite({
                 temporary: true,
                 maxAge: 600,
@@ -118,6 +136,7 @@ export default class Auth extends Plugin {
                 guild: msg.guild.id,
                 user: user.id,
                 naverid: member.userid,
+                roomid:room.id,
             } as InvitePair;
             if (this.invites.has(uniqueU)) {
                 if (Date.now() < this.invites.get(uniqueU).expiresTimestamp) {
@@ -132,19 +151,17 @@ export default class Auth extends Plugin {
                     this.invites.delete(uniqueU);
                 }
             }
-            this.invites.set(uniqueU,invite);
-
-            const room:Room = await this.ncc.chat.createRoom(
-                { id: cafeID.cafeId }, [{ id: member.userid }],
-                {name: "안뇽", isPublic: false}).catch((err) => {Log.e(err); return null;});
-            if (room == null) {
-                await channel.send(this.lang.auth.roomNotMaked);
-                return Promise.resolve();
-            }
-            const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`;
-            await this.ncc.chat.sendText(room, invite.url);
-            await this.ncc.chat.deleteRoom(room);
-
+            this.invites.set(uniqueU, invite);
+            /**
+             * Send text to ncc room
+             */
+            await this.ncc.chat.sendText(room, sprintf(this.lang.auth.nccmessage,{
+                link: invite.url,
+                user: msg.author.username,
+            }));
+            /**
+             * Send rich
+             */
             const rich = await this.getRichByProfile(member, getNickname(msg), msg.author.avatarURL);
             await channel.send(roomURL,rich);
         } else if (testInfo.match) {
@@ -181,6 +198,52 @@ export default class Auth extends Plugin {
             }
         }
         return Promise.resolve();
+    }
+    protected async onNccMessage(message:Message) {
+        if (this.invites.size >= 1) {
+            for (const [key,value] of this.invites) {
+                if (Date.now() > value.expiresTimestamp) {
+                    this.invites.delete(key);
+                    continue;
+                }
+                if (key.roomid === message.room.id && key.naverid === message.user.id) {
+                    // checkmate.
+                    const cfg = await this.sub(this.config, key.guild);
+                    const guild = this.client.guilds.get(key.guild);
+                    const member = guild.member(key.user);
+                    const destRs = guild.roles.filter((v) => v.name === cfg.destRole);
+                    const rooms = (await this.ncc.chat.getRoomList())
+                        .filter((_v) => _v.id === key.roomid);
+                    if (member != null && destRs.size === 1) {
+                        try {
+                            for (const [k, v] of destRs) {
+                                if (!member.roles.has(v.id)) {
+                                    await member.addRole(v, `nc ${key.naverid} authed.`);
+                                    const dm = await member.createDM();
+                                    await dm.send(this.lang.auth.authed);
+                                    // await user.setNote(tag.naverid);
+                                    for (const room of rooms) {
+                                        await this.ncc.chat.sendText(room, this.lang.auth.authed);
+                                        await this.ncc.chat.deleteRoom(room);
+                                    }
+                                    try {
+                                        await value.delete("Ncc authed.");
+                                    } catch (err2) {
+                                        Log.e(err2);
+                                    }
+                                    delete key.guild;
+                                    delete key.roomid;
+                                    cfg.users.push(key as UserPair);
+                                    await cfg.export();
+                                }
+                            }
+                        } catch (err) {
+                            Log.e(err);
+                        }
+                    }
+                }
+            }
+        }
     }
     protected async onGuildMemberAdd(member:Discord.GuildMember) {
         const user = member.user;
@@ -223,6 +286,7 @@ export default class Auth extends Plugin {
                                         await dm.send(this.lang.auth.authed);
                                         // await user.setNote(tag.naverid);
                                         delete tag.guild;
+                                        delete tag.roomid;
                                         cfg.users.push(tag as UserPair);
                                         await cfg.export();
                                     }
@@ -232,14 +296,8 @@ export default class Auth extends Plugin {
                             }
                         }
                     }
-                    try {
-                        await invite.delete("Used.");
-                    } catch (err) {
-                        Log.e(err);
-                    } 
                 }
             }
-            removes.forEach((v) => this.invites.delete(v));
         }
         return Promise.resolve();
     }
@@ -293,6 +351,7 @@ interface AuthInfo {
 }
 interface InvitePair extends UserPair {
     guild:string,
+    roomid:string,
 }
 interface UserPair {
     user:string,

@@ -80,7 +80,7 @@ export default abstract class Plugin {
      * @param key Config indepth key
      * @param value data
      */
-    public async setConfig(key:string, value:string):Promise<{str:string}> {
+    public async setConfig(key:string, value:string, view = false):Promise<{str:string}> {
         if (this.config == null) {
             // ignore
             return Promise.resolve(null);
@@ -186,7 +186,7 @@ export default abstract class Plugin {
                     }
                     if (data != null) {
                         oldValue = depth;
-                        if (data !== "null") {
+                        if (!view) {
                             set(config,_path,data);
                             await this.onSave();
                         }

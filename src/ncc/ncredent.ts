@@ -1,4 +1,5 @@
 import chalk, { Chalk } from "chalk";
+import { EventEmitter } from "events";
 import * as fs from "fs-extra";
 import Session, { Credentials } from "node-ncc-es6";
 import * as path from "path";
@@ -8,11 +9,12 @@ import { CookieJar } from "tough-cookie";
 import Config from "../config";
 import Log from "../log";
 
-export default class NcCredent {
+export default class NcCredent extends EventEmitter {
     protected credit:Credentials;
     protected readonly cookiePath;
     private lastLogin:number;
     constructor() {
+        super();
         this.credit = new Credentials("id","pw");
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie");
         this.lastLogin = -1;

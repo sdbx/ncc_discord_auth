@@ -281,7 +281,7 @@ export class CommandStatus {
         }
     }
     public getLastCmd(depth:number = 1) {
-        if (depth >= 1 && this.commands.length <= 1) {
+        if (depth >= this.commands.length) {
             return null;
         }
         return this.commands[Math.max(0,this.commands.length - depth)];

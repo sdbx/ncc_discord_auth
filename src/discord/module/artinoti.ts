@@ -44,6 +44,9 @@ export default class ArtiNoti extends Plugin {
             } else {
                 cfg.toPostChannel.push(msg.channel.id);
             }
+            const rich = new Discord.RichEmbed();
+            rich.addField("수신 채널 목록",cfg.toPostChannel.length <= 0 ? "없음" : cfg.toPostChannel.join(","));
+            await msg.channel.send(rich);
             await cfg.export();
         }
         return Promise.resolve();
