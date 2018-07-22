@@ -301,7 +301,9 @@ export default class Auth extends Plugin {
                             try {
                                 for (const [k, v] of destRs) {
                                     if (destG.member(user) != null && !destG.member(user).roles.has(v.id)) {
-                                        await destG.member(user).addRole(v, `nc ${tag.naverid} authed.`);
+                                        if (!member.roles.has(v.id)) {
+                                            await destG.member(user).addRole(v, `nc ${tag.naverid} authed.`);
+                                        }
                                         await sudoG.member(user).kick("Authed");
                                         const dm = await user.createDM();
                                         await dm.send(this.lang.auth.authed);

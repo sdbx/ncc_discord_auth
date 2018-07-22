@@ -28,6 +28,7 @@ export default class Cast extends Plugin {
         this.setup = new CommandHelp("중계", this.lang.cast.castDesc, true, {reqAdmin: true});
         this.setup.addField(ParamType.from, "네이버 카페", false);
         this.setup.addField(ParamType.dest, this.lang.cast.castParam, true);
+        this.setup.addField(ParamType.to, "auth|ro|delete", false);
         // get parameter as complex
         this.setup.complex = true;
         // ncc onMessage
@@ -57,7 +58,22 @@ export default class Cast extends Plugin {
             }
             const roomCfg = await this.sub(this.config, roomid);
             const channelCfg = await this.sub(new LinkConfig(), msg.channel.id);
-
+            // already listening?
+            if (roomCfg.channelID === channel.id && channelCfg.roomID === roomCfg.roomID &&
+                roomCfg.channelID && channelCfg.channelID) {
+                // toggle OFF
+                if (testSetup.has(ParamType.to)) {
+                    const opts = testSetup.get(ParamType.to);
+                    roomCfg.authedOnly = opts.indexOf("auth") >= 0;
+                    roomCfg.readOnly = opts.indexOf("ro") >= 0;
+                    if (opts.indexOf("delete") >= 0) {
+                        await this.subDel(roomid);
+                        await this.subDel(msg.channel.id);
+                        await channel.send("삭제 완료");
+                    }
+                }
+                return Promise.resolve();
+            }
             const rooms = (await this.ncc.chat.getRoomList()).filter((value) => value.id === roomid);
             let room:Room = null;
             try {
@@ -122,6 +138,7 @@ export default class Cast extends Plugin {
         }
         const guild = msg.guild;
         const channel = msg.channel;
+
         const channelCfg = await this.sub(new LinkConfig(), msg.channel.id);
         const roomCfg = await this.sub(this.config, channelCfg.roomID);
 

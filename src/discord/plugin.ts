@@ -2,6 +2,7 @@ import * as Discord from "discord.js";
 import * as get from "get-value";
 import * as Hangul from "hangul-js";
 const set = require("set-value");
+import * as fs from "fs-extra";
 import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
@@ -340,6 +341,14 @@ export default abstract class Plugin {
     }
     protected subHas(subName:string):boolean {
         return this.subConfigs.has(subName);
+    }
+    protected async subDel(subName:string):Promise<void> {
+        if (this.subConfigs.has(subName)) {
+            const cfg = this.subConfigs.get(subName);
+            await fs.remove(cfg["saveTo"]);
+            this.subConfigs.delete(subName);
+        }
+        return Promise.resolve();
     }
     protected formatUser(user:Discord.User) {
         return {
