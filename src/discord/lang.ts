@@ -32,6 +32,16 @@ export default class Lang extends Config {
         failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!",
     };
     /**
+     * Module: gather
+     */
+    public gather = {
+        gatherDesc: "이리 와서 집결하세요!",
+        removeDesc: "넌 이제 자유다.",
+        setDefault: "대표 채널로 설정됐다냐~",
+        addGather: "이 채널이 중계에 추가됐다냐.",
+        removeGather: "이 채널이 중계에서 삭제됐다냐.",
+    }
+    /**
      * Module: auth
      */
     public auth = {

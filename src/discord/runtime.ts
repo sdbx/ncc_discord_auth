@@ -8,6 +8,7 @@ import Lang from "./lang";
 import ArtiNoti from "./module/artinoti";
 import Auth from "./module/auth";
 import Cast from "./module/cast";
+import Gather from "./module/gather";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
@@ -32,7 +33,7 @@ export default class Runtime extends EventEmitter {
         super();
         // ,new Auth(), new Login()
         this.plugins.push(
-            new Ping(), new Login(), new Auth(), new ArtiNoti(), new Cast());
+            new Ping(), new Login(), new Auth(), new ArtiNoti(), new Cast(), new Gather());
     }
     public async start():Promise<string> {
         // load config
