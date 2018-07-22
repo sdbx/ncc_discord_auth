@@ -92,11 +92,13 @@ export default class ArtiNoti extends Plugin {
                             rich.setImage("attachment://image.png");
                         }
                         const contents = article.contents.filter(
-                            (v) => ["newline","image"].indexOf(v.type) < 0).map((v) => v.data);
-                        if (contents.length > 25) {
-                            contents.splice(25,contents.length - 25);
+                            (v) => ["newline","image"].indexOf(v.type) < 0)
+                            .map((v) => v.data);
+                        if (contents.length > 15) {
+                            contents.splice(10,contents.length - 10);
+                            contents.push("...");
                         }
-                        rich.setDescription(contents.join("\n"));
+                        rich.setDescription(contents.join("\n").replace(/\n[\n\s]*/igm, "\n"));
                         rich.setURL(`https://cafe.naver.com/${cafe.cafeName}/${article.articleId}`);
                         try {
                             const authlist = await this.sub(new AuthConfig(), guild.id, false);

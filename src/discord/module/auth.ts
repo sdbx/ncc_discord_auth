@@ -61,38 +61,34 @@ export default class Auth extends Plugin {
                 await channel.send(this.lang.noNaver);
                 return Promise.resolve();
             }
-            let type;
-            let param = testAuth.get(ParamType.to);
-            if (param.endsWith("아이디")) {
-                type = PType.ID;
-                param = param.substring(0, param.lastIndexOf(" "));
-            } else if (param.endsWith(" 닉네임") || param.endsWith(" 닉")) {
-                type = PType.NICK;
-                param = param.substring(0, param.lastIndexOf(" "));
-            } else {
-                if (param.replace(/[a-zA-Z0-9]+/ig, "").length === 0) {
-                    type = PType.ID;
-                } else {
-                    type = PType.NICK;
-                }
-            }
             if (channel.type === "dm") {
                 await channel.send(this.lang.auth.onlyGroup);
                 return Promise.resolve();
             }
-            // search nickname
-            const guildCfg = await this.sub(this.config, msg.guild.id);
-            const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
+            let type;
             let member:Profile;
-            try {
-                if (type === PType.NICK) {
-                    member = await this.ncc.getMemberByNick(cafeID.cafeId, param);
-                } else {
-                    member = await this.ncc.getMemberById(cafeID.cafeId, param);
+            const guildCfg = await this.sub(this.config, msg.guild.id);
+            let param = testAuth.get(ParamType.to);
+            const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
+            // search nick
+            if (param.endsWith("아이디")) {
+                type = PType.ID;
+                param = param.substring(0, param.lastIndexOf(" "));
+                member = await this.ncc.getMemberById(cafeID.cafeId, param).catch((err) => null);
+            } else if (param.endsWith(" 닉네임") || param.endsWith(" 닉")) {
+                type = PType.NICK;
+                param = param.substring(0, param.lastIndexOf(" "));
+                member = await this.ncc.getMemberByNick(cafeID.cafeId, param).catch((err) => null);
+            } else {
+                if (param.replace(/[a-zA-Z0-9]+/ig, "").length === 0) {
+                    type = PType.ID;
+                    member = await this.ncc.getMemberById(cafeID.cafeId, param).catch((err) => null);
                 }
-            } catch (err) {
-                Log.e(err);
-                member = null;
+                if (member == null) {
+                    // Check by nick
+                    type = PType.NICK;
+                    member = await this.ncc.getMemberByNick(cafeID.cafeId, param).catch((err) => null);
+                }
             }
             if (member == null) {
                 await channel.send(sprintf(this.lang.auth.nickNotFound, {
@@ -101,7 +97,7 @@ export default class Auth extends Plugin {
                 }));
                 return Promise.resolve();
             }
-            // create instant link
+            // check permission
             if (!this.client.channels.has(guildCfg.proxyChannel)
                 || this.client.channels.get(guildCfg.proxyChannel).type !== "text") {
                 await channel.send(this.lang.auth.proxyFailed);
@@ -111,6 +107,31 @@ export default class Auth extends Plugin {
             if (!proxyC.permissionsFor(proxyC.guild.client.user).has("CREATE_INSTANT_INVITE")) {
                 await channel.send(this.lang.auth.proxyFailed);
                 return Promise.resolve();
+            }
+            /**
+             * Check duplicate
+             */
+            for (const [_invite, value] of this.invites) {
+                if (_invite.guild === msg.guild.id &&
+                    _invite.user === user.id && _invite.naverid === member.userid) {
+                    if (Date.now() < value.expiresTimestamp) {
+                        await channel.send(
+                            `${this.lang.auth.authing}\nhttps://talk.cafe.naver.com/channels/${_invite.roomid}`);
+                        return Promise.resolve();
+                    } else {
+                        try {
+                            value.delete("Reassign");
+                            const rooms = (await this.ncc.chat.getRoomList()).filter((_v) => _v.id === _invite.roomid);
+                            for (const _room of rooms) {
+                                await this.ncc.chat.deleteRoom(_room);
+                            }
+                        } catch (err) {
+                            Log.e(err);
+                        }
+                        this.invites.delete(_invite);
+                    }
+                    break;
+                }
             }
             /**
              * Create room first
@@ -138,19 +159,6 @@ export default class Auth extends Plugin {
                 naverid: member.userid,
                 roomid:room.id,
             } as InvitePair;
-            if (this.invites.has(uniqueU)) {
-                if (Date.now() < this.invites.get(uniqueU).expiresTimestamp) {
-                    await channel.send(this.lang.auth.authing);
-                    return Promise.resolve();
-                } else {
-                    try {
-                        this.invites.get(uniqueU).delete("Reassign");
-                    } catch (err) {
-                        Log.e(err);
-                    }
-                    this.invites.delete(uniqueU);
-                }
-            }
             this.invites.set(uniqueU, invite);
             /**
              * Send text to ncc room
@@ -174,6 +182,18 @@ export default class Auth extends Plugin {
                 const guildCfg = await this.sub(this.config, msg.guild.id);
                 const cafe = await this.ncc.parseNaver(guildCfg.commentURL);
                 const members = await this.getUsers(msg.guild, dest);
+                if (members.length === 0) {
+                    const naver:Profile = await this.ncc.getMemberByNick(cafe.cafeId, dest).catch((err) => null);
+                    if (naver == null) {
+                        await channel.send(sprintf(this.lang.auth.nickNotFound, {
+                            nick: dest,
+                            type: "",
+                        }));
+                    } else {
+                        await channel.send(await getRichByProfile(naver));
+                    }
+                    return Promise.resolve();
+                }
                 for (const member of members) {
                     const gu = guildCfg.users.filter((v) => v.user === member.user.id);
                     let naver:Profile;
@@ -219,23 +239,24 @@ export default class Auth extends Plugin {
                             for (const [k, v] of destRs) {
                                 if (!member.roles.has(v.id)) {
                                     await member.addRole(v, `nc ${key.naverid} authed.`);
-                                    const dm = await member.createDM();
-                                    await dm.send(this.lang.auth.authed);
-                                    // await user.setNote(tag.naverid);
-                                    for (const room of rooms) {
-                                        await this.ncc.chat.sendText(room, this.lang.auth.authed);
-                                        await this.ncc.chat.deleteRoom(room);
-                                    }
-                                    try {
-                                        await value.delete("Ncc authed.");
-                                    } catch (err2) {
-                                        Log.e(err2);
-                                    }
-                                    delete key.guild;
-                                    delete key.roomid;
-                                    cfg.users.push(key as UserPair);
-                                    await cfg.export();
                                 }
+                                const dm = await member.createDM();
+                                await dm.send(this.lang.auth.authed);
+                                // await user.setNote(tag.naverid);
+                                for (const room of rooms) {
+                                    await this.ncc.chat.sendText(room, this.lang.auth.authed);
+                                    await this.ncc.chat.deleteRoom(room);
+                                }
+                                try {
+                                    await value.delete("Ncc authed.");
+                                } catch (err2) {
+                                    Log.e(err2);
+                                }
+                                this.invites.delete(key);
+                                delete key.guild;
+                                delete key.roomid;
+                                cfg.users.push(key as UserPair);
+                                await cfg.export();
                             }
                         } catch (err) {
                             Log.e(err);
@@ -254,7 +275,6 @@ export default class Auth extends Plugin {
             } catch (err) {
                 Log.e(err);
             }
-            const removes = [];
             if (invitesG == null) {
                 // permission denied.
                 return;
@@ -265,7 +285,7 @@ export default class Auth extends Plugin {
                     continue;
                 }
                 if (Date.now() >= invite.expiresTimestamp) {
-                    removes.push(tag);
+                    this.invites.delete(tag);
                     continue;
                 }
                 this.invites.set(tag, invite);
@@ -276,6 +296,7 @@ export default class Auth extends Plugin {
                         const destG = this.client.guilds.get(tag.guild);
                         const sudoG = member.guild;
                         const destRs = destG.roles.filter((v) => v.name === cfg.destRole);
+                        const rooms = (await this.ncc.chat.getRoomList()).filter((_v) => _v.id === tag.roomid);
                         if (destRs.size === 1) {
                             try {
                                 for (const [k, v] of destRs) {
@@ -284,6 +305,11 @@ export default class Auth extends Plugin {
                                         await sudoG.member(user).kick("Authed");
                                         const dm = await user.createDM();
                                         await dm.send(this.lang.auth.authed);
+                                        for (const room of rooms) {
+                                            await this.ncc.chat.sendText(room, this.lang.auth.authed);
+                                            await this.ncc.chat.deleteRoom(room);
+                                        }
+                                        this.invites.delete(tag);
                                         // await user.setNote(tag.naverid);
                                         delete tag.guild;
                                         delete tag.roomid;

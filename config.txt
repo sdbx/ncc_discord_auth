@@ -6,3 +6,6 @@
 2. <prefix>님 프록시 채널를 <인증채널>로 설정해줘
 3. <prefix>님 인증 그룹을 <roles>로 설정해줘
 4. <prefix>님 알림 전환해줘(채널 안에서)
+============================
+메인 서버: https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=872795200
+인증용 서버: https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=67108899

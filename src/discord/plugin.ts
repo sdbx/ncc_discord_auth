@@ -338,6 +338,9 @@ export default abstract class Plugin {
         // const subConfig = {...global}
         return Promise.resolve(newI);
     }
+    protected subHas(subName:string):boolean {
+        return this.subConfigs.has(subName);
+    }
     protected formatUser(user:Discord.User) {
         return {
             name:user.username,
