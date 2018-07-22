@@ -32,6 +32,18 @@ export default class Lang extends Config {
         failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!",
     };
     /**
+     * module: events
+     */
+    public events = {
+        descWelcome: "환영 메세지를 설정한다냐~",
+        descBotCh: "각종 이벤트를 기록한다냥.",
+        typeWelcomeMsg: "환영 메세지를 입력해달라냐. %(name)s는 닉네임, %(mention)s는 멘션이다냐.",
+        setWelcomeSuccess: "설정 완료! 다음은 예제다냥.",
+        setBotCh: "봇 채널 설정 완료!",
+        exitUser: "%(name)s님이 나갔다냐. ~~나가는 김에 죽어버령~~",
+        changeNick: "닉네임이 바뀌었다냐.",
+    }
+    /**
      * Module: gather
      */
     public gather = {
@@ -56,6 +68,7 @@ export default class Lang extends Config {
         님이 보낸 요청이 맞다면 채팅을 쳐주거나 링크를 클릭해달라냥.
         주인님이 보낸 요청이 아니라면 나가달라냥.`,
         authed: "인증 완료다냥!",
+        already_auth: "이미 인증 완료된 아이디다냐!",
     }
     /**
      * Module: artinoti

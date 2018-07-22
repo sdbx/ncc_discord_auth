@@ -39,6 +39,7 @@ export default class Auth extends Plugin {
         this.ncc.on("message", this.ncc_listen);
         // bind
         this.client.on("guildMemberAdd", this.onGuildMemberAdd.bind(this));
+        this.client.on("guildMemberRemove", this.onGuildMemberRemove.bind(this));
         for (const [id,guild] of this.client.guilds) {
             const cfg = await this.sub(this.config, id);
             cfg.guildName = guild.name;
@@ -106,6 +107,13 @@ export default class Auth extends Plugin {
             const proxyC = this.client.channels.get(guildCfg.proxyChannel) as Discord.TextChannel;
             if (!proxyC.permissionsFor(proxyC.guild.client.user).has("CREATE_INSTANT_INVITE")) {
                 await channel.send(this.lang.auth.proxyFailed);
+                return Promise.resolve();
+            }
+            /**
+             * Check authed
+             */
+            if (this.haveAuthed(msg.guild.id,member.userid, msg.author.id)) {
+                await channel.send(this.lang.auth.already_auth);
                 return Promise.resolve();
             }
             /**
@@ -234,13 +242,18 @@ export default class Auth extends Plugin {
                     const destRs = guild.roles.filter((v) => v.name === cfg.destRole);
                     const rooms = (await this.ncc.chat.getRoomList())
                         .filter((_v) => _v.id === key.roomid);
+                    // check authed
+                    const dm = await member.createDM();
+                    if (this.haveAuthed(guild.id, key.naverid, key.user)) {
+                        await dm.send(this.lang.auth.already_auth);
+                        return Promise.resolve();
+                    }
                     if (member != null && destRs.size === 1) {
                         try {
                             for (const [k, v] of destRs) {
                                 if (!member.roles.has(v.id)) {
                                     await member.addRole(v, `nc ${key.naverid} authed.`);
                                 }
-                                const dm = await member.createDM();
                                 await dm.send(this.lang.auth.authed);
                                 // await user.setNote(tag.naverid);
                                 for (const room of rooms) {
@@ -265,6 +278,39 @@ export default class Auth extends Plugin {
                 }
             }
         }
+    }
+    protected async haveAuthed(guildID:string, nID:string, uID:string):Promise<boolean> {
+        let out = false;
+        const guildCfg = await this.sub(this.config, guildID);
+        for (const user of guildCfg.users) {
+            if (user.user === uID || user.naverid === nID) {
+                out = true;
+                break;
+            }
+        }
+        return Promise.resolve(out);
+    }
+    protected async onGuildMemberRemove(member:Discord.GuildMember) {
+        const guild = member.guild;
+        const guildCfg = await this.sub(this.config, guild.id);
+        for (const [pair, invite] of this.invites) {
+            if (pair.user === member.user.id) {
+                invite.delete("User exited.");
+                this.invites.delete(pair);
+                continue;
+            }
+        }
+        let changed = false;
+        for (const user of guildCfg.users) {
+            if (user.user === member.user.id) {
+                changed = true;
+                guildCfg.users.splice(guildCfg.users.indexOf(user));
+            }
+        }
+        if (changed) {
+            await guildCfg.export();
+        }
+        return Promise.resolve();
     }
     protected async onGuildMemberAdd(member:Discord.GuildMember) {
         const user = member.user;
@@ -297,6 +343,11 @@ export default class Auth extends Plugin {
                         const sudoG = member.guild;
                         const destRs = destG.roles.filter((v) => v.name === cfg.destRole);
                         const rooms = (await this.ncc.chat.getRoomList()).filter((_v) => _v.id === tag.roomid);
+                        const dm = await member.createDM();
+                        if (this.haveAuthed(destG.id, tag.naverid, tag.user)) {
+                            await dm.send(this.lang.auth.already_auth);
+                            return Promise.resolve();
+                        }
                         if (destRs.size === 1) {
                             try {
                                 for (const [k, v] of destRs) {
@@ -305,7 +356,7 @@ export default class Auth extends Plugin {
                                             await destG.member(user).addRole(v, `nc ${tag.naverid} authed.`);
                                         }
                                         await sudoG.member(user).kick("Authed");
-                                        const dm = await user.createDM();
+                                        // const dm = await user.createDM();
                                         await dm.send(this.lang.auth.authed);
                                         for (const room of rooms) {
                                             await this.ncc.chat.sendText(room, this.lang.auth.authed);

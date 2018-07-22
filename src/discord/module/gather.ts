@@ -57,8 +57,7 @@ export default class Gather extends Plugin {
             cfg.lastImage = msg.author.avatarURL;
         }
         // cast to dest
-        const data = {
-            embed: null,
+        let data:any = {
             files: [],
         };
         const content = msg.content;
@@ -98,7 +97,7 @@ export default class Gather extends Plugin {
             if (embed.timestamp != null) {
                 richEmbed.setTimestamp(new Date(embed.timestamp));
             }
-            data.embed = richEmbed;
+            data = richEmbed;
             break;
             // data.files.push({ attachment: attach.url, name: attach.filename });
         }
