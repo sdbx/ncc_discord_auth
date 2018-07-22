@@ -28,8 +28,11 @@ export default class Gather extends Plugin {
         return Promise.resolve();
     }
     public async onMessage(msg:Discord.Message) {
+        if (msg.channel.type === "dm") {
+            return Promise.resolve();
+        }
         const cfg = await this.sub(this.config, msg.guild.id);
-        if (msg.channel.type === "dm" || !msg.guild.channels.has(cfg.destChannel)) {
+        if (!msg.guild.channels.has(cfg.destChannel)) {
             return Promise.resolve();
         }
         const destCh = msg.guild.channels.get(cfg.destChannel) as Discord.TextChannel;

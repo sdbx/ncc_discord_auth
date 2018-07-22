@@ -133,6 +133,9 @@ export default class Cast extends Plugin {
     }
     public async onMessage(msg:Discord.Message) {
         await super.onMessage(msg);
+        if (msg.channel.type === "dm") {
+            return Promise.resolve();
+        }
         if (msg.author.id === this.client.user.id || !await this.ncc.availableAsync()) {
             return Promise.resolve();
         }

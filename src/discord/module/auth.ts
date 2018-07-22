@@ -112,7 +112,7 @@ export default class Auth extends Plugin {
             /**
              * Check authed
              */
-            if (this.haveAuthed(msg.guild.id,member.userid, msg.author.id)) {
+            if (await this.haveAuthed(msg.guild.id,member.userid, msg.author.id)) {
                 await channel.send(this.lang.auth.already_auth);
                 return Promise.resolve();
             }
@@ -243,9 +243,19 @@ export default class Auth extends Plugin {
                     const rooms = (await this.ncc.chat.getRoomList())
                         .filter((_v) => _v.id === key.roomid);
                     // check authed
-                    const dm = await member.createDM();
-                    if (this.haveAuthed(guild.id, key.naverid, key.user)) {
+                    if (await this.haveAuthed(guild.id, key.naverid, key.user)) {
+                        const dm = await member.createDM();
                         await dm.send(this.lang.auth.already_auth);
+                        try {
+                            value.delete("duplicate");
+                            const _rooms = (await this.ncc.chat.getRoomList()).filter(
+                                (_v) => _v.id === key.roomid);
+                            for (const _room of rooms) {
+                                await this.ncc.chat.deleteRoom(_room);
+                            }
+                        } catch (err) {
+                            Log.e(err);
+                        }
                         return Promise.resolve();
                     }
                     if (member != null && destRs.size === 1) {
@@ -254,6 +264,7 @@ export default class Auth extends Plugin {
                                 if (!member.roles.has(v.id)) {
                                     await member.addRole(v, `nc ${key.naverid} authed.`);
                                 }
+                                const dm = await member.createDM();
                                 await dm.send(this.lang.auth.authed);
                                 // await user.setNote(tag.naverid);
                                 for (const room of rooms) {
@@ -296,6 +307,14 @@ export default class Auth extends Plugin {
         for (const [pair, invite] of this.invites) {
             if (pair.user === member.user.id) {
                 invite.delete("User exited.");
+                try {
+                    const rooms = (await this.ncc.chat.getRoomList()).filter((_v) => _v.id === pair.roomid);
+                    for (const _room of rooms) {
+                        await this.ncc.chat.deleteRoom(_room);
+                    }
+                } catch (err) {
+                    Log.e(err);
+                }
                 this.invites.delete(pair);
                 continue;
             }
@@ -343,9 +362,19 @@ export default class Auth extends Plugin {
                         const sudoG = member.guild;
                         const destRs = destG.roles.filter((v) => v.name === cfg.destRole);
                         const rooms = (await this.ncc.chat.getRoomList()).filter((_v) => _v.id === tag.roomid);
-                        const dm = await member.createDM();
-                        if (this.haveAuthed(destG.id, tag.naverid, tag.user)) {
+                        if (await this.haveAuthed(destG.id, tag.naverid, tag.user)) {
+                            const dm = await member.createDM();
                             await dm.send(this.lang.auth.already_auth);
+                            try {
+                                _invite.delete("duplicate");
+                                const _rooms = (await this.ncc.chat.getRoomList()).filter(
+                                    (_v) => _v.id === tag.roomid);
+                                for (const _room of rooms) {
+                                    await this.ncc.chat.deleteRoom(_room);
+                                }
+                            } catch (err) {
+                                Log.e(err);
+                            }
                             return Promise.resolve();
                         }
                         if (destRs.size === 1) {
@@ -356,7 +385,7 @@ export default class Auth extends Plugin {
                                             await destG.member(user).addRole(v, `nc ${tag.naverid} authed.`);
                                         }
                                         await sudoG.member(user).kick("Authed");
-                                        // const dm = await user.createDM();
+                                        const dm = await user.createDM();
                                         await dm.send(this.lang.auth.authed);
                                         for (const room of rooms) {
                                             await this.ncc.chat.sendText(room, this.lang.auth.authed);
