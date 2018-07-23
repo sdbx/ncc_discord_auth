@@ -6,6 +6,7 @@ import Plugin from "../plugin";
 import { getNickname, MainCfg } from "../runtime";
 import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "../runutil";
 
+const regexEmoji = /<:[A-Za-z0-9_]{2,}:\d+>/ig;
 export default class Gather extends Plugin {
     // declare config file: use save data
     protected config = new GatherConfig();
@@ -31,14 +32,14 @@ export default class Gather extends Plugin {
         if (msg.channel.type === "dm") {
             return Promise.resolve();
         }
+        if (regexEmoji.test(msg.content)) {
+            // const emojies 
+        }
         const cfg = await this.sub(this.config, msg.guild.id);
         if (!msg.guild.channels.has(cfg.destChannel)) {
             return Promise.resolve();
         }
         const destCh = msg.guild.channels.get(cfg.destChannel) as Discord.TextChannel;
-        if (cfg.listenChannels.indexOf(msg.channel.id) < 0) {
-            return Promise.resolve();
-        }
         const channel = msg.channel as Discord.TextChannel;
         let webhook:Discord.Webhook;
         try {
@@ -51,6 +52,9 @@ export default class Gather extends Plugin {
         }
         if (webhook == null) {
             Log.w("Gather", "skip - no webhook");
+            return Promise.resolve();
+        }
+        if (cfg.listenChannels.indexOf(msg.channel.id) < 0) {
             return Promise.resolve();
         }
         // change image

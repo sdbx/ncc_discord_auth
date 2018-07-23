@@ -17,7 +17,7 @@ export default class Ping extends Plugin {
         const user = msg.author;
         const check = this.ping.test(command,options);
         if (check.match) {
-            await msg.reply(`퐁! \`${this.client.ping}\` ${check.get(ParamType.from)}`);
+            await msg.reply(`퐁! \`${this.client.ping}\` <:GWchinaSakuraThinking:398950680217255977>`);
         }
         return Promise.resolve();
     }

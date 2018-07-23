@@ -412,6 +412,7 @@ export function getNickname(msg:Discord.Message) {
 export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];
+    public prefixSimple = "$";
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {
         super("main");
