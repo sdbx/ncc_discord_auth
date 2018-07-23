@@ -2,7 +2,7 @@ import * as Discord from "discord.js";
 import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
-import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "../runutil";
 
 export default class Ping extends Plugin {
     private ping:CommandHelp;
@@ -12,10 +12,10 @@ export default class Ping extends Plugin {
         this.ping.complex = true;
         return out;
     }
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         const channel = msg.channel;
         const user = msg.author;
-        const check = this.ping.test(command,options);
+        const check = this.ping.check(this.global, command, state);
         if (check.match) {
             await msg.reply(`퐁! \`${this.client.ping}\` ${check.get(ParamType.from)}`);
         }

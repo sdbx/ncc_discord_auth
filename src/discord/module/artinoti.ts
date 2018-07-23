@@ -5,7 +5,7 @@ import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 import { AuthConfig } from "./auth";
 
 export default class ArtiNoti extends Plugin {
@@ -34,10 +34,9 @@ export default class ArtiNoti extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
-        const paramPair = this.toggle.check(msg.channel.type, this.global.isAdmin(msg.author.id));
-        const testToggle = this.toggle.test(command,options,paramPair);
+        const testToggle = this.toggle.check(this.global,command,state);
         if (testToggle.match) {
             const cfg = await this.sub(this.config, msg.guild.id);
             if (cfg.toPostChannel.indexOf(msg.channel.id) >= 0) {

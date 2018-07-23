@@ -9,7 +9,7 @@ import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
 import { MainCfg } from "./runtime";
-import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "./runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "./runutil";
 
 export default abstract class Plugin {
     protected config:Config;
@@ -51,7 +51,8 @@ export default abstract class Plugin {
      * @param command command(suffix)
      * @param options options
      */
-    public abstract async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void>;
+    public abstract async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void>;
+        
     public get help():CommandHelp[] {
         const out:CommandHelp[] = [];
         for (const [key,value] of Object.entries(this)) {

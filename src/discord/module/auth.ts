@@ -10,7 +10,7 @@ import Comment from "../../structure/comment";
 import Profile from "../../structure/profile";
 import Plugin from "../plugin";
 import { getNickname, MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Auth extends Plugin {
     protected config = new AuthConfig();
@@ -50,12 +50,12 @@ export default class Auth extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
         const user = msg.author;
         const channel = msg.channel;
-        const testAuth = this.authNaver.test(command,options);
-        const testInfo = this.infoNaver.test(command,options);
+        const testAuth = this.authNaver.check(this.global,command);
+        const testInfo = this.infoNaver.check(this.global,command);
         if (testAuth.match) {
             // check naver
             if (!await this.ncc.availableAsync()) {
@@ -181,6 +181,10 @@ export default class Auth extends Plugin {
             const rich = await getRichByProfile(member, getNickname(msg), msg.author.avatarURL);
             await channel.send(roomURL,rich);
         } else if (testInfo.match) {
+            if (!await this.ncc.availableAsync()) {
+                await channel.send(this.lang.noNaver);
+                return Promise.resolve();
+            }
             let dest = testInfo.get(ParamType.dest);
             if (dest.endsWith(" 네이버")) {
                 dest = dest.substring(0, dest.lastIndexOf(" "));

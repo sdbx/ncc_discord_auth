@@ -10,7 +10,7 @@ import Log from "../../log";
 import { cafePrefix } from "../../ncc/ncconstant";
 import Plugin from "../plugin";
 import { getNickname, MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 import { AuthConfig, getNaver, getRichByProfile } from "./auth";
 
 export default class Cast extends Plugin {
@@ -38,10 +38,9 @@ export default class Cast extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
-        const paramPair = this.setup.check(msg.channel.type, this.global.isAdmin(msg.author.id));
-        const testSetup = this.setup.test(command, options, paramPair);
+        const testSetup = this.setup.check(this.global, command, state);
         if (testSetup.match && msg.channel.type !== "dm") {
             const channel = msg.channel as Discord.TextChannel;
             const guild = msg.guild;

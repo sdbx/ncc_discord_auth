@@ -1,5 +1,6 @@
 import * as Discord from "discord.js";
 import { EventEmitter } from "events";
+import { a } from "hangul-js";
 import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
@@ -13,10 +14,10 @@ import Gather from "./module/gather";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
-import { CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "./runutil";
+import { CmdParam, CommandHelp, CommandStatus, DiscordFormat, Param, ParamType } from "./runutil";
 
 const queryCmd = /\s+\S+/ig;
-const safeCmd = /(".+?")|('.+?')/i;
+export const safeCmd = /(".+?")|('.+?')/i;
 const presetCfgs:{[key:string]: string[]} = {
     "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL", "cast<%g>.cafeURL"],
     "프록시 채널" : ["auth<%g>.proxyChannel"],
@@ -114,7 +115,7 @@ export default class Runtime extends EventEmitter {
             }
         }
         // command check
-        if (!prefix.test(text)) {
+        if (!prefix.test(text) && !text.startsWith(this.global.simplePrefix)) {
             // save configs 10 minutes inverval when normal...
             if (Date.now() - this.lastSaved >= 600000) {
                 this.lastSaved = Date.now();
@@ -122,74 +123,19 @@ export default class Runtime extends EventEmitter {
             }
             return Promise.resolve();
         }
-        let chain = msg.content;
-        // zero, remove \" or \'..
-        chain = chain.replace(/\\('|")/igm,"");
-        chain = chain.replace(prefix,"");
-        // first, replace "" or '' to easy
-        const safeList:string[] = [];
-        while (safeCmd.test(chain)) {
-            const value = chain.match(safeCmd)[0];
-            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")));
-            chain = chain.replace(safeCmd,"${" + (safeList.length - 1) + "}");
-        }
-        // second, chain..
-        let pieces:Keyword[] = [];
-        let cacheWord:string[] = [];
-        for (const piece of chain.match(queryCmd)) {
-            const split = Object.entries(ParamType)
-            .map((value) => [value[0],value[1].split("/")] as [string,string[]]).map((value) => {
-                let check:Keyword = null;
-                const [_typeN, _suffix] = value;
-                for (const _value of _suffix) {
-                    if (piece.endsWith(_value)) {
-                        // match suffix
-                        check = {
-                            type: ParamType[_typeN],
-                            str: piece.substring(0,piece.lastIndexOf(_value)),
-                        };
-                        break;
-                    }
-                }
-                return check;
-            }).filter((value) => value != null);
-            let part;
-            // select correct data
-            if (split.length >= 1) {
-                part = split[0].str;
-            } else {
-                part = piece;
-            }
-            safeList.forEach((value, index) => {
-                part = part.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value);
-            });
-            cacheWord.push(part);
-            if (split.length >= 1) {
-                // commit
-                const key = {
-                    type: split[0].type,
-                    str: cacheWord.join("").trim(),
-                    query: cacheWord
-                } as Keyword;
-                pieces.push(key);
-                cacheWord = [];
-            }
-        }
-        const _cmds = pieces.reverse().filter((v) => v.type === ParamType.do);
-        // cmd exists?
-        let cmd:string = null;
-        if (_cmds.length >= 1) {
-            cmd = _cmds[0].str;
-            pieces = pieces.reverse().filter((v) => v.type !== ParamType.do).reverse();
-        } else {
-            // no exists :(
-            cmd = cacheWord.join("").trim();
-        }
+        /*
+        Let Commandhelp parse them.
+        */
+        const status:CmdParam = {
+            isAdmin: this.global.isAdmin(msg.author.id),
+            isDM: msg.channel.type === "dm",
+            isSimple: !prefix.test(text) && text.startsWith(this.global.simplePrefix),
+        };
         /*
           * hard coding!
         */
         try {
-            if (await this.hardCodingCmd(msg, cmd, pieces)) {
+            if (await this.hardCodingCmd(msg, text, status)) {
                 return;
             }
         } catch (err) {
@@ -197,12 +143,13 @@ export default class Runtime extends EventEmitter {
             return;
         }
         try {
-            await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, cmd, pieces)));
-        } catch  (err) {
+            await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)));
+        } catch (err) {
             Log.e(err);
         }
     }
-    private async hardCodingCmd(msg:Discord.Message, cmd:string, pieces:Keyword[]):Promise<boolean> {
+
+    private async hardCodingCmd(msg:Discord.Message, cmd:string, status:CmdParam):Promise<boolean> {
         let result = false;
         const helpCmd = new CommandHelp("도움,도와,도움말",this.lang.helpDesc,true);
         helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
@@ -213,11 +160,10 @@ export default class Runtime extends EventEmitter {
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true);
         const saveCmd = new CommandHelp("저장", "저장", true,{reqAdmin:true});
 
-        const paramPair = helpCmd.check(msg.channel.type,this.global.isAdmin(msg.author.id));
         /*
             Help Command
         */
-        const _help = helpCmd.test(cmd,pieces);
+        const _help = helpCmd.check(this.global, cmd, status);
         if (!result && _help.match) {
             let dest = "*";
             if (_help.exist(ParamType.dest)) {
@@ -261,7 +207,8 @@ export default class Runtime extends EventEmitter {
                         richMsg.setTitle(this.lang.helpTitle);
                         richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
                         for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
-                            richMsg.addField(helps[i * 20 + k].title, helps[i * 20 + k].description);
+                            const help = helps[i * 20 + k];
+                            richMsg.addField(status.isSimple ? help.stdTitle : help.title, help.description);
                         }
                         await msg.channel.send(richMsg);
                     }
@@ -272,14 +219,14 @@ export default class Runtime extends EventEmitter {
         /**
          * Config command
          */
-        const _set = setCmd.test(cmd, pieces, paramPair);
+        const _set = setCmd.check(this.global, cmd, status);
         if (!result && /* msg.channel.type === "dm" && */ _set.match) {
             /**
              * option set
              */
             if (!_set.has(ParamType.to)) {
                 if (cmd.endsWith("보여")) {
-                    _set.options.set(ParamType.to,"1");
+                    _set.opticals.set(ParamType.to,"1");
                 } else {
                     return Promise.resolve(false);
                 }
@@ -347,7 +294,7 @@ export default class Runtime extends EventEmitter {
         /**
          * Pseudo admin auth
          */
-        const _adm = adminCmd.test(cmd,pieces,paramPair);
+        const _adm = adminCmd.check(this.global, cmd, status);
         if (!result && msg.channel.type === "dm" && _adm.match) {
             const str5 = _adm.get(ParamType.to);
             if (str5.toLowerCase() === this.global.token.substr(0,5).toLowerCase()) {
@@ -361,7 +308,7 @@ export default class Runtime extends EventEmitter {
         /**
          * Save
          */
-        const _save = saveCmd.test(cmd,pieces,paramPair);
+        const _save = saveCmd.check(this.global, cmd, status);
         if (!result && _save.match) {
             this.emit("save");
             result = true;
@@ -412,6 +359,7 @@ export function getNickname(msg:Discord.Message) {
 export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];
+    public simplePrefix = "$";
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {
         super("main");
