@@ -4,7 +4,7 @@ import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Sample extends Plugin {
     // declare config file: use save data
@@ -26,9 +26,9 @@ export default class Sample extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
-        const testSample = this.sample.test(command,options);
+        const testSample = this.sample.check(this.global, command, state);
         if (testSample.match) {
             // send Message
             await msg.reply(this.lang.sample.hello);

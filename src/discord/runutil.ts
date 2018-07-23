@@ -1,5 +1,6 @@
 import * as Discord from "discord.js";
 import Log from "../log";
+import { MainCfg, safeCmd } from "./runtime";
 
 export enum ParamType {
     thing = "이/가",
@@ -9,19 +10,19 @@ export enum ParamType {
     from = "에서",
     do = "해줘/해/줘",
 }
-export interface Keyword {
+export interface Param {
     type:ParamType;
     str:string;
-    query?:string[];
-    require?:boolean;
+    require:boolean;
 }
 export class CommandHelp {
     public cmds:string[]; // allow cmds
-    public params:Keyword[]; // parameter info
+    public params:Param[]; // parameter info
     public description:string; // Description command
     public complex:boolean; // receive only keyword is matching?
     public reqAdmin:boolean; // require admin?
     public dmOnly:boolean; // direct message only..
+    // public singleWord:boolean; // receive only single word?
     public constructor(commands:string, desc:string,complex:boolean = false,
         options?:{reqAdmin?:boolean,dmOnly?:boolean}) {
         this.cmds = commands.split(",");
@@ -31,6 +32,7 @@ export class CommandHelp {
         if (options != undefined && options != null) {
             this.reqAdmin = options.reqAdmin && true;
             this.dmOnly = options.dmOnly && true;
+            // this.singleWord = options.singleWord && true;
             if (this.reqAdmin) {
                 this.description += " (관리자)";
             }
@@ -48,6 +50,9 @@ export class CommandHelp {
             require,
         });
     }
+    public get fields():Param[] {
+        return this.params;
+    }
     public get title():string {
         let out:string = "";
         if (this.params.length >= 1) {
@@ -64,100 +69,216 @@ export class CommandHelp {
         out += this.cmds.join("|");
         return out;
     }
-    public check(type:string,admin:boolean) {
-        return {
-            admin,
-            dm: type === "dm",
+    public get stdTitle():string {
+        let out:string = "";
+        out += this.cmds.join("|");
+        const designer = (value, index) => {
+            const echo:string[] = [];
+            echo.push(value.require ? "<" : "[");
+            echo.push(value.str);
+            echo.push(value.require ? ">" : "]");
+            return echo.join("");
         };
+        if (this.params.length >= 1) {
+            const req = this.params.filter((_v) => _v.require);
+            if (req.length >= 1) {
+                out += " ";
+                out += req.map(designer).join(" ");
+            }
+            const opt = this.params.filter((_v) => !_v.require);
+            if (opt.length >= 1) {
+                out += " ";
+                out += this.params.filter((_v) => !_v.require).map(designer).join(" ");
+            }
+        }
+        return out;
     }
-    public test(command:string, options:Keyword[], checks?:{admin:boolean,dm:boolean}) {
-        let cmdOk = false;
-        let cmdPiece;
-        let optStatus:string = null;
-        if (checks == null && (this.reqAdmin || this.dmOnly)) {
-            // :(
-        } else if (this.reqAdmin && !checks.admin) {
-            // :(
-        } else if (this.dmOnly && !checks.dm) {
-            // :(
-        } else {
-            for (const cmd of this.cmds) {
-                if (cmd === command) {
-                    cmdOk = true;
+    public check(global:MainCfg,content:string,state?:CmdParam):CommandStatus {
+        const output = {
+            match: false,
+            reqParam: false,
+            requires: new Map<ParamType, string>(),
+            opticals: new Map<ParamType, string>(),
+            command: ""
+        };
+        const encoded = this.encode(content);
+        let message = encoded.encoded;
+        if ((this.reqAdmin && !state.isAdmin) || (this.dmOnly && !state.isDM)) {
+            return new CommandStatus(output.match, output.reqParam, output.requires,
+                output.opticals, output.command);
+        }
+        if (global.prefix.test(content)) {
+            // standalone mode
+            const queryDo = this.endsWith(content, ParamType.do.split("/"));
+            if (queryDo != null) {
+                message = queryDo.str;
+            }
+            const queryEnd = this.endsWith(message, this.cmds, true);
+            // check command endsWith
+            if (queryEnd == null) {
+                // @TODO return cmd not match
+                return new CommandStatus(output.match, output.reqParam, output.requires,
+                     output.opticals, output.command);
+            }
+            output.match = true;
+            message = queryEnd.str.trimRight();
+            message = message.replace(global.prefix, "").trimLeft();
+            // parse param
+            const fields = this.fields;
+            const pmSuffix:string[] = [];
+            // add suffix search
+            fields.map((_v) => _v.type).forEach((_v) => {
+                _v.split("/").forEach((_v2) => {
+                    if (pmSuffix.indexOf(_v2) < 0) {
+                        pmSuffix.push(_v2);
+                    }
+                });
+            });
+            // check need param parser
+            if (pmSuffix.length >= 1) {
+                const wordsRegex = new RegExp(`.+?(${pmSuffix.join("|")})`, "ig");
+                if (wordsRegex.test(message)) {
+                    // ~~를, ~~에게, ~~를, ...
+                    const params = message.match(wordsRegex).map((_v, _i) => {
+                        const pm = this.getParamType(_v);
+                        return {
+                            type: pm.type,
+                            data: _v.substring(0, _v.lastIndexOf(pm.suffix)),
+                            suffix: pm.suffix,
+                            index: _i,
+                        }
+                    }).filter((_v) => _v.type != null);
+                    // split params
+                    let buffer = "";
+                    for (const param of params) {
+                        const duplicates = params.filter((_v) => _v.type === param.type);
+                        if (duplicates[duplicates.length - 1].index === param.index) {
+                            // flush!
+                            const field = fields.filter((_v) => _v.type === param.type);
+                            (field[0].require ? output.requires : output.opticals)
+                                .set(param.type, this.decode(buffer + param.data, encoded.key));
+                            buffer = "";
+                        } else {
+                            buffer += (param.data + param.suffix);
+                        }
+                    }
+                    message = message.replace(wordsRegex, "");
+                }
+            }
+            // check require paramter exsits
+            let exist = true;
+            for (const field of fields) {
+                if (field.require && !output.requires.has(field.type)) {
+                    if (this.complex && message.length >= 1) {
+                        output.requires.set(field.type, this.decode(message, encoded.key));
+                        message = "";
+                        continue;
+                    }
+                    exist = false;
                     break;
                 }
-                if (this.complex && command.endsWith(" " + cmd)) {
-                    cmdOk = true;
-                    cmdPiece = command.substring(0, command.lastIndexOf(" " + cmd));
+            }
+            message = message + queryEnd.end;
+            output.command = this.decode(message, encoded.key);
+            output.reqParam = !exist;
+        } else if (content.startsWith(global.simplePrefix)) {
+            // simple mode
+            let isVaild = false;
+            for (const commandSuffix of this.cmds) {
+                const str = global.simplePrefix + commandSuffix;
+                if (message.startsWith(str)) {
+                    output.command = commandSuffix;
+                    message = message.length < str.length ? "" : message.substr(str.length);
+                    isVaild = true;
                     break;
+                }
+            }
+            if (!isVaild) {
+                // @TODO not vaild action
+                return new CommandStatus(output.match, output.reqParam,
+                    output.requires, output.opticals, output.command);
+            }
+            message = message.trim();
+            const split = message.split(/\s+/ig);
+
+            output.match = true;
+            output.reqParam = false;
+            const fields = this.fields;
+            const requires = fields.filter((_v) => _v.require);
+            const opticals = fields.filter((_v) => !_v.require);
+            let i = 0;
+            if (requires.length + opticals.length === 1) {
+                split[0] = message;
+            }
+            for (const require of requires) {
+                if (split.length <= i) {
+                    output.reqParam = true;
+                    break;
+                }
+                output.requires.set(require.type, this.decode(split[i], encoded.key));
+                i += 1;
+            }
+            for (const optical of opticals) {
+                if (split.length <= i) {
+                    break;
+                }
+                output.opticals.set(optical.type, this.decode(split[i], encoded.key));
+                i += 1;
+            }
+            let exist = true;
+            for (const field of fields) {
+                if (field.require && !output.requires.has(field.type)) {
+                    exist = false;
+                    break;
+                }
+            }
+            output.reqParam = !exist;
+        }
+        return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command);
+    }
+    private encode(source:string) {
+        let chain = source;
+        const safeList:string[] = [];
+        while (safeCmd.test(chain)) {
+            const value = source.match(safeCmd)[0];
+            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")));
+            chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}");
+        }
+        return {
+            encoded: chain,
+            key: safeList,
+        }
+    }
+    private decode(encoded:string, key:string[]) {
+        let chain = encoded;
+        key.forEach((value, index) => {
+            chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value);
+        });
+        return chain;
+    }
+    private getParamType(suffix:string) {
+        for (const [key, value] of Object.entries(ParamType)) {
+            for (const v of value.split("/")) {
+                if (suffix.endsWith(v)) {
+                    return {
+                        type: value as ParamType,
+                        suffix: v as string,
+                    };
                 }
             }
         }
-        const must = this.params.filter((_v) => _v.require);
-        const optional = this.params.filter((_v) => !_v.require);
-
-        const param_must:Map<ParamType, string> = new Map();
-        const param_opt:Map<ParamType, string> = new Map();
-
-        if (cmdOk) {
-            let dummy = false;
-            for (const paramP of options) {
-                // check - must
-                let _must = -1;
-                must.forEach((_v,_i) => {
-                    if (_must < 0 && paramP.type === _v.type) {
-                        _must = _i;
-                        param_must.set(paramP.type,paramP.str);
-                    }
-                });
-                if (_must >= 0) {
-                    must.splice(_must,1);
-                    continue;
-                }
-                // check - opt
-                let _opt = -1;
-                optional.forEach((_v,_i) => {
-                    if (_opt < 0 && paramP.type === _v.type) {
-                        _opt = _i;
-                        param_opt.set(paramP.type,paramP.str);
-                    }
-                });
-                if (_opt >= 0) {
-                    optional.splice(_opt,1);
-                    continue;
-                }
-                // cmd.. or dummy?
-                if (paramP.type !== ParamType.do) {
-                    dummy = true;
-                    if (this.complex) {
-                        param_opt.set(paramP.type,paramP.str);
-                    }
-                }
-            }
-            if (must.length >= 1) {
-                if (this.complex && must.length === 1 && cmdPiece != null) {
-                    param_must.set(must[0].type, cmdPiece);
-                    must.splice(0,1);
-                    cmdPiece = null;
-                } else {
-                    optStatus = must.map((_v) => _v.str).join(", ");
-                }
-            }
-            if (this.complex && optional.length === 1 && cmdPiece != null) {
-                param_opt.set(optional[0].type, cmdPiece);
-                optional.slice(0,1);
-            }
-            if (!this.complex && (optional.length >= 1 || dummy)) {
-                Log.i(command,"Strict mode: failed. But pass.");
+        return null;
+    }
+    private endsWith(source:string, ends:string[], ws = false) {
+        for (const _end of ends) {
+            if (source.endsWith((ws ? " " : "") + _end)) {
+                return {
+                    str: source.substr(0, source.length - _end.length),
+                    end: _end,
+                };
             }
         }
-        return new CommandStatus(
-            cmdOk,
-            optStatus,
-            param_must,
-            param_opt,
-            command.split(/\s/ig),
-        );
+        return null;
     }
 }
 export class DiscordFormat {
@@ -235,60 +356,79 @@ export class DiscordFormat {
     }
 }
 export class CommandStatus {
+    public commandMatch:boolean = false;
+    public requireParam:boolean = false;
     public requires:Map<ParamType, string>;
-    public options:Map<ParamType, string>;
-    public commands:string[];
-    protected commandMatch:boolean;
-    protected optionStatus:string;
-    constructor(cmdOk:boolean, optStatus:string, req:Map<ParamType, string>, 
-            choices:Map<ParamType, string>, cmds:string[]) {
-        this.commandMatch = cmdOk;
-        this.requires = req;
-        this.options = choices;
-        this.optionStatus = optStatus;
-        this.commands = cmds;
-    }
-    public get match() {
-        return this.commandMatch && this.optionStatus == null;
-    }
-    public error(msg:string) {
-        if (this.commandMatch && this.optionStatus != null) {
-            return sprintf(msg,{param:this.optionStatus});
-        }
-        return null;
+    public opticals:Map<ParamType, string>;
+    public command:string;
+
+    constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, string>
+        , opt:Map<ParamType, string>, command:string) {
+            this.commandMatch = cmdMatch;
+            this.requireParam = reqParam;
+            this.requires = require;
+            this.opticals = opt;
+            this.command = command;
     }
     public has(key:ParamType) {
         return this.exist(key);
     }
     public exist(key:ParamType) {
-        return this.requires.has(key) || this.options.has(key);
+        return this.requires.has(key) || this.opticals.has(key);
     }
     public get(key:ParamType) {
         if (this.requires.has(key)) {
             return this.requires.get(key);
-        } else if (this.options.has(key)) {
-            return this.options.get(key);
+        } else if (this.opticals.has(key)) {
+            return this.opticals.get(key);
         } else {
             return undefined;
         }
     }
     public getSubCmd(start:number, end:number) {
-        if (end >= this.commands.length || start > end) {
+        const commands = this.command.split(/\s+/ig);
+        if (end >= commands.length || start > end) {
             return null;
         } else {
-            const filter = this.commands.filter((_v,_i) => _i >= start && _i < end);
+            const filter = commands.filter((_v,_i) => _i >= start && _i < end);
             return filter.length >= 1 ? filter.join(" ") : null;
         }
     }
     public getLastCmd(depth:number = 1) {
-        if (depth >= this.commands.length) {
+        const commands = this.command.split(/\s+/ig);
+        if (depth >= commands.length) {
             return null;
         }
-        return this.commands[Math.max(0,this.commands.length - depth)];
+        return commands[Math.max(0,commands.length - depth)];
+    }
+    public get match():boolean {
+        return this.commandMatch && !this.requireParam;
+    }
+    public toString():string {
+        const require = {};
+        const opt = {};
+        for (const [key, value] of this.requires) {
+            require[key] = value;
+        }
+        for (const [key, value] of this.opticals) {
+            opt[key] = value;
+        }
+        return JSON.stringify({
+            commandMatch: this.commandMatch,
+            requireParam: this.requireParam,
+            requires: require,
+            opticals: opt,
+            command: this.command,
+        }, null, 4);
     }
 }
 export interface ChainData {
     type:number;
     data:object;
     time:number;
+}
+export interface CmdParam {
+    isAdmin:boolean,
+    isDM:boolean,
+    isSimple:boolean,
 }

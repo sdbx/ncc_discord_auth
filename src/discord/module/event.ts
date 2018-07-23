@@ -4,7 +4,7 @@ import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class EventNotifier extends Plugin {
     // declare config file: use save data
@@ -55,11 +55,10 @@ export default class EventNotifier extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
-        const paramPair = this.welcome.check(msg.channel.type, this.global.isAdmin(msg.author.id));
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
-        const testWelcome = this.welcome.test(command, options, paramPair);
-        const testReceive = this.eventR.test(command, options, paramPair);
+        const testWelcome = this.welcome.check(this.global, command, state);
+        const testReceive = this.eventR.check(this.global, command, state);
         if (testWelcome.match) {
             await msg.channel.send(this.lang.events.typeWelcomeMsg);
             this.startChain(msg.channel.id, msg.author.id, ChainType.WELCOME);

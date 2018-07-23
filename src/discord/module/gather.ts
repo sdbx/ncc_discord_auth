@@ -4,7 +4,7 @@ import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
 import { getNickname, MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 const regexEmoji = /<:[A-Za-z0-9_]{2,}:\d+>/ig;
 export default class Gather extends Plugin {
@@ -118,11 +118,10 @@ export default class Gather extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
-        const paramPair = this.gather.check(msg.channel.type, this.global.isAdmin(msg.author.id));
-        const testGather = this.gather.test(command, options, paramPair);
-        const testRemove = this.remove.test(command, options, paramPair);
+        const testGather = this.gather.check(this.global, command, state);
+        const testRemove = this.remove.check(this.global, command, state);
         if (msg.channel.type !== "dm" && (testGather.match || testRemove.match)) {
             const cfg = await this.sub(this.config,msg.guild.id);
             const channel = msg.channel as Discord.TextChannel;

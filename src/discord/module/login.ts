@@ -9,7 +9,7 @@ import Log from "../../log";
 import { LoginError } from "../../ncc/ncredent";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
-import { ChainData, CommandHelp, CommandStatus, DiscordFormat, Keyword, ParamType, } from "../runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Login extends Plugin {
     // declare config file: use save data
@@ -36,11 +36,10 @@ export default class Login extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg:Discord.Message, command:string, options:Keyword[]):Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
         const lang = this.lang.login;
-        const paramPair = this.naverLogin.check(msg.channel.type, this.global.isAdmin(msg.author.id));
-        const testNaver = this.naverLogin.test(command,options,paramPair);
+        const testNaver = this.naverLogin.check(this.global,command,state);
         /**
          * naver login
          * I don't have server with https or TLS.... sh**.
@@ -74,7 +73,7 @@ export default class Login extends Plugin {
                 return Promise.resolve();
             }
         }
-        const _status = this.status.test(command,options,paramPair);
+        const _status = this.status.check(this.global,command,state);
         if (_status.match) {
             const send = new Discord.RichEmbed();
             const nState =
