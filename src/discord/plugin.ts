@@ -382,4 +382,19 @@ export default abstract class Plugin {
     protected isValidConfig(key:string, obj:object):boolean {
         return true;
     }
+    protected getFirst<T>(arr:T[]):T {
+        if (arr != null && arr.length >= 1) {
+            return arr[0];
+        } else {
+            return null;
+        }
+    }
+    protected getFirstMap<T, V>(m:Map<T, V>):V {
+        if (m != null && m.size >= 1) {
+            for (const [k, v] of m) {
+                return v;
+            }
+        }
+        return null;
+    }
 }
