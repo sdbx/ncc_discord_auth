@@ -14,6 +14,7 @@ namespace Log {
     const totalBlank = 5; // some whitespace
     const guidePtrn = 10; // show gray text size
     let contentLimit = -1;
+    let lastTiming = Date.now();
     export let ui:Inquirer.ui.BottomBar;
     // 1: 8color 2: 256color 3: 0xFFFFFF color
     /*
@@ -82,6 +83,17 @@ namespace Log {
      */
     export function v(arg1:string, arg2:string = null) {
         custom("#ffc6fd", "#ffd7ff", chalk.bgCyan.cyan, "LOG", { arg1, arg2 });
+    }
+    /**
+     * Time
+     */
+    export function time(name?:string) {
+        if (name == null) {
+            lastTiming = Date.now();
+            return;
+        }
+        d(name, "Time-Delta: " + (Date.now() - lastTiming));
+        lastTiming = Date.now();
     }
     /**
      * JSON trace
