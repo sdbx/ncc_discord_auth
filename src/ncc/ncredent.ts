@@ -6,25 +6,26 @@ import * as path from "path";
 import * as read from "read";
 import * as request from "request-promise-native";
 import { CookieJar } from "tough-cookie";
+import Cache from "../cache";
 import Config from "../config";
 import Log from "../log";
 
 export default class NcCredent extends EventEmitter {
     protected credit:Credentials;
     protected readonly cookiePath;
-    private lastLogin:number;
+    private _name:Cache<string>;
     constructor() {
         super();
         this.credit = new Credentials("id","pw");
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie");
-        this.lastLogin = -1;
+        this._name = new Cache("",1);
     }
     /**
      * This is not mean "auth is vaild.".
      * But it means buffer!
      */
     public get available():boolean {
-        return Date.now() - this.lastLogin <= 3600000;
+        return !this._name.expired && this._name.cache.length >= 2;
     }
     public get username():string {
         return this.credit.username;
@@ -80,10 +81,11 @@ export default class NcCredent extends EventEmitter {
         this.credit.password = "__";
         if (name != null) {
             this.credit.username = name;
+            this._name = new Cache(name, 43200);
             await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(name);
         } else {
-            this.lastLogin = -1;
+            this._name.revoke();
         }
         return Promise.resolve(name);
     }
@@ -107,35 +109,16 @@ export default class NcCredent extends EventEmitter {
         const result:string = await this.validateLogin();
         if (result != null) {
             this.credit.username = result;
-            // await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
+            this._name = new Cache(result, 43200);
+            await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
             await this.onLogin(result);
         } else {
-            this.lastLogin = -1;
+            this._name.revoke();
         }
         return Promise.resolve(result);
     }
     protected async onLogin(username:string):Promise<void> {
         return Promise.resolve();
-    }
-    /*
-    public async login():Promise<Session> {
-        let name;
-        name = await this.loadCredit();
-        if (name == null) {
-            do {
-                name = await this.genCreditByConsole();
-            } while (name == null);
-        }
-        console.log(`Username: ${name}`);
-        this.session = new Session(this.credit);
-        await this.session.connect();
-        return Promise.resolve(this.session);
-    }
-    */
-    private read(prompt:string,silent:boolean):Promise<string> {
-        return new Promise((res,rej) => {
-            read({prompt:"", silent},(err, pw:string) => err != null ? rej(err) : res(pw));
-        });
     }
 }
 export interface LoginError {
