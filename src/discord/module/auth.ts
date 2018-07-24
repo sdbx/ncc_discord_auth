@@ -186,6 +186,7 @@ export default class Auth extends Plugin {
                 return Promise.resolve();
             }
             let dest = testInfo.get(ParamType.dest);
+            
             if (dest.endsWith(" 네이버")) {
                 dest = dest.substring(0, dest.lastIndexOf(" "));
                 if (dest.endsWith("의")) {
@@ -218,13 +219,16 @@ export default class Auth extends Plugin {
                     } catch (err) {
                         Log.w(err);
                     }
+                    
                     if (naver == null) {
                         await channel.send(sprintf(this.lang.auth.nickNotFound, {
                             nick: dest,
                             type: "",
                         }));
                     } else {
+                        
                         await channel.send(await getRichByProfile(naver, member.nickname, member.user.avatarURL));
+                        
                     }
                 }
             }
@@ -441,12 +445,13 @@ export async function getRichByProfile(member:Profile, name?:string, icon?:strin
     if (member.profileurl == null) {
         member.profileurl = "https://ssl.pstatic.net/static/m/cafe/mobile/cafe_profile_c77.png";
     }
-    const image:Buffer = await request.get(member.profileurl, { encoding: null });
+    // const image:Buffer = await request.get(member.profileurl, { encoding: null });
     // rich message
     const rich = new Discord.RichEmbed();
     rich.setFooter(member.cafeDesc == null ? "네이버 카페" : member.cafeDesc, member.cafeImage);
-    rich.attachFile(new Discord.Attachment(image, "profile.png"));
-    rich.setThumbnail("attachment://profile.png");
+    // rich.attachFile(new Discord.Attachment(image, "profile.png"));
+    // rich.setThumbnail("attachment://profile.png");
+    rich.setThumbnail(member.profileurl);
     if (name != null) {
         rich.setAuthor(name, icon);
     }

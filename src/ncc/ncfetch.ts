@@ -3,6 +3,7 @@ import * as encoding from "encoding";
 import * as Entities from "html-entities";
 import * as querystring from "querystring";
 import * as request from "request-promise-native";
+import Cache from "../cache";
 import Log from "../log";
 import Article from "../structure/article";
 import Cafe from "../structure/cafe";
@@ -13,6 +14,8 @@ import NcCredent from "./ncredent";
 const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0";
 export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities();
+    private cacheDetail = new Map<number, Cache<Cafe>>();
+    private cacheCafeID = new Map<string, Cache<number>>();
     constructor() {
         super();
     }
@@ -80,7 +83,12 @@ export default class NcFetch extends NcCredent {
             },
             jar: option.useAuth ? cookie : false
         }
+        // log url
+        const query = querystring.stringify(options.qs, "&", "=");
+        // Log.d("Fetch URL", requrl + "?" + query);
+        
         const buffer:Buffer | string = await request(options);
+        
         let body:string;
         /**
          * Naver cafe uses euc-kr f***.
@@ -90,30 +98,35 @@ export default class NcFetch extends NcCredent {
         } else {
             body = buffer as string;
         }
-        return Promise.resolve(cheerio.load(body));
+        
+        const cio = cheerio.load(body);
+        
+        return Promise.resolve(cio);
     }
     /**
      * 네이버 게시글 링크로 네이버 카페 정보를 받아옵니다.
      * @param purl 게시글 링크
      */
     public async parseNaver(purl:string):Promise<Cafe> {
-        const cut = purl.match(/^(http|https):\/\/cafe\.naver\.com\/[A-Za-z0-9]+\//i);
+        const cut = purl.match(/^https?:\/\/cafe\.naver\.com\/[A-Za-z0-9]+(\/)?/i);
+        let cafename = "";
         if (cut != null) {
             purl = cut[0];
+            const query = cut[0].match(/\/[A-Za-z0-9]+/ig);
+            cafename = query[query.length - 1].substr(1);
+        } else {
+            return Promise.reject();
         }
-        const $ = await this.getWeb(purl);
-        const src = $("#main-area > script").html();
-        const id = Number.parseInt(src.match(/clubid=[0-9]*/m)[0].split("=")[1]);
-        /*
-        const title = $($(".d-none").get(0)).text();
-        let skipMobile = $("#u_skipToMobileweb").attr("href");
-        skipMobile = skipMobile.substr(skipMobile.lastIndexOf("/") + 1);
-        return Promise.resolve({
-            cafeId: id,
-            cafeName: skipMobile,
-            cafeDesc: title,
-        } as Cafe);
-        */
+        let id:number;
+        // find cache
+        if (this.cacheCafeID.has(cafename) && !this.cacheCafeID.get(cafename).expired) {
+            id = this.cacheCafeID.get(cafename).cache;
+        } else {
+            const $ = await this.getWeb(purl);
+            const src = $("#main-area > script").html();
+            id = Number.parseInt(src.match(/clubid=[0-9]+/m)[0].split("=")[1]);
+            this.cacheCafeID.set(cafename,new Cache(id, 86400));
+        }
         return this.parseNaverDetail(id);
     }
     /**
@@ -121,6 +134,10 @@ export default class NcFetch extends NcCredent {
      * @param cafeid 네카페 숫자 ID
      */
     public async parseNaverDetail(cafeid:number):Promise<Cafe> {
+        // check cache
+        if (this.cacheDetail.has(cafeid) && !this.cacheDetail.get(cafeid).expired) {
+            return this.cacheDetail.get(cafeid).cache;
+        }
         const url = `${cafePrefix}/CafeProfileView.nhn?clubid=${cafeid.toString(10)}`;
         const $ = await this.getWeb(url);
         let members:string[] = $(".invite-padd02").map((index, element) => {
@@ -137,12 +154,14 @@ export default class NcFetch extends NcCredent {
             }
         }).get();
         members = members.filter((_v) => _v != null);
-        return Promise.resolve({
+        const cafe = {
             cafeId: cafeid,
             cafeName: members[1].substr(members[1].lastIndexOf("/") + 1),
             cafeDesc: members[0].trim(),
             cafeImage: members[2].length <= 0 ? null : members[2],
-        } as Cafe);
+        } as Cafe;
+        this.cacheDetail.set(cafeid, new Cache(cafe, 86400));
+        return Promise.resolve(cafe);
     }
     /**
      * 최근 게시글 목록을 받아옵니다.(5개)
