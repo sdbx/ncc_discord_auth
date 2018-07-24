@@ -90,10 +90,12 @@ namespace Log {
     export function time(name?:string) {
         if (name == null) {
             lastTiming = Date.now();
-            return;
+            return 0;
         }
-        d(name, "Time-Delta: " + (Date.now() - lastTiming));
+        const delta = Date.now() - lastTiming;
+        d(name, "Time-Delta: " + delta);
         lastTiming = Date.now();
+        return delta;
     }
     /**
      * JSON trace
