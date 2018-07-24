@@ -17,4 +17,7 @@ export default class Cache<T> {
     public get expired() {
         return Date.now() > this.ends;
     }
+    public revoke() {
+        this.ends = -1;
+    }
 }

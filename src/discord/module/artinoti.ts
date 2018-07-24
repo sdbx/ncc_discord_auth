@@ -26,7 +26,7 @@ export default class ArtiNoti extends Plugin {
         // get parameter as complex
         this.toggle.complex = true;
         // setinterval
-        this.timer = setInterval(this.fetch.bind(this),20000);
+        this.timer = setInterval(this.fetch.bind(this),60000);
         // call once :)
         await this.fetch();
         return Promise.resolve();

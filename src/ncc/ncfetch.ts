@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import * as encoding from "encoding";
 import * as Entities from "html-entities";
+import { Agent } from "https";
 import * as querystring from "querystring";
 import * as request from "request-promise-native";
 import Cache from "../cache";
@@ -16,6 +17,9 @@ export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities();
     private cacheDetail = new Map<number, Cache<Cafe>>();
     private cacheCafeID = new Map<string, Cache<number>>();
+    private httpsAgent = new Agent({
+        keepAlive: true
+    });
     constructor() {
         super();
     }
@@ -73,6 +77,7 @@ export default class NcFetch extends NcCredent {
             url: requrl,
             qs: param,
             body: post_body,
+            agent: this.httpsAgent,
             encoding: option.eucKR ? null : "utf-8",
             strictSSL: true,
             headers: {
@@ -85,8 +90,8 @@ export default class NcFetch extends NcCredent {
         }
         // log url
         const query = querystring.stringify(options.qs, "&", "=");
-        // Log.d("Fetch URL", requrl + "?" + query);
-        
+        Log.i("Fetch URL", requrl + "?" + query);
+        Log.time();
         const buffer:Buffer | string = await request(options);
         
         let body:string;
@@ -100,7 +105,7 @@ export default class NcFetch extends NcCredent {
         }
         
         const cio = cheerio.load(body);
-        
+        Log.time("Req");
         return Promise.resolve(cio);
     }
     /**
