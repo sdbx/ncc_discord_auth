@@ -186,7 +186,7 @@ export default class Auth extends Plugin {
                 return Promise.resolve();
             }
             let dest = testInfo.get(ParamType.dest);
-            
+            Log.time();
             if (dest.endsWith(" 네이버")) {
                 dest = dest.substring(0, dest.lastIndexOf(" "));
                 if (dest.endsWith("의")) {
@@ -463,6 +463,7 @@ export async function getRichByProfile(member:Profile, name?:string, icon?:strin
         rich.addField("총 게시글 수", member.numArticles);
         rich.addField("총 댓글 수", member.numComments);
     }
+    rich.addField("지연 시간", Log.time("getRich"));
     return Promise.resolve(rich);
 }
 enum PType {
