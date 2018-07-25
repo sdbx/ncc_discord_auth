@@ -51,10 +51,8 @@ export default class Runtime extends EventEmitter {
         this.lastSaved = Date.now();
         // ncc test auth by cookie
         try {
-            if (await this.ncc.loadCredit() != null) {
-                Log.i("Runtime-ncc","login!");
-            } else {
-                Log.i("Runtime-ncc", "Cookie invalid :(");
+            if (await this.ncc.loadCredit() == null) {
+                Log.i("Runtime-ncc","Login via cookie failed.");
             }
         } catch (err) {
             Log.e(err);
@@ -69,7 +67,11 @@ export default class Runtime extends EventEmitter {
         this.client.on("ready",this.ready.bind(this));
         this.client.on("message",this.onMessage.bind(this));
         // ncc login
-
+        if (this.global.consoleLogin && !await this.ncc.availableAsync()) {
+            while (await this.ncc.genCreditByConsole() == null) {
+                continue;
+            }
+        }
         // client login (ignore)
         this.client.login(this.global.token)
         return Promise.resolve("");
@@ -360,6 +362,7 @@ export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];
     public simplePrefix = "$";
+    public consoleLogin = false;
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {
         super("main");

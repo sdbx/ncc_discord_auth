@@ -68,12 +68,27 @@ export default class Auth extends Plugin {
                 await channel.send(this.lang.auth.onlyGroup);
                 return Promise.resolve();
             }
+            /**
+             * Check duplicate
+             */
+            const have = this.getFirst(this.authQueue.filter((v) => v.guildID === guild.id && v.userID === user.id));
+            if (have != null) {
+                if (await this.inviteExpired(have.uInviteCode)) {
+                    await this.ncc.deleteRoom(have.uChatID);
+                } else {
+                    await channel.send(
+                        `${this.lang.auth.authing}\nhttps://talk.cafe.naver.com/channels/${have.uChatID}`);
+                    return Promise.resolve();
+                }
+            }
+            /**
+             * 
+             */
             let type;
             let member:Profile;
-            const guildCfg = await this.sub(this.config, msg.guild.id);
             let param = testAuth.get(ParamType.to);
+            const guildCfg = await this.sub(this.config, msg.guild.id);
             const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
-            // search nick
             if (param.endsWith("아이디")) {
                 type = PType.ID;
                 param = param.substring(0, param.lastIndexOf(" "));
@@ -100,6 +115,13 @@ export default class Auth extends Plugin {
                 }));
                 return Promise.resolve();
             }
+            /**
+             * Check authed
+             */
+            if (await this.haveAuthed(msg.guild.id,member.userid, msg.author.id)) {
+                await channel.send(this.lang.auth.already_auth);
+                return Promise.resolve();
+            }
             // check permission
             if (!this.client.channels.has(guildCfg.proxyChannel)
                 || this.client.channels.get(guildCfg.proxyChannel).type !== "text") {
@@ -110,26 +132,6 @@ export default class Auth extends Plugin {
             if (!proxyC.permissionsFor(proxyC.guild.client.user).has("CREATE_INSTANT_INVITE")) {
                 await channel.send(this.lang.auth.proxyFailed);
                 return Promise.resolve();
-            }
-            /**
-             * Check authed
-             */
-            if (await this.haveAuthed(msg.guild.id,member.userid, msg.author.id)) {
-                await channel.send(this.lang.auth.already_auth);
-                return Promise.resolve();
-            }
-            /**
-             * Check duplicate
-             */
-            const have = this.getFirst(this.authQueue.filter((v) => v.guildID === guild.id && v.userID === user.id));
-            if (have != null) {
-                if (await this.inviteExpired(have.uInviteCode)) {
-                    await this.ncc.deleteRoom(have.uChatID);
-                } else {
-                    await channel.send(
-                        `${this.lang.auth.authing}\nhttps://talk.cafe.naver.com/channels/${have.uChatID}`);
-                    return Promise.resolve();
-                }
             }
             /**
              * Create room first
@@ -149,7 +151,7 @@ export default class Auth extends Plugin {
                 maxAge: 600,
                 maxUses: 3,
                 unique: true,
-            }, user.id);
+            }, `${user.username}#${user.tag} is authing`);
             const authInfo = new AuthInfo();
             authInfo.guildID = guild.id;
             authInfo.proxyID = proxyC.guild.id;
@@ -233,7 +235,7 @@ export default class Auth extends Plugin {
         }
         if (breakInvite) {
             try {
-                const invite = await this.client.fetchInvite(queue.uInviteCode);
+                const invite = await this.getInvite(queue);
                 await invite.delete("Checked.");
             } catch (err) {
                 Log.e(err);
@@ -243,7 +245,7 @@ export default class Auth extends Plugin {
         return Promise.resolve();
     }
     protected async verify(queue:AuthInfo):Promise<string> {
-        const invite = await this.client.fetchInvite(queue.uInviteCode);
+        const invite = await this.getInvite(queue);
         if (await this.inviteExpired(invite)) {
             return this.lang.auth.expiredAuth;
         }
@@ -271,7 +273,7 @@ export default class Auth extends Plugin {
     protected async onNccMessage(message:Message) {
         const roomID = message.room.id;
         const queue = this.getFirst(this.authQueue.filter((_v) => _v.uChatID === roomID));
-        if (queue == null) {
+        if (queue == null || queue.naverID !== message.user.id) {
             return Promise.resolve();
         }
         const room = await this.ncc.getRoom(roomID);
@@ -321,7 +323,7 @@ export default class Auth extends Plugin {
             return Promise.resolve();
         }
         const dm = await user.createDM();
-        const invite = await this.client.fetchInvite(queue.uInviteCode);
+        const invite = await this.getInvite(queue);
         if (invite.uses >= 1) {
             const error = await this.verify(queue);
             if (error != null) {
@@ -340,11 +342,30 @@ export default class Auth extends Plugin {
     private async inviteExpired(inviteCode:string | Discord.Invite) {
         let _invite;
         if (typeof inviteCode === "string") {
-            _invite = await this.client.fetchInvite(inviteCode);
+            _invite = await this.getInvite(inviteCode);
         } else {
             _invite = inviteCode;
         }
         return _invite == null || Date.now() >= _invite.expiresTimestamp;
+    }
+    private async getInvite(queue:AuthInfo | string) {
+        let id:string;
+        let guild:Discord.PartialGuild | Discord.Guild;
+        if (typeof queue === "string") {
+            id = queue;
+            const i:Discord.Invite = await this.client.fetchInvite(id).catch((err) => null);
+            if (i == null) {
+                return null;
+            }
+            guild = i.guild;
+        } else {
+            id = queue.uInviteCode;
+            guild = this.client.guilds.get(queue.proxyID);
+        }
+        if (guild == null || !(guild instanceof Discord.Guild)) {
+            return null;
+        }
+        return this.getFirstMap((await guild.fetchInvites()).filter((v) => v.code === id));
     }
     private deleteQueue(queue:AuthInfo) {
         this.authCache.forEach((v, i) => {
