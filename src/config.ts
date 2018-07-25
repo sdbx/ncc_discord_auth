@@ -5,9 +5,8 @@ import Log from "./log";
 export default class Config {
     public static readonly appVersion:number = 2; // app version
     // tslint:disable-next-line
-    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name,subDir,sub,nosave";
-    public blacklist:string[]; // blacklist for config
-    protected version:number; // config version
+    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name,subDir,sub";
+    public version:number; // config version
     /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
     public cafe:ICafe = {} as any;
@@ -16,11 +15,11 @@ export default class Config {
     public roleName:string = "@everyone";
     public articleCfg:IArticleCfg = {} as any;
     */
+    public blacklist:string[]; // blacklist for config
     // private readonly saveTo:string = "./config/config.json";
-    private configName:string;
-    private subDir:string; // subdir
-    private saveTo:string; // save location
-    private nosave:boolean;
+    protected configName:string;
+    protected subDir:string; // subdir
+    protected saveTo:string; // save location
     public static get dirpath():string {
         let rootDir = path.resolve(process.cwd());
         if (!rootDir.endsWith("ncc_discord_auth")) {
@@ -36,17 +35,13 @@ export default class Config {
      * @param _name Name of config
      * @param _version Version
      */
-    public constructor(_name:string, _sub = null, _nosave = false, _version = Config.appVersion) {
-        if (_name != null) {
-            this.initialize(_name, _sub, _nosave, _version);
-        }
-    }
-    public initialize(_name:string, _sub = null, _nosave = false, _version = Config.appVersion) {
+    public constructor(_name:string,_sub = null, _version = Config.appVersion) {
+        // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
         this.version = _version;
         this.blacklist = [];
         this.subDir = _sub;
         this.name = _name;
-        this.nosave = _nosave;
+        // console.log(`${_name}'s config: ${this.saveTo}`);
     }
     public set sub(n:string) {
         this.subDir = n;
@@ -68,10 +63,10 @@ export default class Config {
      * @returns success? (reject,resolve)
      */
     public async export():Promise<void> {
-        if (this.nosave) {
-            return Promise.resolve();
-        }
-        const write = this.exportJSON();
+        const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
+        Config.excludes.split(",").forEach(v => ignore.push(v));
+        const write:string = JSON.stringify(this,
+            (key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
         try {
             await fs.ensureFile(this.saveTo);
             await fs.writeFile(this.saveTo,write,{encoding:"utf-8"});
@@ -80,42 +75,6 @@ export default class Config {
             Log.e(err);
             return Promise.reject();
         }
-    }
-    public clone<T extends Config>(breakPipe = true):T {
-        const constFn = this.constructor;
-        const newI:T = new (constFn as any)() as T;
-        newI.initialize(this.configName, this.subDir, breakPipe, this.version);
-        newI.from(this.exportJSON());
-        return newI;
-    }
-    public exportJSON():string {
-        const ignore:string[] = (this.blacklist.join(",") + "," + Config.excludes).split(",");
-        const write:string = JSON.stringify(this,
-            (key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t");
-        return write;
-    }
-    public from(data:string | object) {
-        if (typeof data === "string") {
-            try {
-                data = JSON.parse(data);
-            } catch (err) {
-                Log.w("Config","JSON parse error.");
-                data = {};
-            }
-        }
-        const file_version:number = data["version"] === undefined ? -1 : data["version"];
-        // remove non-cloneable
-        const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
-        Config.excludes.split(",").forEach(v => ignore.push(v));
-        ignore.push("version");
-        for (const [key, value] of Object.entries(ignore)) {
-            if (ignore.indexOf(key) >= 0) {
-                delete data[key];
-            }
-        }
-        // clone!
-        this._clone(data);
-        return file_version;
     }
     public async has(_path = this.saveTo):Promise<boolean> {
         return fs.ensureFile(this.saveTo).then(() => true).catch(() => false);
@@ -126,15 +85,37 @@ export default class Config {
      */
     public async import(write:boolean = false):Promise<void> {
         const exists = await this.has();
+        let file_version = Number.MAX_SAFE_INTEGER;
         if (exists) {
             // load data
             const text:string = await fs.readFile(this.saveTo,{encoding:"utf-8"});
-            const fVersion = this.from(text);
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                Log.w("Config","JSON parse error.")
+                data = {};
+            }
+            file_version = data.version;
+            // remove non-cloneable
+            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a));
+            Config.excludes.split(",").forEach(v => ignore.push(v));
+            ignore.push("version");
+            for (const [key, value] of Object.entries(ignore)) {
+                if (ignore.indexOf(key) >= 0) {
+                    delete data[key];
+                }
+            }
+            // clone!
+            this._clone(data);
             // update if app version is higher or write
-            write = write || fVersion < this.version;
-        } else {
-            Log.w(this.saveTo.substr(this.saveTo.lastIndexOf("/")),"Config not found.");
+            if (file_version < this.version || write) {
+                return this.export();
+            } else {
+                return Promise.resolve();
+            }
         }
+        console.error("Can't read config file");
         if (write) {
             return await this.export();
         } else {
@@ -169,47 +150,3 @@ export default class Config {
         return out;
     }
 }
-/*
-export interface IDiscordID {
-    room:number;
-    botChannel:number;
-    welcomeChannel:number; // discordMainChID
-    articleChannels:number[];
-}
-export interface IMessage {
-    welcome:string;
-    authed:string;
-}
-export interface ICafe {
-    url:string;
-    id:number;
-    article:number;
-}
-export class Game {
-    public static readonly Playing:string = "playing";
-    public static readonly Watching:string = "watching";
-    public static readonly Listening:string = "listening";
-    public static readonly Streaming:string = "streaming";
-    public name:string;
-    public type:string;
-    constructor(input:{name:string,type:string}= {name:"Bots",type:"Playing"}) {
-        this.name = input.name;
-        this.type = input.type;
-    }
-    public getID(type:string):number {
-        const order:string[] = [Game.Playing,Game.Watching,Game.Listening,Game.Streaming];
-        let out:number = 0;
-        for (let i = 0;i < order.length;i += 1) {
-            if (order[i].toLowerCase() === type.toLowerCase()) {
-                out = i;
-                break;
-            }
-        }
-        return out;
-    }
-}
-export interface IArticleCfg {
-    enableAlert:boolean;
-    updateSec:number;
-}
-*/

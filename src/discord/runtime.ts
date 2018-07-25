@@ -38,7 +38,7 @@ export default class Runtime extends EventEmitter {
         this.plugins = [];
         
         this.plugins.push(
-         new Ping(), new Login(), new Auth() /*,new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier() */);
+         new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier());
             
     }
     public async start():Promise<string> {

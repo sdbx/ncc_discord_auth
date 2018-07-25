@@ -329,11 +329,18 @@ export default abstract class Plugin {
     protected async sub<T extends Config>(parent:T,subName:string,sync = true):Promise<T> {
         const key = this.subKey(parent.name, subName);
         if (this.subs.has(key)) {
-            const cfg = this.subs.get(subName) as T;
-            return sync ? cfg : cfg.clone(true);
+            const cfg = this.subs.get(key) as T;
+            const receiver = {
+                set: (target, p, value, r) => {
+                    Log.d("SubConfig", "Hooked setting value: " + p.toString());
+                    return false;
+                }
+            } as ProxyHandler<T>;
+            const proxy = new Proxy(cfg, receiver);
+            return sync ? cfg : proxy;
         }
-        const newI:T = new (parent["constructor"] as any)() as T;
-        newI.initialize(subName, parent.name, !sync);
+        const newI:T = new (parent["constructor"] as any)(subName, parent.name) as T;
+        // newI.initialize(subName, parent.name, !sync);
         await newI.import(false).catch(Log.e);
         if (sync) {
             this.subs.set(key, newI);
