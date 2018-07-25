@@ -8,7 +8,7 @@ import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
-import { GlobalCfg } from "./runtime";
+import { MainCfg } from "./runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "./runutil";
 
 export default abstract class Plugin {
@@ -16,7 +16,7 @@ export default abstract class Plugin {
     protected client:Discord.Client;
     protected ncc:Ncc;
     protected lang:Lang;
-    protected global:GlobalCfg;
+    protected global:MainCfg;
     protected timeout = 1 * 60 * 1000; // 1 is minutes
     private chains:Map<string, ChainData>;
     private subs:Map<string, Config>;
@@ -27,7 +27,7 @@ export default abstract class Plugin {
      * @param ncc nccapi
      */
     public init(runtime:{
-        client:Discord.Client, ncc:Ncc, lang:Lang, mainConfig:GlobalCfg, subConfigs:Map<string,Config>}):void {
+        client:Discord.Client, ncc:Ncc, lang:Lang, mainConfig:MainCfg, subConfigs:Map<string,Config>}):void {
         this.client = runtime.client;
         this.ncc = runtime.ncc;
         this.lang = runtime.lang

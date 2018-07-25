@@ -120,7 +120,7 @@ export default class NcFetch extends NcCredent {
             const query = cut[0].match(/\/[A-Za-z0-9]+/ig);
             cafename = query[query.length - 1].substr(1);
         } else {
-            return Promise.reject();
+            return Promise.reject("Wrong url: " + purl);
         }
         let id:number;
         // find cache

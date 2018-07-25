@@ -10,7 +10,7 @@ import Cafe from "../../structure/cafe";
 import Comment from "../../structure/comment";
 import Profile from "../../structure/profile";
 import Plugin from "../plugin";
-import { getNickname, GlobalCfg } from "../runtime";
+import { getNickname, MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Auth extends Plugin {

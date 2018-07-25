@@ -99,13 +99,26 @@ export default class Runtime extends EventEmitter {
     }
     protected async ready() {
         // init plugins
-        const {...reduced} = this.global as GlobalCfg;
+        const receiver = {
+            get: (target, prop, r) => {
+                if (prop === "token") {
+                    return "_";
+                  } else {
+                    return Reflect.get(target, prop, r);
+                  }
+            },
+            set: (target, p, value, r) => {
+                Log.d("SubConfig", "Hooked setting value: " + p.toString());
+                return false;
+            }
+        } as ProxyHandler<MainCfg>;
+        const proxy = new Proxy(this.global, receiver);
         for (const plugin of this.plugins) {
             plugin.init({
                 client:this.client,
                 ncc: this.ncc,
                 lang: this.lang,
-                mainConfig: reduced,
+                mainConfig: proxy,
                 subConfigs: this.locals,
             });
         }
@@ -370,12 +383,7 @@ export function getNickname(msg:Discord.Message) {
         return msg.author.username;
     }
 }
-export interface GlobalCfg {
-    authUsers:string[];
-    prefix:RegExp;
-    simplePrefix:string;
-}
-class MainCfg extends Config implements GlobalCfg {
+export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];
     public simplePrefix = "$";

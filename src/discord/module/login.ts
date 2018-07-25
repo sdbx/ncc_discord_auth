@@ -8,7 +8,7 @@ import Config from "../../config";
 import Log from "../../log";
 import { LoginError } from "../../ncc/ncredent";
 import Plugin from "../plugin";
-import { GlobalCfg } from "../runtime";
+import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Login extends Plugin {
