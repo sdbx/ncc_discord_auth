@@ -69,6 +69,7 @@ export default class Lang extends Config {
         주인님이 보낸 요청이 아니라면 나가달라냥.`,
         authed: "인증 완료다냥!",
         already_auth: "이미 인증 완료된 아이디다냐!",
+        expiredAuth: "이미 유효 기간이 지났다냐.",
     }
     /**
      * Module: artinoti

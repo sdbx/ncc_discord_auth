@@ -26,21 +26,26 @@ const presetCfgs:{[key:string]: string[]} = {
 
 export default class Runtime extends EventEmitter {
     private global:MainCfg;
+    private locals:Map<string, Config>;
     private lang:Lang;
     private client:Discord.Client;
     private ncc:Ncc;
-    private plugins:Plugin[] = [];
+    private plugins:Plugin[];
     private lastSaved:number;
     constructor() {
         super();
         // ,new Auth(), new Login()
+        this.plugins = [];
+        
         this.plugins.push(
-            new Ping(), new Login(), new Auth(), new ArtiNoti(), new Cast(), new Gather(), new EventNotifier());
+         new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier());
+            
     }
     public async start():Promise<string> {
         // load config
         this.global = new MainCfg();
         await this.global.import(true).catch((err) => null);
+        this.locals = new Map();
         // init client
         this.client = new Discord.Client();
         // create ncc - not authed
@@ -51,10 +56,8 @@ export default class Runtime extends EventEmitter {
         this.lastSaved = Date.now();
         // ncc test auth by cookie
         try {
-            if (await this.ncc.loadCredit() != null) {
-                Log.i("Runtime-ncc","login!");
-            } else {
-                Log.i("Runtime-ncc", "Cookie invalid :(");
+            if (await this.ncc.loadCredit() == null) {
+                Log.i("Runtime-ncc","Login via cookie failed.");
             }
         } catch (err) {
             Log.e(err);
@@ -69,9 +72,13 @@ export default class Runtime extends EventEmitter {
         this.client.on("ready",this.ready.bind(this));
         this.client.on("message",this.onMessage.bind(this));
         // ncc login
-
+        if (this.global.consoleLogin && !await this.ncc.availableAsync()) {
+            while (await this.ncc.genCreditByConsole() == null) {
+                continue;
+            }
+        }
         // client login (ignore)
-        this.client.login(this.global.token)
+        await this.client.login(this.global.token)
         return Promise.resolve("");
     }
     public async destroy() {
@@ -92,8 +99,28 @@ export default class Runtime extends EventEmitter {
     }
     protected async ready() {
         // init plugins
+        const receiver = {
+            get: (target, prop, r) => {
+                if (prop === "token") {
+                    return "_";
+                  } else {
+                    return Reflect.get(target, prop, r);
+                  }
+            },
+            set: (target, p, value, r) => {
+                Log.d("SubConfig", "Hooked setting value: " + p.toString());
+                return false;
+            }
+        } as ProxyHandler<MainCfg>;
+        const proxy = new Proxy(this.global, receiver);
         for (const plugin of this.plugins) {
-            plugin.init(this.client, this.ncc, this.lang,this.global);
+            plugin.init({
+                client:this.client,
+                ncc: this.ncc,
+                lang: this.lang,
+                mainConfig: proxy,
+                subConfigs: this.locals,
+            });
         }
         this.emit("ready");
     }
@@ -360,6 +387,7 @@ export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];
     public simplePrefix = "$";
+    public consoleLogin = false;
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {
         super("main");

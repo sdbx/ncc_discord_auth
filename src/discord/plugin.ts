@@ -18,21 +18,22 @@ export default abstract class Plugin {
     protected lang:Lang;
     protected global:MainCfg;
     protected timeout = 1 * 60 * 1000; // 1 is minutes
-    private subConfigs:Map<string,Config>;
-    private chains:Map<string,ChainData>;
+    private chains:Map<string, ChainData>;
+    private subs:Map<string, Config>;
 
     /**
      * on plugin load
      * @param cl client
      * @param ncc nccapi
      */
-    public init(cl:Discord.Client, nc:Ncc, ln:Lang, mainConfig:MainCfg):void {
-        this.client = cl;
-        this.ncc = nc;
-        this.lang = ln;
-        this.subConfigs = new Map();
+    public init(runtime:{
+        client:Discord.Client, ncc:Ncc, lang:Lang, mainConfig:MainCfg, subConfigs:Map<string,Config>}):void {
+        this.client = runtime.client;
+        this.ncc = runtime.ncc;
+        this.lang = runtime.lang
+        this.subs = runtime.subConfigs;
         this.chains = new Map();
-        this.global = mainConfig;
+        this.global = runtime.mainConfig;
     }
     /**
      * on discord ready
@@ -224,7 +225,7 @@ export default abstract class Plugin {
         if (this.config != null) {
             await this.config.export();
             const proArr = [];
-            this.subConfigs.forEach((_value) => proArr.push(_value.export()));
+            this.subs.forEach((_value) => proArr.push(_value.export()));
             await Promise.all(proArr);
         }
         return Promise.resolve();
@@ -325,29 +326,39 @@ export default abstract class Plugin {
      * @param global class object 
      * @param subName sub name :)
      */
-    protected async sub<T extends Config>(global:T,subName:string,save = true):Promise<T> {
-        if (save && this.subConfigs.has(subName)) {
-            return Promise.resolve(this.subConfigs.get(subName) as T);
+    protected async sub<T extends Config>(parent:T,subName:string,sync = true):Promise<T> {
+        const key = this.subKey(parent.name, subName);
+        if (this.subs.has(key)) {
+            const cfg = this.subs.get(key) as T;
+            const receiver = {
+                set: (target, p, value, r) => {
+                    Log.d("SubConfig", "Hooked setting value: " + p.toString());
+                    return false;
+                }
+            } as ProxyHandler<T>;
+            const proxy = new Proxy(cfg, receiver);
+            return sync ? cfg : proxy;
         }
-        const newI:T = new (global["constructor"] as any)() as T;
-        newI.name = subName;
-        newI.sub = global.name;
-        await newI.import(true).catch(Log.e);
-        if (save) {
-            this.subConfigs.set(subName,newI);
+        const newI:T = new (parent["constructor"] as any)(subName, parent.name) as T;
+        // newI.initialize(subName, parent.name, !sync);
+        await newI.import(false).catch(Log.e);
+        if (sync) {
+            this.subs.set(key, newI);
         }
-        // test.name = "test74";
-        // const subConfig = {...global}
         return Promise.resolve(newI);
     }
-    protected subHas(subName:string):boolean {
-        return this.subConfigs.has(subName);
+    protected subKey(name:string, subName?:string) {
+        return `${name}\$${subName == null ? "__default__" : subName}`;
     }
-    protected async subDel(subName:string):Promise<void> {
-        if (this.subConfigs.has(subName)) {
-            const cfg = this.subConfigs.get(subName);
+    protected subHas(subName:string, name = this.config.name):boolean {
+        return this.subs.has(this.subKey(name, subName));
+    }
+    protected async subDel(subName:string, name = this.config.name):Promise<void> {
+        const key = this.subKey(name, subName);
+        if (this.subs.has(key)) {
+            const cfg = this.subs.get(key);
             await fs.remove(cfg["saveTo"]);
-            this.subConfigs.delete(subName);
+            this.subs.delete(key);
         }
         return Promise.resolve();
     }
@@ -356,12 +367,6 @@ export default abstract class Plugin {
             name:user.username,
             mention:`<@${user.id}>`
         }
-    }
-    protected format(value:string, ...args:any[]):string {
-        const pm = [];
-        pm.push(value);
-        args.forEach((v) => pm.push(v));
-        return sprintf.apply(null,pm);
     }
     protected toLangString(value:string | number | boolean) {
         let data:string;
@@ -381,5 +386,20 @@ export default abstract class Plugin {
     }
     protected isValidConfig(key:string, obj:object):boolean {
         return true;
+    }
+    protected getFirst<T>(arr:T[]):T {
+        if (arr != null && arr.length >= 1) {
+            return arr[0];
+        } else {
+            return null;
+        }
+    }
+    protected getFirstMap<T, V>(m:Map<T, V>):V {
+        if (m != null && m.size >= 1) {
+            for (const [k, v] of m) {
+                return v;
+            }
+        }
+        return null;
     }
 }

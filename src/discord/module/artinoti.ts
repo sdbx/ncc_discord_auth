@@ -102,8 +102,8 @@ export default class ArtiNoti extends Plugin {
                         try {
                             const authlist = await this.sub(new AuthConfig(), guild.id, false);
                             if (authlist.users != null) {
-                                authlist.users.filter((_v) => _v.naverid === user.userid).forEach((_v) => {
-                                    const m = guild.member(_v.user);
+                                authlist.users.filter((_v) => _v.naverID === user.userid).forEach((_v) => {
+                                    const m = guild.member(_v.userID);
                                     if (m != null) {
                                         rich.setFooter(m.nickname === null ? m.user.username : m.nickname,
                                             m.user.avatarURL);
