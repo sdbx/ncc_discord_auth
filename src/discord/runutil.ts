@@ -1,6 +1,6 @@
 import * as Discord from "discord.js";
 import Log from "../log";
-import { MainCfg, safeCmd } from "./runtime";
+import { GlobalCfg, safeCmd } from "./runtime";
 
 export enum ParamType {
     thing = "이/가",
@@ -93,7 +93,7 @@ export class CommandHelp {
         }
         return out;
     }
-    public check(global:MainCfg,content:string,state?:CmdParam):CommandStatus {
+    public check(global:GlobalCfg,content:string,state?:CmdParam):CommandStatus {
         const output = {
             match: false,
             reqParam: false,

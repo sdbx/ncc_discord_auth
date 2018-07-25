@@ -10,7 +10,7 @@ import Cafe from "../../structure/cafe";
 import Comment from "../../structure/comment";
 import Profile from "../../structure/profile";
 import Plugin from "../plugin";
-import { getNickname, MainCfg } from "../runtime";
+import { getNickname, GlobalCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Auth extends Plugin {
@@ -82,7 +82,7 @@ export default class Auth extends Plugin {
                 }
             }
             /**
-             * 
+             * fetch naver ID
              */
             let type;
             let member:Profile;
@@ -93,7 +93,7 @@ export default class Auth extends Plugin {
                 type = PType.ID;
                 param = param.substring(0, param.lastIndexOf(" "));
                 member = await this.ncc.getMemberById(cafeID.cafeId, param).catch((err) => null);
-            } else if (param.endsWith(" 닉네임") || param.endsWith(" 닉")) {
+            } else if (param.endsWith("닉네임") || param.endsWith("닉")) {
                 type = PType.NICK;
                 param = param.substring(0, param.lastIndexOf(" "));
                 member = await this.ncc.getMemberByNick(cafeID.cafeId, param).catch((err) => null);
@@ -262,11 +262,8 @@ export default class Auth extends Plugin {
         if (!member.roles.has(toRole.id)) {
             await member.addRole(toRole, `nc ${queue.naverID} authed.`);
         }
-        cfg.users.push({
-            userID: queue.userID,
-            guildID: queue.guildID,
-            naverID: queue.naverID,
-        } as AuthUser);
+        const {...reduced} = queue as AuthUser;
+        cfg.users.push(reduced);
         await cfg.export();
         return Promise.resolve(null);
     }
@@ -434,14 +431,14 @@ enum PType {
     NICK,
 }
 class AuthUser {
-    public userID;
-    public guildID;
-    public naverID;
+    public userID:string;
+    public guildID:string;
+    public naverID:string;
 }
 class AuthInfo extends AuthUser {
-    public uChatID; // unique
-    public uInviteCode; // unique
-    public proxyID;
+    public uChatID:string; // unique
+    public uInviteCode:string; // unique
+    public proxyID:string;
 }
 export class AuthConfig extends Config {
     public guildName = "Sample";

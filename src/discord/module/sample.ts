@@ -3,7 +3,7 @@ import { sprintf } from "sprintf-js";
 import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
-import { MainCfg } from "../runtime";
+import { GlobalCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Sample extends Plugin {

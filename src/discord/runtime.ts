@@ -26,21 +26,26 @@ const presetCfgs:{[key:string]: string[]} = {
 
 export default class Runtime extends EventEmitter {
     private global:MainCfg;
+    private locals:Map<string, Config>;
     private lang:Lang;
     private client:Discord.Client;
     private ncc:Ncc;
-    private plugins:Plugin[] = [];
+    private plugins:Plugin[];
     private lastSaved:number;
     constructor() {
         super();
         // ,new Auth(), new Login()
+        this.plugins = [];
+        
         this.plugins.push(
-            new Ping(), new Login(), new Auth(), new ArtiNoti(), new Cast(), new Gather(), new EventNotifier());
+         new Ping(), new Login(), new Auth() /*,new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier() */);
+            
     }
     public async start():Promise<string> {
         // load config
         this.global = new MainCfg();
         await this.global.import(true).catch((err) => null);
+        this.locals = new Map();
         // init client
         this.client = new Discord.Client();
         // create ncc - not authed
@@ -73,7 +78,7 @@ export default class Runtime extends EventEmitter {
             }
         }
         // client login (ignore)
-        this.client.login(this.global.token)
+        await this.client.login(this.global.token)
         return Promise.resolve("");
     }
     public async destroy() {
@@ -94,8 +99,15 @@ export default class Runtime extends EventEmitter {
     }
     protected async ready() {
         // init plugins
+        const {...reduced} = this.global as GlobalCfg;
         for (const plugin of this.plugins) {
-            plugin.init(this.client, this.ncc, this.lang,this.global);
+            plugin.init({
+                client:this.client,
+                ncc: this.ncc,
+                lang: this.lang,
+                mainConfig: reduced,
+                subConfigs: this.locals,
+            });
         }
         this.emit("ready");
     }
@@ -358,7 +370,12 @@ export function getNickname(msg:Discord.Message) {
         return msg.author.username;
     }
 }
-export class MainCfg extends Config {
+export interface GlobalCfg {
+    authUsers:string[];
+    prefix:RegExp;
+    simplePrefix:string;
+}
+class MainCfg extends Config implements GlobalCfg {
     public token = "_";
     public authUsers:string[] = [];
     public simplePrefix = "$";

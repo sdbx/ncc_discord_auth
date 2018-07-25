@@ -9,7 +9,7 @@ import Config from "../../config";
 import Log from "../../log";
 import { cafePrefix } from "../../ncc/ncconstant";
 import Plugin from "../plugin";
-import { getNickname, MainCfg } from "../runtime";
+import { getNickname, GlobalCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 import { AuthConfig, getNaver, getRichByProfile } from "./auth";
 
