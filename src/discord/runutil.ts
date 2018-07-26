@@ -18,15 +18,16 @@ export enum ParamAccept {
     CHANNEL,
     ROLE,
 }
-export interface Param<T extends number> {
-    type:ParamType;
-    str:string;
-    require:boolean;
-    subset:Map<string,T>;
+export interface Param {
+    type:ParamType; // type via natural (~~to)
+    code:string; // type via simple (!auth code:Pickaxe)
+    accept:ParamAccept; // accept types
+    desc:string; // Description of command
+    require:boolean; // require?
 }
 export class CommandHelp {
     public cmds:string[]; // allow cmds
-    public params:Array<Param<number>>; // parameter info
+    public params:Param[]; // parameter info
     public description:string; // Description command
     public complex:boolean; // receive only keyword is matching?
     public reqAdmin:boolean; // require admin?
@@ -52,21 +53,20 @@ export class CommandHelp {
             this.reqAdmin = this.dmOnly = false;
         }
     }
-    public addField(type:ParamType, content:string,require:boolean = true, suffix:Array<[string, number]> = null) {
-        const pmap = new Map<string, number>();
-        if (suffix != null) {
-            suffix.forEach(([key, value]) => {
-                pmap.set(key, value);
-            });
+    public addField(type:ParamType, content:string,
+        require:boolean = true, code:string = null, accept:ParamAccept = ParamAccept.ANY) {
+        if (code == null) {
+            code = "";
         }
         this.params.push({
             type,
-            str: content,
+            code,
+            accept,
+            desc: content,
             require,
-            subset: pmap,
-        } as Param<number>);
+        } as Param);
     }
-    public get fields():Array<Param<number>> {
+    public get fields():Param[] {
         return this.params;
     }
     public get title():string {
@@ -75,7 +75,7 @@ export class CommandHelp {
             out.push(this.params.map((value,index) => {
                 const echo:string[] = [];
                 echo.push(value.require ? "<" : "[");
-                echo.push(value.str);
+                echo.push(value.desc);
                 echo.push(`(${value.type.replace(/\//ig,",")})`);
                 echo.push(value.require ? ">" : "]");
                 return echo.join("");
@@ -215,10 +215,16 @@ export class CommandHelp {
             }
             message = message.trim();
             const split = message.split(/\s+/ig);
+            const fields = this.fields;
+            for (const piece of split) {
+                if (piece.match(/\S+:.+/i)) {
+                    const key = piece.substring(0,piece.indexOf(":"));
+                    const value = piece.substr(piece.indexOf(":") + 1);
+                }
+            }
 
             output.match = true;
             output.reqParam = false;
-            const fields = this.fields;
             const requires = fields.filter((_v) => _v.require);
             const opticals = fields.filter((_v) => !_v.require);
             let i = 0;
