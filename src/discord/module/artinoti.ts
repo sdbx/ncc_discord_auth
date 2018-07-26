@@ -3,6 +3,7 @@ import * as request from "request-promise-native";
 import { sprintf } from "sprintf-js";
 import Config from "../../config";
 import Log from "../../log";
+import { cafePrefix } from "../../ncc/ncconstant";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
@@ -84,7 +85,8 @@ export default class ArtiNoti extends Plugin {
                         const user = await this.ncc.getMemberById(cafe.cafeId,article.userId);
                         const rich = new Discord.RichEmbed();
                         rich.setTitle(article.articleTitle);
-                        rich.setAuthor(user.nickname, user.profileurl);
+                        // tslint:disable-next-line
+                        rich.setAuthor(user.nickname, user.profileurl, `${cafePrefix}/CafeMemberNetworkView.nhn?clubid=${cafe.cafeId.toString(10)}&m=view&memberid=${user.userid}`);
                         if (article.imageURL != null) {
                             const image:Buffer = await request.get(article.imageURL, { encoding: null });
                             rich.attachFile(new Discord.Attachment(image, "image.png"));
@@ -98,7 +100,7 @@ export default class ArtiNoti extends Plugin {
                             contents.push("...");
                         }
                         rich.setDescription(contents.join("\n").replace(/\n[\n\s]*/igm, "\n"));
-                        rich.setURL(`https://cafe.naver.com/${cafe.cafeName}/${article.articleId}`);
+                        rich.setURL(`${cafePrefix}/${cafe.cafeName}/${article.articleId}`);
                         try {
                             const authlist = await this.sub(new AuthConfig(), guild.id, false);
                             if (authlist.users != null) {

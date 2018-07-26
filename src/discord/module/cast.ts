@@ -9,7 +9,7 @@ import Config from "../../config";
 import Log from "../../log";
 import { cafePrefix } from "../../ncc/ncconstant";
 import Plugin from "../plugin";
-import { getNickname, MainCfg } from "../runtime";
+import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 import { AuthConfig, getNaver, getRichByProfile } from "./auth";
 
@@ -160,7 +160,7 @@ export default class Cast extends Plugin {
             await channel.send(this.lang.cast.authonly);
             return Promise.resolve();
         }
-        const nick = `${getNickname(msg)}(${n != null ? n : "미인증"})`;
+        const nick = `${DiscordFormat.getNickname(msg)}(${n != null ? n : "미인증"})`;
         if (msg.attachments.size > 0) {
             for (const [key,attach] of msg.attachments) {
                 let url:string = attach.url;

@@ -10,7 +10,7 @@ import Cafe from "../../structure/cafe";
 import Comment from "../../structure/comment";
 import Profile from "../../structure/profile";
 import Plugin from "../plugin";
-import { getNickname, MainCfg } from "../runtime";
+import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Auth extends Plugin {
@@ -170,7 +170,7 @@ export default class Auth extends Plugin {
             /**
              * Send rich
              */
-            const rich = await getRichByProfile(member, getNickname(msg), msg.author.avatarURL);
+            const rich = await getRichByProfile(member, DiscordFormat.getNickname(msg), msg.author.avatarURL);
             const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`;
             await channel.send(roomURL,rich);
         } else if (testInfo.match) {
@@ -416,13 +416,13 @@ export async function getRichByProfile(member:Profile, name?:string, icon?:strin
     if (name != null) {
         rich.setAuthor(name, icon);
     }
-    rich.addField("네이버 ID", member.userid);
-    rich.addField("네이버 닉네임", member.nickname);
+    rich.addField("네이버 ID", member.userid, true);
+    rich.addField("네이버 닉네임", member.nickname, true);
     if (member.level != null) {
-        rich.addField("등급", member.level);
-        rich.addField("총 방문 수", member.numVisits);
-        rich.addField("총 게시글 수", member.numArticles);
-        rich.addField("총 댓글 수", member.numComments);
+        rich.addField("등급", member.level, true);
+        rich.addField("총 방문 수", member.numVisits, true);
+        rich.addField("총 게시글 수", member.numArticles, true);
+        rich.addField("총 댓글 수", member.numComments, true);
     }
     return Promise.resolve(rich);
 }

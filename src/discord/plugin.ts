@@ -10,15 +10,45 @@ import Ncc from "../ncc/ncc";
 import Lang from "./lang";
 import { MainCfg } from "./runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "./runutil";
-
+/**
+ * The base of bot command executor
+ * @class 플러그인
+ */
 export default abstract class Plugin {
+    /**
+     * This module's config at globalID
+     */
     protected config:Config;
+    /**
+     * Discord client
+     */
     protected client:Discord.Client;
+    /**
+     * Ncc client
+     */
     protected ncc:Ncc;
+    /**
+     * Language
+     */
     protected lang:Lang;
+    /**
+     * Main config (readonly)
+     * 
+     * token is hidden.
+     */
     protected global:MainCfg;
+    /**
+     * Chaining timeout. (**ms**)
+     */
     protected timeout = 1 * 60 * 1000; // 1 is minutes
+    /**
+     * Chaining cache
+     */
     private chains:Map<string, ChainData>;
+    /**
+     * Sub configs..
+     * @see runtime.locals
+     */
     private subs:Map<string, Config>;
 
     /**
@@ -31,7 +61,6 @@ export default abstract class Plugin {
         this.client = runtime.client;
         this.ncc = runtime.ncc;
         this.lang = runtime.lang
-        this.subs = runtime.subConfigs;
         this.chains = new Map();
         this.global = runtime.mainConfig;
     }
@@ -53,7 +82,10 @@ export default abstract class Plugin {
      * @param options options
      */
     public abstract async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void>;
-        
+    /**
+     * Give help info to runtime
+     * @returns helps
+     */
     public get help():CommandHelp[] {
         const out:CommandHelp[] = [];
         for (const [key,value] of Object.entries(this)) {
@@ -65,7 +97,9 @@ export default abstract class Plugin {
     }
     /**
      * @todo on message received
-     * DO NOT SEND MESSAGE when BOT has spoken.
+     * 
+     * **DO NOT SEND MESSAGE when BOT has spoken** unless filtering.
+     * 
      * on message received(except command)
      * @param msg 
      */
@@ -221,6 +255,9 @@ export default abstract class Plugin {
             return Promise.resolve(param);
         }
     }
+    /**
+     * On autosaving
+     */
     public async onSave() {
         if (this.config != null) {
             await this.config.export();
@@ -238,6 +275,12 @@ export default abstract class Plugin {
     public chaining(channel:string, user:string) {
         return this.chains.has(`${channel}$${user}`);
     }
+    /**
+     * Calling chain for receive message
+     * @param message received id (uses channelid, userid)
+     * @param channel manual channel id (useless for now)
+     * @param user manual user id (useless for now)
+     */
     public async callChain(message:Discord.Message, channel?:string, user?:string):Promise<boolean> {
         if (channel == null) {
             channel = message.channel.id;
@@ -263,6 +306,14 @@ export default abstract class Plugin {
         }
         return Promise.resolve(false);
     }
+    /**
+     * Finish chain and call onEndChain
+     * @param message Discord message
+     * @param type Type of chain(user define)
+     * @param data Received data
+     * @param channel manual channel id (useless for now)
+     * @param user manual user id (useless for now)
+     */
     public async endChain(message:Discord.Message, type:number, data:ChainData, channel?:string, user?:string) {
         if (channel == null) {
             channel = message.channel.id;
@@ -280,6 +331,9 @@ export default abstract class Plugin {
             time: -1,
         } as ChainData);
     }
+    /**
+     * on Destroy event
+     */
     public async onDestroy() {
         await this.onSave();
         return Promise.resolve();
@@ -347,12 +401,27 @@ export default abstract class Plugin {
         }
         return Promise.resolve(newI);
     }
+    /**
+     * Get key of subconfig
+     * @param name module's global config name
+     * @param subName subname
+     */
     protected subKey(name:string, subName?:string) {
         return `${name}\$${subName == null ? "__default__" : subName}`;
     }
+    /**
+     * Does key have config?
+     * @param subName subname (filename)
+     * @param name directory name
+     */
     protected subHas(subName:string, name = this.config.name):boolean {
         return this.subs.has(this.subKey(name, subName));
     }
+    /**
+     * Delete subconfig (with file)
+     * @param subName subname (filename)
+     * @param name directory name
+     */
     protected async subDel(subName:string, name = this.config.name):Promise<void> {
         const key = this.subKey(name, subName);
         if (this.subs.has(key)) {
@@ -362,12 +431,10 @@ export default abstract class Plugin {
         }
         return Promise.resolve();
     }
-    protected formatUser(user:Discord.User) {
-        return {
-            name:user.username,
-            mention:`<@${user.id}>`
-        }
-    }
+    /**
+     * format value to language string
+     * @param value value
+     */
     protected toLangString(value:string | number | boolean) {
         let data:string;
         const type = typeof value;
@@ -384,6 +451,14 @@ export default abstract class Plugin {
         }
         return data;
     }
+    /**
+     * Filter editable configs
+     * 
+     * Default: all
+     * @param key config key
+     * @param obj to set value
+     * @returns editable?
+     */
     protected isValidConfig(key:string, obj:object):boolean {
         return true;
     }

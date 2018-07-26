@@ -14,33 +14,71 @@ import Gather from "./module/gather";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
-import { CmdParam, CommandHelp, CommandStatus, DiscordFormat, Param, ParamType } from "./runutil";
+import { CmdParam, CommandHelp, DiscordFormat, ParamType } from "./runutil";
 
-const queryCmd = /\s+\S+/ig;
-export const safeCmd = /(".+?")|('.+?')/i;
+/**
+ * List of presets
+ * 설정할 때 간단하게 하기 위한 용도.
+ */
 const presetCfgs:{[key:string]: string[]} = {
     "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL", "cast<%g>.cafeURL"],
     "프록시 채널" : ["auth<%g>.proxyChannel"],
     "인증 그룹" : ["auth<%g>.destRole"],
 }
-
+/**
+ * The home of bot
+ * 
+ * Manage Config, Discord, Ncc and cast to plugins
+ * @class 메인 클라이언트
+ */
 export default class Runtime extends EventEmitter {
+    /**
+     * Global config like token, prefix..
+     * 최상위 설정 파일
+     */
     private global:MainCfg;
+    /**
+     * The list of config with plugins
+     */
     private locals:Map<string, Config>;
+    /**
+     * language file
+     * 언어팩 - 기본: 프레타체
+     */
     private lang:Lang;
+    /**
+     * Discord client
+     */
     private client:Discord.Client;
+    /**
+     * Naver Cafe Chat + Naver Cafe API client
+     */
     private ncc:Ncc;
+    /**
+     * Plugins
+     */
     private plugins:Plugin[];
+    /**
+     * Uses for Autosave
+     * @private
+     */
     private lastSaved:number;
+    /**
+     * @todo Plugin 추가하기
+     * 
+     * In fact, this adds only plugins.
+     */
     constructor() {
         super();
-        // ,new Auth(), new Login()
         this.plugins = [];
-        
         this.plugins.push(
          new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier());
-            
     }
+    /**
+     * **Async**
+     * 
+     * Connect discord&ncc client and **START** Bot.
+     */
     public async start():Promise<string> {
         // load config
         this.global = new MainCfg();
@@ -81,6 +119,11 @@ export default class Runtime extends EventEmitter {
         await this.client.login(this.global.token)
         return Promise.resolve("");
     }
+    /**
+     * **Async**
+     * 
+     * Destroy client and plugins
+     */
     public async destroy() {
         this.client.removeAllListeners();
         try {
@@ -97,6 +140,10 @@ export default class Runtime extends EventEmitter {
         // this.emit("save");
         return Promise.resolve();
     }
+    /**
+     * Discord's onReady event receiver
+     * @event Discord.Client#ready
+     */
     protected async ready() {
         // init plugins
         const receiver = {
@@ -124,6 +171,11 @@ export default class Runtime extends EventEmitter {
         }
         this.emit("ready");
     }
+    /**
+     * Discord's onMessage event receiver
+     * @param msg Discord's message
+     * @event Discord.Client#message
+     */
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;
         const prefix = this.global.prefix;
@@ -175,7 +227,12 @@ export default class Runtime extends EventEmitter {
             Log.e(err);
         }
     }
-
+    /**
+     * Handle command(hard-coding) on top-level
+     * @param msg Discord message
+     * @param cmd Command string
+     * @param status The status of message (dm, isadmin)
+     */
     private async hardCodingCmd(msg:Discord.Message, cmd:string, status:CmdParam):Promise<boolean> {
         let result = false;
         const helpCmd = new CommandHelp("도움,도와,도움말",this.lang.helpDesc,true);
@@ -232,7 +289,7 @@ export default class Runtime extends EventEmitter {
                     for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
                         const richMsg = new Discord.RichEmbed();
                         richMsg.setTitle(this.lang.helpTitle);
-                        richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
+                        richMsg.setAuthor(DiscordFormat.getNickname(msg), msg.author.avatarURL);
                         for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
                             const help = helps[i * 20 + k];
                             richMsg.addField(status.isSimple ? help.stdTitle : help.title, help.description);
@@ -342,6 +399,12 @@ export default class Runtime extends EventEmitter {
         }
         return Promise.resolve(result);
     }
+    /**
+     * Set config of plugin via command
+     * @param key <Plugin's name>.<config depth>
+     * @param value to setting value (don't matter when watching)
+     * @param see Watching?
+     */
     private async setConfig(key:string, value:string, see = false):Promise<Discord.RichEmbed> {
         let say:object;
         for (const plugin of this.plugins) {
@@ -371,18 +434,11 @@ export default class Runtime extends EventEmitter {
         }
         return Promise.resolve(null);
     }
-    private filterEmpty(value:string):boolean {
-        return value.length >= 1;
-    }
 }
-export function getNickname(msg:Discord.Message) {
-    if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
-        const guildnick = msg.guild.member(msg.author).nickname;
-        return guildnick != null ? guildnick : msg.author.username;
-    } else {
-        return msg.author.username;
-    }
-}
+/**
+ * Main config with token, prefix, admins.
+ * @class Main config
+ */
 export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];

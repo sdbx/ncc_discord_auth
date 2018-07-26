@@ -7,11 +7,26 @@ import * as path from "path";
 import * as Util from "util";
 
 /* tslint:disable:no-namespace */
+/**
+ * Log module like Android Logcat
+ */
 namespace Log {
     const colorLevel = chalk.supportsColor.level;
+    /**
+     * The maximum size of prefix
+     */
     const prefixLimit = 16;
+    /**
+     * The maximum size of Number field
+     */
     const numberLimit = 3;
+    /**
+     * Total of whitespace, check code for detail..
+     */
     const totalBlank = 5; // some whitespace
+    /**
+     * Repeat prefix each {guidePtrn} time
+     */
     const guidePtrn = 10; // show gray text size
     let contentLimit = -1;
     let lastTiming = Date.now();
@@ -24,32 +39,31 @@ namespace Log {
     */
     /**
      * Warning
-     * @param arg1 Title or Content 
-     * @param arg2 Content if exists
+     * @param title Title or Content 
+     * @param content Content if exists
      */
-    export function w(arg1:string,arg2:string = null) {
-        custom("#fffacd","#ffaf5f",chalk.bgYellow.yellow,"WRN",{arg1,arg2});
+    export function w(title:string,content:string = null) {
+        custom("#fffacd","#ffaf5f",chalk.bgYellow.yellow,"WRN",{title,content});
     }
     /**
      * Infomation
-     * @param arg1 Title or Content
-     * @param arg2 Content if exists
+     * @param title Title or Content
+     * @param content Content if exists
      */
-    export function i(arg1:string, arg2:string = null) {
-        custom("#aee4f2", "#afd7ff", chalk.bgBlue.blue, "INF", { arg1, arg2 });
+    export function i(title:string, content:string = null) {
+        custom("#aee4f2", "#afd7ff", chalk.bgBlue.blue, "INF", { title, content });
     }
     /**
      * Debug
-     * @param arg1 Title or Content
-     * @param arg2 Content if exists
+     * @param title Title or Content
+     * @param content Content if exists
      */
-    export function d(arg1:string, arg2:string = null) {
-        custom("#caf9c0", "#afff87", chalk.bgGreen.green, "DBG", { arg1, arg2 });
+    export function d(title:string, content:string = null) {
+        custom("#caf9c0", "#afff87", chalk.bgGreen.green, "DBG", { title, content });
     }
     /**
      * Error
-     * @param arg1 Title or Content
-     * @param arg2 Content if exists
+     * @param error Error object or string or any..
      */
     export function e(error:Error | string | object | any) {
         let show:string;
@@ -74,18 +88,19 @@ namespace Log {
                 show = "";
             }
         }
-        custom("#ff715b", "#ff5f5f", chalk.bgRed.red, "ERR", {arg1:title, arg2:show});
+        custom("#ff715b", "#ff5f5f", chalk.bgRed.red, "ERR", {title, content:show});
     }
     /**
      * Verbose
-     * @param arg1 Title or Content
-     * @param arg2 Content if exists
+     * @param title Title or Content
+     * @param content Content if exists
      */
-    export function v(arg1:string, arg2:string = null) {
-        custom("#ffc6fd", "#ffd7ff", chalk.bgCyan.cyan, "LOG", { arg1, arg2 });
+    export function v(title:string, content:string = null) {
+        custom("#ffc6fd", "#ffd7ff", chalk.bgCyan.cyan, "LOG", { title, content });
     }
     /**
-     * Time
+     * Record or log time (benchmarking)
+     * @param name Title of log
      */
     export function time(name?:string) {
         if (name == null) {
@@ -103,7 +118,7 @@ namespace Log {
      * @param obj JSON.stringify object
      */
     export function json(title:string, obj:object) {
-        custom("#d2b7ff", "#af5fff", chalk.bgCyan.cyan, "OBJ", {arg1:title, arg2:JSON.stringify(obj,null,2)});
+        custom("#d2b7ff", "#af5fff", chalk.bgCyan.cyan, "OBJ", {title, content:JSON.stringify(obj,null,2)});
     }
     /**
      * Custom style trace
@@ -114,7 +129,7 @@ namespace Log {
      * @param msg Message (Title, Description)
      */
     export function custom(themeH:string, theme256H:string, theme8C:Chalk, 
-        tag:string, msg:{arg1:string, arg2?:string}) {
+        tag:string, msg:{title:string, content?:string}) {
         const design = style(themeH,theme256H,theme8C);
         raw(design.header, design.num, design.content, design.hlight, tag, msg);
     }
@@ -123,6 +138,7 @@ namespace Log {
      * @param themeH A hex of 0xFFFFFF colors
      * @param theme256H A hex of 256 colors
      * @param theme8C Chalk object of 8 colors
+     * @param inverse Reverse Primary and Secondary color?
      */
     function style(themeH:string, theme256H:string, theme8C:Chalk, inverse = false) {
         let header:Chalk;
@@ -171,9 +187,9 @@ namespace Log {
      * @param content Contents (Title, Desc)
      */
     export function raw(headerColor:Chalk, numberColor:Chalk, contentColor:Chalk,
-        headerSemiColor:Chalk, defaultH:string, content:{arg1:string, arg2?:string}) {
-        const prefix = content.arg2 == null ? caller() : content.arg1;
-        let message = content.arg2 == null ? content.arg1 : content.arg2;
+        headerSemiColor:Chalk, defaultH:string, content:{title:string, content?:string}) {
+        const prefix = content.content == null ? caller() : content.title;
+        let message = content.content == null ? content.title : content.content;
         // set content width
         contentLimit = Math.max(5, process.stdout.columns - prefixLimit - numberLimit - totalBlank);
         if (message == null) {
@@ -218,6 +234,9 @@ namespace Log {
             _log(numberColor, "",numberColor, "END",numberColor, "");
         }
     }
+    /**
+     * Hook console.log and console.error
+     */
     export function hook() {
         const _hook = Hook(console, true);
         _hook.attach("log", (method, args) => {
@@ -236,9 +255,20 @@ namespace Log {
         ansi("?25l");
         // ui = new Inquirer.ui.BottomBar();
     }
+    /**
+     * Read result.. or pink~
+     * @param title Title or Content
+     * @param content Content if exists
+     */
     export function r(title:string, content:string) {
-        custom("#ffcce3", "#ffcce3", chalk.bgBlack.white, "IME", {arg1:title, arg2:content});
+        custom("#ffcce3", "#ffcce3", chalk.bgBlack.white, "IME", {title, content});
     }
+    /**
+     * **async** Read string from stdin
+     * @param title Title of input field
+     * @param option Hide password / Log result auto.
+     * @returns Readed string
+     */
     export async function read(title:string, option = {hide:false, logResult:true},
             content?:string, need = true):Promise<string> {
 
@@ -273,19 +303,6 @@ namespace Log {
         ansi("254D", `${format.cursor}C`);
 
         if (need) {
-            /*
-            Method 1: Design ugly, but stable!
-            const mutable = new Mutable(); 
-            mutable.muted = false;
-            const mutableStream = new Writable(mutable);
-            const rl = readline.createInterface({
-                input: process.stdin,
-                output: mutableStream,
-                terminal: true
-            });
-            rl.on("line",(input) => console.log(input));
-           */
-            // Method 2: Design directly
             const stdin = process.stdin;
             stdin.setRawMode(true);
             stdin.resume();
@@ -299,9 +316,18 @@ namespace Log {
             return Promise.resolve("ok");
         }
     }
-    export function removeReset(_ansi:string) {
-        return _ansi.replace(/(.\[39m.\[49m|.\[0m])$/i, "");
-    }
+    /**
+     * Log with cursor
+     * @private
+     * @param headerColor Header part color
+     * @param headerMsg Header part string
+     * @param numberColor Number part color
+     * @param numberMsg Number part string
+     * @param contentColor Content part color
+     * @param contentMsg Content part string
+     * @param cursorColor Cursor color
+     * @returns ANSI formatted string with Cursor position
+     */
     function formatCursor(headerColor:Chalk, headerMsg:string,
             numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string,
             cursorColor?:Chalk) {
@@ -331,6 +357,17 @@ namespace Log {
             echo: format.join(""),
         };
     }
+    /**
+     * Get formatted string.
+     * @private
+     * @param headerColor Header part color
+     * @param headerMsg Header part string
+     * @param numberColor Number part color
+     * @param numberMsg Number part string
+     * @param contentColor Content part color
+     * @param contentMsg Content part string
+     * @returns ANSI formatted string
+     */
     function formatLog(headerColor:Chalk, headerMsg:string,
             numberColor:Chalk,numberMsg:string, contentColor:Chalk, contentMsg:string) {
 
@@ -350,6 +387,15 @@ namespace Log {
         }
         return format.join("");
     }
+    /**
+     * Log to stdout
+     * @param headerColor Header part color
+     * @param headerMsg Header part string
+     * @param numberColor Number part color
+     * @param numberMsg Number part string
+     * @param contentColor Content part color
+     * @param contentMsg Content part string
+     */
     function _log(headerColor:Chalk, headerMsg:string,
         numberColor:Chalk, numberMsg:string, contentColor:Chalk, contentMsg:string) {
         const format = formatLog(headerColor,headerMsg,numberColor,numberMsg,contentColor,contentMsg);
@@ -359,9 +405,16 @@ namespace Log {
             process.stdout.write(format + "\n");
         }
     }
+    /**
+     * Write raw ANSI code
+     * @param code ansi code
+     */
     function ansi(...code:string[]) {
         process.stdout.write(code.map((_v) => "\x1B[" + _v).join(""));
     }
+    /**
+     * Get caller
+     */
     function caller() {
         let dp = 1;
         let deeper;
@@ -376,8 +429,10 @@ namespace Log {
         return out;
     }
     /**
-     * @return shell length
+     * return length in console
+     * @private
      * @param str string
+     * @return shell length
      */
     function length(str:string) {
         if (str == null) {
@@ -390,9 +445,20 @@ namespace Log {
         const unicodes =  unicodeLength(str);
         return asciis + 2 * unicodes;
     }
+    /**
+     * Get unicode size of str
+     * @private
+     * @param str string
+     */
     function unicodeLength(str:string) {
         return str.replace(/[ -~]/ig, "").length;
     }
+    /**
+     * Substring with unicode size for console.
+     * @private
+     * @param str string
+     * @param end the end of cut
+     */
     function cutstr(str:string, end:number) {
         let ln = 0;
         let k = 0;
@@ -413,16 +479,10 @@ namespace Log {
 
 export default Log;
 
-class Mutable {
-    public muted = false;
-    public write = (chunk, encoding, callback) => {
-        if (!this.muted) {
-            process.stdout.write(chunk, encoding);
-        }
-        callback();
-    } 
-}
-
+/**
+ * Input keyboard event and show input with cursor
+ * @private
+ */
 class IME {
     public mute:boolean = false;
     private readonly timeout = 30;
@@ -477,7 +537,7 @@ class IME {
                 // Esc
                 this.finish(false, "Cancel.");
                 return;
-            } break;
+            }
             case 0x7F: {
                 // Backspace
                 if (this.data.length >= 1) {
@@ -494,7 +554,7 @@ class IME {
                 // Return or enter
                 this.finish(true, this.data.join(""));
                 return;
-            } break;
+            }
             default: {
                 if (keycode !== -1) {
                     this.data.push(str);

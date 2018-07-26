@@ -1,7 +1,8 @@
 import * as Discord from "discord.js";
 import Log from "../log";
-import { MainCfg, safeCmd } from "./runtime";
+import { MainCfg } from "./runtime";
 
+const safeCmd = /(".+?")|('.+?')/i;
 export enum ParamType {
     thing = "이/가",
     dest = "을/를/좀",
@@ -10,14 +11,22 @@ export enum ParamType {
     from = "에서",
     do = "해줘/해/줘",
 }
-export interface Param {
+export enum ParamAccept {
+    ANY,
+    NUMBER,
+    USER,
+    CHANNEL,
+    ROLE,
+}
+export interface Param<T extends number> {
     type:ParamType;
     str:string;
     require:boolean;
+    subset:Map<string,T>;
 }
 export class CommandHelp {
     public cmds:string[]; // allow cmds
-    public params:Param[]; // parameter info
+    public params:Array<Param<number>>; // parameter info
     public description:string; // Description command
     public complex:boolean; // receive only keyword is matching?
     public reqAdmin:boolean; // require admin?
@@ -43,31 +52,37 @@ export class CommandHelp {
             this.reqAdmin = this.dmOnly = false;
         }
     }
-    public addField(type:ParamType, content:string,require:boolean = true) {
+    public addField(type:ParamType, content:string,require:boolean = true, suffix:Array<[string, number]> = null) {
+        const pmap = new Map<string, number>();
+        if (suffix != null) {
+            suffix.forEach(([key, value]) => {
+                pmap.set(key, value);
+            });
+        }
         this.params.push({
             type,
             str: content,
             require,
-        });
+            subset: pmap,
+        } as Param<number>);
     }
-    public get fields():Param[] {
+    public get fields():Array<Param<number>> {
         return this.params;
     }
     public get title():string {
-        let out:string = "";
+        const out:string[] = [];
         if (this.params.length >= 1) {
-            out = this.params.map((value,index) => {
+            out.push(this.params.map((value,index) => {
                 const echo:string[] = [];
                 echo.push(value.require ? "<" : "[");
                 echo.push(value.str);
-                echo.push(` (${value.type.replace(/\//ig,",")})`);
+                echo.push(`(${value.type.replace(/\//ig,",")})`);
                 echo.push(value.require ? ">" : "]");
                 return echo.join("");
-            }).join(" ");
-            out += " ";
+            }).join(" "));
         }
-        out += this.cmds.join("|");
-        return out;
+        out.push(this.cmds.join("|"));
+        return out.join(" ");
     }
     public get stdTitle():string {
         let out:string = "";
@@ -282,6 +297,12 @@ export class CommandHelp {
     }
 }
 export class DiscordFormat {
+    public static formatUser(user:Discord.User) {
+        return {
+            name:user.username,
+            mention:`<@${user.id}>`
+        }
+    }
     public static mentionUser(userid:string) {
         return `<@${userid}>`;
     }
@@ -290,6 +311,14 @@ export class DiscordFormat {
     }
     public static emoji(emojiName:string, emojiId:string, animated = false) {
         return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`;
+    }
+    public static getNickname(msg:Discord.Message) {
+        if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
+            const guildnick = msg.guild.member(msg.author).nickname;
+            return guildnick != null ? guildnick : msg.author.username;
+        } else {
+            return msg.author.username;
+        }
     }
 
     private _italic = false;

@@ -9,13 +9,13 @@ export default class Lang extends Config {
     public nameNumber = "숫자";
     public nameBoolean = "논리";
     public valNull = "null";
-    /**
+    /*
      * Module: ping
      */
     public ping = {
         helpPing: "핑 날리는 거다냥!",
     }
-    /**
+    /*
      * Module: auth
      */
     public login = {
@@ -31,7 +31,7 @@ export default class Lang extends Config {
         failAdmin_invalidToken: "토큰이 안맞다냥..",
         failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!",
     };
-    /**
+    /*
      * module: events
      */
     public events = {
@@ -43,7 +43,7 @@ export default class Lang extends Config {
         exitUser: "%(name)s님이 나갔다냐. ~~나가는 김에 죽어버령~~",
         changeNick: "닉네임이 바뀌었다냐.",
     }
-    /**
+    /*
      * Module: gather
      */
     public gather = {
@@ -53,7 +53,7 @@ export default class Lang extends Config {
         addGather: "이 채널이 중계에 추가됐다냐.",
         removeGather: "이 채널이 중계에서 삭제됐다냐.",
     }
-    /**
+    /*
      * Module: auth
      */
     public auth = {
@@ -71,13 +71,13 @@ export default class Lang extends Config {
         already_auth: "이미 인증 완료된 아이디다냐!",
         expiredAuth: "이미 유효 기간이 지났다냐.",
     }
-    /**
+    /*
      * Module: artinoti
      */
     public noti = {
         toggleDesc: "이 채널에서 알림 수신을 끄거나 킨다냥",
     }
-    /**
+    /*
      * Module: cast
      */
     public cast = {
@@ -94,7 +94,7 @@ export default class Lang extends Config {
         authonly: "인증된 유저 전용이다냐",
         needNaver: "네이버 카페 이름이 필요하다냐",
     }
-    /**
+    /*
      * Module: sample
      */
     public sample = {
@@ -123,13 +123,13 @@ export default class Lang extends Config {
     }
     public getType(obj:any) {
         switch (typeof obj) {
-            case "boolean": return this.nameBoolean; break;
-            case "function": return "Function"; break;
-            case "number": return this.nameNumber; break;
-            case "object": return "Object"; break;
-            case "string": return this.nameString; break;
-            case "symbol": return "Symbol"; break;
-            case "undefined" : return "Undefined"; break;
+            case "boolean": return this.nameBoolean;
+            case "function": return "Function";
+            case "number": return this.nameNumber;
+            case "object": return "Object";
+            case "string": return this.nameString;
+            case "symbol": return "Symbol";
+            case "undefined" : return "Undefined";
         }
         throw new Error(".");
     }
