@@ -93,7 +93,7 @@ export default class Config {
             try {
                 data = JSON.parse(text);
             } catch (err) {
-                Log.w("Config","JSON parse error.")
+                Log.w("Config","JSON parse error at " + this.saveTo);
                 data = {};
             }
             file_version = data.version;

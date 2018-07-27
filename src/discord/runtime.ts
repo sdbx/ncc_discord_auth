@@ -292,7 +292,7 @@ export default class Runtime extends EventEmitter {
                         richMsg.setAuthor(DiscordFormat.getNickname(msg), msg.author.avatarURL);
                         for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
                             const help = helps[i * 20 + k];
-                            richMsg.addField(status.isSimple ? help.stdTitle : help.title, help.description);
+                            richMsg.addField(status.isSimple ? help.simpleTitle : help.title, help.description);
                         }
                         await msg.channel.send(richMsg);
                     }

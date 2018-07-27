@@ -63,6 +63,7 @@ export default abstract class Plugin {
         this.lang = runtime.lang
         this.chains = new Map();
         this.global = runtime.mainConfig;
+        this.subs = runtime.subConfigs;
     }
     /**
      * on discord ready
