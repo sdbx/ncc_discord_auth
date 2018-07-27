@@ -16,14 +16,37 @@ export enum ParamAccept {
     NUMBER,
     USER,
     CHANNEL,
-    ROLE,
+}
+class AcceptRegex {
+    public static check(type:ParamAccept, str:string):string | null {
+        let tag;
+        switch (type) {
+            case ParamAccept.NUMBER : tag = "NUMBER"; break;
+            case ParamAccept.USER : tag = "USER"; break;
+            case ParamAccept.CHANNEL : tag = "CHANNEL"; break;
+            default: tag = "ANY";
+        }
+        if (AcceptRegex[tag].test(str)) {
+            if (tag !== "ANY") {
+                return str.match(/[0-9]+/i)[0];
+            } else {
+                return str;
+            }
+        }
+        return null;
+    }
+    private static readonly ANY = /.*/ig;
+    private static readonly NUMBER = /[0-9]+/i;
+    private static readonly USER = /<@[0-9]+>/i;
+    private static readonly CHANNEL = /<#[0-9]+>/i;
 }
 export interface Param {
     type:ParamType; // type via natural (~~to)
-    code:string; // type via simple (!auth code:Pickaxe)
-    accept:ParamAccept; // accept types
+    code?:string[]; // type via simple (!auth code:Pickaxe) - maybe null
+    accept?:ParamAccept; // accept types
     desc:string; // Description of command
     require:boolean; // require?
+    example?:Map<ParamType, string>; // example parameter
 }
 export class CommandHelp {
     public cmds:string[]; // allow cmds
@@ -54,59 +77,24 @@ export class CommandHelp {
         }
     }
     public addField(type:ParamType, content:string,
-        require:boolean = true, code:string = null, accept:ParamAccept = ParamAccept.ANY) {
-        if (code == null) {
-            code = "";
-        }
+        require:boolean, options:{code?:string[], accept?:ParamAccept, example?:Map<ParamType, string>} = {}) {
         this.params.push({
             type,
-            code,
-            accept,
+            code: this.safeGet(options.code, []),
+            accept: this.safeGet(options.accept, ParamAccept.ANY),
             desc: content,
             require,
+            example: this.safeGet(options.example, new Map<ParamType, string>()),
         } as Param);
     }
     public get fields():Param[] {
         return this.params;
     }
     public get title():string {
-        const out:string[] = [];
-        if (this.params.length >= 1) {
-            out.push(this.params.map((value,index) => {
-                const echo:string[] = [];
-                echo.push(value.require ? "<" : "[");
-                echo.push(value.desc);
-                echo.push(`(${value.type.replace(/\//ig,",")})`);
-                echo.push(value.require ? ">" : "]");
-                return echo.join("");
-            }).join(" "));
-        }
-        out.push(this.cmds.join("|"));
-        return out.join(" ");
+        return this.getTitle(false);
     }
-    public get stdTitle():string {
-        let out:string = "";
-        out += this.cmds.join("|");
-        const designer = (value, index) => {
-            const echo:string[] = [];
-            echo.push(value.require ? "<" : "[");
-            echo.push(value.str);
-            echo.push(value.require ? ">" : "]");
-            return echo.join("");
-        };
-        if (this.params.length >= 1) {
-            const req = this.params.filter((_v) => _v.require);
-            if (req.length >= 1) {
-                out += " ";
-                out += req.map(designer).join(" ");
-            }
-            const opt = this.params.filter((_v) => !_v.require);
-            if (opt.length >= 1) {
-                out += " ";
-                out += this.params.filter((_v) => !_v.require).map(designer).join(" ");
-            }
-        }
-        return out;
+    public get simpleTitle():string {
+        return this.getTitle(true);
     }
     public check(global:MainCfg,content:string,state?:CmdParam):CommandStatus {
         const output = {
@@ -114,7 +102,8 @@ export class CommandHelp {
             reqParam: false,
             requires: new Map<ParamType, string>(),
             opticals: new Map<ParamType, string>(),
-            command: ""
+            command: "",
+            code: null,
         };
         const encoded = this.encode(content);
         let message = encoded.encoded;
@@ -123,6 +112,29 @@ export class CommandHelp {
                 output.opticals, output.command);
         }
         if (global.prefix.test(content)) {
+            // decode Function
+            const decodeFn = (field:Param, decoded:string) => {
+                // 1. check code
+                let _break1 = false;
+                field.code.forEach((_code) => {
+                    if (_break1) {
+                        return;
+                    }
+                   _code.split(",").map((_v) => _v.trim()).forEach((subcode) => {
+                       if (!_break1 && decoded.endsWith(subcode)) {
+                           // code found
+                           decoded = decoded.substring(0, decoded.length - subcode.length).trimRight();
+                           output.code = _code;
+                           _break1 = true;
+                       }
+                   });
+                });
+                if (field.code.length >= 2 && output.code == null) {
+                    // need suffix.
+                    return null;
+                }
+                return decoded;
+            };
             // standalone mode
             const queryDo = this.endsWith(content, ParamType.do.split("/"));
             if (queryDo != null) {
@@ -140,18 +152,18 @@ export class CommandHelp {
             message = message.replace(global.prefix, "").trimLeft();
             // parse param
             const fields = this.fields;
-            const pmSuffix:string[] = [];
+            const subFields:string[] = [];
             // add suffix search
-            fields.map((_v) => _v.type).forEach((_v) => {
-                _v.split("/").forEach((_v2) => {
-                    if (pmSuffix.indexOf(_v2) < 0) {
-                        pmSuffix.push(_v2);
+            fields.forEach((field) => {
+                field.type.split("/").forEach((subcmd) => {
+                    if (subFields.filter((v) => v === subcmd).length < 0) {
+                        subFields.push(subcmd);
                     }
                 });
             });
             // check need param parser
-            if (pmSuffix.length >= 1) {
-                const wordsRegex = new RegExp(`.+?(${pmSuffix.join("|")})`, "ig");
+            if (subFields.length >= 1) {
+                const wordsRegex = new RegExp(`.+?(${subFields.join("|")})`, "ig");
                 if (wordsRegex.test(message)) {
                     // ~~를, ~~에게, ~~를, ...
                     const params = message.match(wordsRegex).map((_v, _i) => {
@@ -168,10 +180,18 @@ export class CommandHelp {
                     for (const param of params) {
                         const duplicates = params.filter((_v) => _v.type === param.type);
                         if (duplicates[duplicates.length - 1].index === param.index) {
-                            // flush!
-                            const field = fields.filter((_v) => _v.type === param.type);
-                            (field[0].require ? output.requires : output.opticals)
-                                .set(param.type, this.decode(buffer + param.data, encoded.key));
+                            const _field = fields.filter((_v) => _v.type === param.type);
+                            if (_field.length < 0) {
+                                continue;
+                            }
+                            const field = _field[0];
+                            let decoded = decodeFn(_field[0], this.decode(buffer + param.data, encoded.key));
+                            decoded = AcceptRegex.check(field.accept, decoded);
+                            if (decoded != null) {
+                                // flush!
+                                (field[0].require ? output.requires : output.opticals)
+                                .set(param.type, decoded);
+                            }
                             buffer = "";
                         } else {
                             buffer += (param.data + param.suffix);
@@ -185,7 +205,11 @@ export class CommandHelp {
             for (const field of fields) {
                 if (field.require && !output.requires.has(field.type)) {
                     if (this.complex && message.length >= 1) {
-                        output.requires.set(field.type, this.decode(message, encoded.key));
+                        const decoded = decodeFn(field, this.decode(message, encoded.key));
+                        if (decoded != null) {
+                            // flush!
+                            output.requires.set(field.type, decoded);
+                        }
                         message = "";
                         continue;
                     }
@@ -257,6 +281,44 @@ export class CommandHelp {
         }
         return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command);
     }
+    protected getTitle(simple:boolean) {
+        let out:string = "";
+        if (this.params.length >= 1) {
+            out += this.params.map((value) => {
+                return this.getFieldHelp(value, simple);
+            }).join(" ");
+        }
+        out += `{${this.cmds.join("|")}}`;
+        return out;
+    }
+    protected getFieldHelp(value:Param, korMode:boolean) {
+        const guideCode = value.code.length >= 2;
+        const cmds = value.code.map(
+            (_v) => this.getPreferText(_v.split(",").map((__v) => __v.trim()), true))
+        const splitter = this.safeGet(value.desc, "").length <= 0 ? "" : ":";
+        let echo = "";
+        echo += value.require ? "<" : "[";
+        if (!korMode) {
+            if (guideCode) {
+                echo += `{${cmds.join("|")}}${splitter}`;
+            } else if (cmds.length === 1) {
+                echo += `${cmds[0]}${splitter}`; 
+            }
+        }
+        if (value.desc.length >= 1) {
+            echo += guideCode ? `[${value.desc}]` : value.desc;
+        }
+        if (korMode) {
+            if (guideCode && value.code) {
+                echo += ` {${cmds.join("|")}}`;
+            }
+        }
+        echo += value.require ? ">" : "]";
+        if (korMode) {
+            echo += `{${value.type.replace(/\//ig,",")}}`;
+        }
+        return echo;
+    }
     private encode(source:string) {
         let chain = source;
         const safeList:string[] = [];
@@ -277,6 +339,9 @@ export class CommandHelp {
         });
         return chain;
     }
+    private safeGet<T>(obj:T | undefined, defaultV:T | null):T | null {
+        return obj === undefined ? defaultV : obj;
+    }
     private getParamType(suffix:string) {
         for (const [key, value] of Object.entries(ParamType)) {
             for (const v of value.split("/")) {
@@ -289,6 +354,26 @@ export class CommandHelp {
             }
         }
         return null;
+    }
+    private getPreferText(arr:string[], ascii = true) {
+        if (arr.length === 1) {
+            return arr[0]
+        } else if (arr.length >= 2) {
+            const alphabetCmd = /[A-Za-z0-9_]/ig;
+            const delta = (str:string) => {
+                if (str.length <= 0) {
+                    return -1;
+                }
+                return Math.round((this.safeGet(str.match(alphabetCmd), []).length / str.length) * 1000);
+            }
+            arr.sort((a,b) => {
+                return delta(a) - delta(b);
+            });
+            return arr[ascii ? 0 : arr.length - 1];
+        } else {
+            // wtf
+            return null;
+        }
     }
     private endsWith(source:string, ends:string[], ws = false) {
         for (const _end of ends) {
