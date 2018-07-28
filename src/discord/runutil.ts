@@ -65,8 +65,8 @@ export class CommandHelp {
         this.params = [];
         this.complex = complex;
         if (options != undefined && options != null) {
-            this.reqAdmin = this.safeGet(options.reqAdmin, true);
-            this.dmOnly = this.safeGet(options.dmOnly, true);
+            this.reqAdmin = this.safeGet(options.reqAdmin, false);
+            this.dmOnly = this.safeGet(options.dmOnly, false);
             // this.singleWord = options.singleWord && true;
             if (this.reqAdmin) {
                 this._description += " (관리자)";
@@ -220,6 +220,7 @@ export class CommandHelp {
                 if (field.require && !output.requires.has(field.type)) {
                     if (this.complex && message.length >= 1) {
                         let decoded = decodeFn(field, this.decode(message, encoded.key), false);
+                        Log.d("decoded",decoded);
                         decoded = AcceptRegex.check(field.accept, decoded);
                         if (decoded != null) {
                             // flush!
