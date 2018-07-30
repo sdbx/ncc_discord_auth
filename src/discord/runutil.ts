@@ -114,31 +114,6 @@ export class CommandHelp {
             return new CommandStatus(output.match, output.reqParam, output.requires,
                 output.opticals, output.command);
         }
-        // decode Function
-        const decodeFn = (field:Param, decoded:string) => {
-            // 1. check code
-            let _break1 = false;
-            let tag = null;
-            const codeAdd = [];
-            field.code
-            codeAdd.push(...);
-            codeAdd.push(...field.type);
-            codeAdd.map((_v) => _v.trim()).forEach((subcode) => {
-                if (!_break1) {
-                    // code found
-                    if (decoded.startsWith(subcode + ":")) {
-                        tag = subcode;
-                        decoded = decoded.substring(subcode.length + 1);
-                        _break1 = true;
-                    }
-                }
-            });
-            if (field.code.length >= 2 && field.code.filter((v) => v === )) {
-                // need suffix.
-                return null;
-            }
-            return decoded;
-        };
         Log.d("Command", this.cmds.join(","));
         if (global.prefix.test(content)) {
             const blocks = this.splitByFields(content, global.prefix, this.fields);
@@ -192,62 +167,53 @@ export class CommandHelp {
             }
             message = message.trim();
             const split = message.split(/\s+/ig);
-            const fields = this.fields;
-            const applies:number[] = [];
-            for (const [index, piece] of split.entries()) {
-                if (piece.match(/\S+:.+/i)) {
-                    for (const field of fields) {
-                        let decoded = decodeFn(field, this.decode(piece, encoded.key), true);
-                        decoded = AcceptRegex.check(field.accept, decoded);
-                        if (decoded != null) {
-                            (field.require ? output.requires : output.opticals).set(field.type, decoded);
-                            applies.push(index);
-                            break;
-                        }
-                    }
-                }
-            }
+
             output.match = true;
             output.reqParam = false;
+            const fields = this.fields;
             const requires = fields.filter((_v) => _v.require);
             const opticals = fields.filter((_v) => !_v.require);
             let i = 0;
-            if (applies.length === 0 && requires.length + opticals.length === 1) {
+            if (requires.length + opticals.length === 1) {
                 split[0] = message;
             }
+            const parse = (field:Param, str:string) => {
+                let con = this.decode(str, encoded.key);
+                let rCode = null;
+                for (const _code of field.code) {
+                    for (const __code of _code.split("/")) {
+                        if (con.startsWith(__code + ":")) {
+                            con = con.substr(con.indexOf(":") + 1);
+                            rCode = _code;
+                        }
+                    }
+                }
+                return {
+                    content: con,
+                    type: field.type,
+                    subType: rCode,
+                    ends: "",
+                } as FieldBlock;
+            }
             for (const require of requires) {
-                if (output.requires.has(require.type)) {
-                    continue;
-                }
-                if (applies.indexOf(i) >= 0) {
-                    i += 1;
-                    continue;
-                }
                 if (split.length <= i) {
                     output.reqParam = true;
                     break;
                 }
-                if (output) {
-                output.requires.set(require.type, this.decode(split[i], encoded.key));
+                const block = parse(require, split[i]);
+                if (require.code.length <= 1 || block.subType != null) {
+                    output.requires.set(require.type, block);   
                 }
                 i += 1;
             }
             for (const optical of opticals) {
-                if (output.opticals.has(optical.type)) {
-                    continue;
-                }
-                if (applies.indexOf(i) >= 0) {
-                    i += 1;
-                    continue;
-                }
                 if (split.length <= i) {
                     break;
                 }
-                output.opticals.set(optical.type, {
-                    content: this.decode(split[i], encoded.key),
-                    ends: "",
-                    type: optical.type,
-                });
+                const block = parse(optical, split[i]);
+                if (optical.code.length <= 1 || block.subType != null) {
+                    output.opticals.set(optical.type, block);   
+                }
                 i += 1;
             }
             let exist = true;
