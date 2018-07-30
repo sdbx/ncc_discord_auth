@@ -104,10 +104,9 @@ export class CommandHelp {
         const output = {
             match: false,
             reqParam: false,
-            requires: new Map<ParamType, string>(),
-            opticals: new Map<ParamType, string>(),
+            requires: new Map<ParamType, FieldBlock>(),
+            opticals: new Map<ParamType, FieldBlock>(),
             command: "",
-            code: null,
         };
         const encoded = this.encode(content);
         let message = encoded.encoded;
@@ -116,126 +115,64 @@ export class CommandHelp {
                 output.opticals, output.command);
         }
         // decode Function
-        const decodeFn = (field:Param, decoded:string, atStart:boolean) => {
+        const decodeFn = (field:Param, decoded:string) => {
             // 1. check code
             let _break1 = false;
-            field.code.forEach((_code) => {
-                if (_break1) {
-                    return;
-                }
-                let codeAdd = _code;
-                if (atStart) {
-                    codeAdd = `${codeAdd},${field.type.replace(/\//ig, ",")}`;
-                }
-                codeAdd.split(",").map((_v) => _v.trim()).forEach((subcode) => {
-                    if (!_break1) {
-                        // code found
-                        if (!atStart && decoded.endsWith(subcode)) {
-                            decoded = decoded.substring(0, decoded.length - subcode.length).trimRight();
-                            output.code = _code;
-                            _break1 = true;
-                        } else if (atStart && decoded.startsWith(subcode + ":")) {
-                            decoded = decoded.substring(subcode.length + 1);
-                            output.code = _code;
-                            _break1 = true;
-                        }
+            let tag = null;
+            const codeAdd = [];
+            field.code
+            codeAdd.push(...);
+            codeAdd.push(...field.type);
+            codeAdd.map((_v) => _v.trim()).forEach((subcode) => {
+                if (!_break1) {
+                    // code found
+                    if (decoded.startsWith(subcode + ":")) {
+                        tag = subcode;
+                        decoded = decoded.substring(subcode.length + 1);
+                        _break1 = true;
                     }
-                });
+                }
             });
-            if (field.code.length >= 2 && output.code == null) {
+            if (field.code.length >= 2 && field.code.filter((v) => v === )) {
                 // need suffix.
                 return null;
             }
             return decoded;
         };
+        Log.d("Command", this.cmds.join(","));
         if (global.prefix.test(content)) {
-            // standalone mode
-            const queryDo = this.endsWith(content, ParamType.do.split("/"));
-            if (queryDo != null) {
-                message = queryDo.str;
-            }
-            const queryEnd = this.endsWith(message, this.cmds, true);
-            // check command endsWith
-            if (queryEnd == null) {
+            const blocks = this.splitByFields(content, global.prefix, this.fields);
+            if (blocks == null) {
                 // @TODO return cmd not match
                 return new CommandStatus(output.match, output.reqParam, output.requires,
                      output.opticals, output.command);
             }
-            output.match = true;
-            message = queryEnd.str.trimRight();
-            message = message.replace(global.prefix, "").trimLeft();
-            // parse param
-            const fields = this.fields;
-            const subFields:string[] = [];
-            // add suffix search
-            fields.forEach((field) => {
-                field.type.split("/").forEach((subcmd) => {
-                    if (subFields.filter((v) => v === subcmd).length < 0) {
-                        subFields.push(subcmd);
-                    }
-                });
-            });
-            // check need param parser
-            if (subFields.length >= 1) {
-                const wordsRegex = new RegExp(`.+?(${subFields.join("|")})`, "ig");
-                if (wordsRegex.test(message)) {
-                    // ~~를, ~~에게, ~~를, ...
-                    const params = message.match(wordsRegex).map((_v, _i) => {
-                        const pm = this.getParamType(_v);
-                        return {
-                            type: pm.type,
-                            data: _v.substring(0, _v.lastIndexOf(pm.suffix)),
-                            suffix: pm.suffix,
-                            index: _i,
-                        }
-                    }).filter((_v) => _v.type != null);
-                    // split params
-                    let buffer = "";
-                    for (const param of params) {
-                        const duplicates = params.filter((_v) => _v.type === param.type);
-                        if (duplicates[duplicates.length - 1].index === param.index) {
-                            const _field = fields.filter((_v) => _v.type === param.type);
-                            if (_field.length < 0) {
-                                continue;
-                            }
-                            const field = _field[0];
-                            let decoded = decodeFn(_field[0], this.decode(buffer + param.data, encoded.key), false);
-                            decoded = AcceptRegex.check(field.accept, decoded);
-                            if (decoded != null) {
-                                // flush!
-                                (field[0].require ? output.requires : output.opticals)
-                                .set(param.type, decoded);
-                            }
-                            buffer = "";
-                        } else {
-                            buffer += (param.data + param.suffix);
-                        }
-                    }
-                    message = message.replace(wordsRegex, "");
+            for (const block of blocks) {
+                const field = getFirst(this.fields.filter((v) => v.type));
+                block.content = this.decode(block.content, encoded.key);
+                if (field == null) {
+                    continue; // wtf???
                 }
-            }
-            // check require paramter exsits
-            let exist = true;
-            for (const field of fields) {
-                if (field.require && !output.requires.has(field.type)) {
-                    if (this.complex && message.length >= 1) {
-                        let decoded = decodeFn(field, this.decode(message, encoded.key), false);
-                        Log.d("decoded",decoded);
-                        decoded = AcceptRegex.check(field.accept, decoded);
-                        if (decoded != null) {
-                            // flush!
-                            output.requires.set(field.type, decoded);
-                        }
-                        message = "";
-                        continue;
-                    }
-                    exist = false;
-                    break;
+                // check subType requires
+                if (field.code.length >= 2 && block.subType == null) {
+                    // Require Field
+                    Log.d("Require Field!");
+                    continue;
                 }
+                // check type is correct
+                if (AcceptRegex.check(field.accept, block.content) == null) {
+                    Log.w("Parameter Type is wrong!");
+                    continue;
+                }
+                block.content = AcceptRegex.check(field.accept, block.content);
+                (field.require ? output.requires : output.opticals).set(field.type, block);
             }
-            message = message + queryEnd.end;
-            output.command = this.decode(message, encoded.key);
-            output.reqParam = !exist;
+            const cmd = this.getCommand(this.decode(message, encoded.key));
+            if (cmd != null) {
+                output.command = cmd.long;
+                output.match = true;
+            }
+            output.reqParam = output.requires.size < this.fields.filter((v) => v.require).length;
         } else if (content.startsWith(global.simplePrefix)) {
             // simple mode
             let isVaild = false;
@@ -306,7 +243,11 @@ export class CommandHelp {
                 if (split.length <= i) {
                     break;
                 }
-                output.opticals.set(optical.type, this.decode(split[i], encoded.key));
+                output.opticals.set(optical.type, {
+                    content: this.decode(split[i], encoded.key),
+                    ends: "",
+                    type: optical.type,
+                });
                 i += 1;
             }
             let exist = true;
@@ -319,6 +260,104 @@ export class CommandHelp {
             output.reqParam = !exist;
         }
         return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command);
+    }
+    protected getCommand(str:string) {
+        const suffix = getFirst(
+            str.match(new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig,"|")})$`,"ig"))
+        );
+        if (suffix == null) {
+            return null;
+        }
+        const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig,"|")})$`,"ig"), "").trim();
+        return {
+            short,
+            long: getFirst(this.cmds.filter((v) => short === v)),
+        };
+    }
+    protected splitByFields(str:string, prefix:RegExp, fields:Param[]) {
+        // cut header
+        let chain = str;
+        if (chain.match(prefix) == null) {
+            return null;
+        }
+        chain = chain.replace(prefix,"").trimLeft();
+        // cut suffix
+        const suffix = getFirst(
+            chain.match(new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig,"|")})$`,"ig"))
+        );
+        if (suffix == null) {
+            return null;
+        }
+        chain = chain.replace(suffix, "");
+        // query field block
+        const queryBlocks:FieldBlock[] = [];
+        for (const field of fields) {
+            // generate field block
+            const destCommands = field.type.split("/");
+            const mergeCommands = [];
+            if (field.code.length >= 1) {
+                mergeCommands.push(...field.code);
+            }
+            if (field.code.length < 2) {
+                mergeCommands.push(...destCommands);
+            }
+            // regex match for block
+            const fsmatch = new RegExp(`.*(${mergeCommands.join("|")})(${destCommands.join("|")})?\\s+`,"ig");
+            let regexMatch = getFirst(chain.match(fsmatch)); // regexMatch must have "TRIM" on right
+            if (regexMatch != null) {
+                // check cmd
+                regexMatch = regexMatch.trimRight();
+                const filter = this.endsWith(regexMatch, destCommands, false);
+                let codeID;
+                let ends = "";
+                if (filter != null) {
+                    const codeObj = getFirst(field.code
+                        .map((v, i) => ({obj:this.endsWith(regexMatch, v.split("/")), index:i}))
+                        .filter((v) => v.obj != null));
+                    if (codeObj != null) {
+                        codeID = field.code[codeObj.index];
+                        ends += codeObj.obj.end;
+                    }
+                    ends += filter.end;
+                }
+                queryBlocks.push({
+                    content: substrMatch(chain, 0, mergeCommands).trimRight(),
+                    subType: codeID,
+                    type: field.type,
+                    ends,
+                } as FieldBlock);
+            } else if (fields.length === 1 && this.complex && field.code.length <= 1) {
+                // Special case: if only one parameter
+                queryBlocks.push({
+                    content: chain.trim(),
+                    type: field.type,
+                    ends: "",
+                } as FieldBlock);
+                break;
+            }
+        }
+        chain = chain.trimRight();
+        // resort ordering
+        const orderedBlocks:FieldBlock[] = [];
+        queryBlocks.sort((a, b) => {
+            const aS = a.content + a.ends
+            const aEnd = chain.indexOf(aS) + aS.length // not include
+            const bS = b.content + b.ends;
+            const bEnd = chain.indexOf(bS) + bS.length;
+            return aEnd - bEnd;
+        })
+        // make block useful.
+        for (let i = 0; i < queryBlocks.length; i += 1) {
+            const lastEnd = i === 0 ? 0 : queryBlocks[i - 1].content.length + queryBlocks[i - 1].ends.length;
+            orderedBlocks.push({
+                ...queryBlocks[i],
+                content: chain.substr(lastEnd, queryBlocks[i].content.length - lastEnd).trim(),
+            });
+        }
+        /**
+         * Return Blocks
+         */
+        return orderedBlocks;
     }
     protected getTitle(simple:boolean) {
         let out:string = "";
@@ -420,6 +459,9 @@ export class CommandHelp {
         }
     }
     private endsWith(source:string, ends:string[], ws = false) {
+        if (source == null) {
+            return null;
+        }
         for (const _end of ends) {
             if (source.endsWith((ws ? " " : "") + _end)) {
                 return {
@@ -522,12 +564,12 @@ export class DiscordFormat {
 export class CommandStatus {
     public commandMatch:boolean = false;
     public requireParam:boolean = false;
-    public requires:Map<ParamType, string>;
-    public opticals:Map<ParamType, string>;
+    public requires:Map<ParamType, FieldBlock>;
+    public opticals:Map<ParamType, FieldBlock>;
     public command:string;
 
-    constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, string>
-        , opt:Map<ParamType, string>, command:string) {
+    constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, FieldBlock>
+        , opt:Map<ParamType, FieldBlock>, command:string) {
             this.commandMatch = cmdMatch;
             this.requireParam = reqParam;
             this.requires = require;
@@ -595,4 +637,62 @@ export interface CmdParam {
     isAdmin:boolean,
     isDM:boolean,
     isSimple:boolean,
+}
+interface FieldBlock {
+    content:string;
+    subType?:string;
+    type?:ParamType;
+    ends:string;
+}
+
+export function getFirst<T>(arr:T[]):T {
+    if (arr != null && arr.length >= 1) {
+        return arr[0];
+    } else {
+        return null;
+    }
+}
+export function getFirstMap<T, V>(m:Map<T, V>):V {
+    if (m != null && m.size >= 1) {
+        for (const [k, v] of m) {
+            return v;
+        }
+    }
+    return null;
+}
+export function substrMatch(str:string, start:number | string[], end:number | string[],
+    startOffset = 0, endOffset = 0) {
+    if (Array.isArray(start)) {
+        let n = -1;
+        for (const value of start) {
+            n = str.indexOf(value);
+            if (n >= 0) {
+                break;
+            }
+            n = -1;
+        }
+        if (n >= 0) {
+            start = n;
+        } else {
+            start = 0;
+        }
+    }
+    start = Math.max(0,start + startOffset);
+    if (Array.isArray(end)) {
+        let n = -1;
+        for (const value of end) {
+            n = str.lastIndexOf(value);
+            if (n >= 0) {
+                break;
+            }
+            n = -1;
+        }
+        if (n >= 0) {
+            end = n;
+        } else {
+            end = str.length - 1;
+        }
+    }
+    end = Math.min(str.length, end + endOffset);
+    return str.substring(start, end);
 }

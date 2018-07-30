@@ -380,10 +380,10 @@ namespace Log {
             format.push(headerColor(`${headerMsg.padStart(prefixLimit - unicodeLength(headerMsg))} `));
         }
         if (numberMsg != null) {
-            format.push(numberColor(` ${numberMsg.padStart(numberLimit - unicodeLength(numberMsg))} `));
+            format.push(numberColor(`${numberMsg.padStart(numberLimit - unicodeLength(numberMsg) + 1)} `));
         }
         if (contentMsg != null) {
-            format.push(contentColor(` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg))} `));
+            format.push(contentColor(` ${contentMsg.padEnd(contentLimit - unicodeLength(contentMsg) + 1)}`));
         }
         return format.join("");
     }

@@ -9,7 +9,7 @@ import Log from "../log";
 import Ncc from "../ncc/ncc";
 import Lang from "./lang";
 import { MainCfg } from "./runtime";
-import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "./runutil";
+import { ChainData, CmdParam, CommandHelp, CommandStatus, getFirst, getFirstMap, ParamType } from "./runutil";
 /**
  * The base of bot command executor
  * @class 플러그인
@@ -464,18 +464,9 @@ export default abstract class Plugin {
         return true;
     }
     protected getFirst<T>(arr:T[]):T {
-        if (arr != null && arr.length >= 1) {
-            return arr[0];
-        } else {
-            return null;
-        }
+        return getFirst(arr);
     }
     protected getFirstMap<T, V>(m:Map<T, V>):V {
-        if (m != null && m.size >= 1) {
-            for (const [k, v] of m) {
-                return v;
-            }
-        }
-        return null;
+        return getFirstMap(m);
     }
 }

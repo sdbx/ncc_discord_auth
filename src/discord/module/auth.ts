@@ -29,7 +29,7 @@ export default class Auth extends Plugin {
         super.ready();
         // CommandHelp: suffix, description
         this.authNaver = new CommandHelp("인증", this.lang.auth.authCmdDesc);
-        this.authNaver.addField(ParamType.to, "계정", true, {code: ["id,아이디","nick,닉네임"]});
+        this.authNaver.addField(ParamType.to, "계정", true, {code: ["id/아이디","nick/닉네임"]});
         this.authNaver.complex = true;
         // info
         this.infoNaver = new CommandHelp("알려", "네이버 정보 갯");
