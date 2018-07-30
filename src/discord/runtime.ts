@@ -14,33 +14,71 @@ import Gather from "./module/gather";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
-import { CmdParam, CommandHelp, CommandStatus, DiscordFormat, Param, ParamType } from "./runutil";
+import { CmdParam, CommandHelp, DiscordFormat, ParamType } from "./runutil";
 
-const queryCmd = /\s+\S+/ig;
-export const safeCmd = /(".+?")|('.+?')/i;
+/**
+ * List of presets
+ * 설정할 때 간단하게 하기 위한 용도.
+ */
 const presetCfgs:{[key:string]: string[]} = {
     "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL", "cast<%g>.cafeURL"],
     "프록시 채널" : ["auth<%g>.proxyChannel"],
     "인증 그룹" : ["auth<%g>.destRole"],
 }
-
+/**
+ * The home of bot
+ * 
+ * Manage Config, Discord, Ncc and cast to plugins
+ * @class 메인 클라이언트
+ */
 export default class Runtime extends EventEmitter {
+    /**
+     * Global config like token, prefix..
+     * 최상위 설정 파일
+     */
     private global:MainCfg;
+    /**
+     * The list of config with plugins
+     */
     private locals:Map<string, Config>;
+    /**
+     * language file
+     * 언어팩 - 기본: 프레타체
+     */
     private lang:Lang;
+    /**
+     * Discord client
+     */
     private client:Discord.Client;
+    /**
+     * Naver Cafe Chat + Naver Cafe API client
+     */
     private ncc:Ncc;
+    /**
+     * Plugins
+     */
     private plugins:Plugin[];
+    /**
+     * Uses for Autosave
+     * @private
+     */
     private lastSaved:number;
+    /**
+     * @todo Plugin 추가하기
+     * 
+     * In fact, this adds only plugins.
+     */
     constructor() {
         super();
-        // ,new Auth(), new Login()
         this.plugins = [];
-        
         this.plugins.push(
          new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier());
-            
     }
+    /**
+     * **Async**
+     * 
+     * Connect discord&ncc client and **START** Bot.
+     */
     public async start():Promise<string> {
         // load config
         this.global = new MainCfg();
@@ -81,6 +119,11 @@ export default class Runtime extends EventEmitter {
         await this.client.login(this.global.token)
         return Promise.resolve("");
     }
+    /**
+     * **Async**
+     * 
+     * Destroy client and plugins
+     */
     public async destroy() {
         this.client.removeAllListeners();
         try {
@@ -97,6 +140,10 @@ export default class Runtime extends EventEmitter {
         // this.emit("save");
         return Promise.resolve();
     }
+    /**
+     * Discord's onReady event receiver
+     * @event Discord.Client#ready
+     */
     protected async ready() {
         // init plugins
         const receiver = {
@@ -124,6 +171,11 @@ export default class Runtime extends EventEmitter {
         }
         this.emit("ready");
     }
+    /**
+     * Discord's onMessage event receiver
+     * @param msg Discord's message
+     * @event Discord.Client#message
+     */
     protected async onMessage(msg:Discord.Message) {
         const text = msg.content;
         const prefix = this.global.prefix;
@@ -175,11 +227,17 @@ export default class Runtime extends EventEmitter {
             Log.e(err);
         }
     }
-
+    /**
+     * Handle command(hard-coding) on top-level
+     * @param msg Discord message
+     * @param cmd Command string
+     * @param status The status of message (dm, isadmin)
+     */
     private async hardCodingCmd(msg:Discord.Message, cmd:string, status:CmdParam):Promise<boolean> {
         let result = false;
         const helpCmd = new CommandHelp("도움,도와,도움말",this.lang.helpDesc,true);
-        helpCmd.addField(ParamType.dest, "알고 싶은 명령어",false);
+        const helpCode = "명령어/name";
+        helpCmd.addField(ParamType.dest, "궁금한", false, {code: [helpCode]});
         const setCmd = new CommandHelp("설정,보여",this.lang.sudoNeed, false, { reqAdmin:true });
         setCmd.addField(ParamType.dest, "목적", true);
         setCmd.addField(ParamType.to, "설정값", false);
@@ -193,54 +251,49 @@ export default class Runtime extends EventEmitter {
         const _help = helpCmd.check(this.global, cmd, status);
         if (!result && _help.match) {
             let dest = "*";
-            if (_help.exist(ParamType.dest)) {
+            if (_help.exist(ParamType.dest) && _help.code(ParamType.dest) === helpCode) {
                 dest = _help.get(ParamType.dest);
-                if (dest.endsWith("명령어")) {
-                    dest = dest.substring(0,dest.lastIndexOf("명령어") - 1).trim();
-                }
                 if (dest.length < 1) {
                     dest = "*";
                 }
             }
-            if (dest != null) {
-                let helps:CommandHelp[] = [];
-                if (dest === "*") {
-                    /**
-                     * Add hard-coded commands
-                     */
-                    helps.push(helpCmd, setCmd, adminCmd);
-                }
-                this.plugins.map((_v) => _v.help).forEach((_v,_i) => {
-                    _v.forEach((__v,__i) => {
-                        if (dest !== "*") {
-                            if (__v.cmds.indexOf(dest) >= 0) {
-                                helps.push(__v);
-                            }
-                        } else {
+            let helps:CommandHelp[] = [];
+            if (dest === "*") {
+                /**
+                 * Add hard-coded commands
+                 */
+                helps.push(helpCmd, setCmd, adminCmd, saveCmd);
+            }
+            this.plugins.map((_v) => _v.help).forEach((_v, _i) => {
+                _v.forEach((__v, __i) => {
+                    if (dest !== "*") {
+                        if (__v.cmds.indexOf(dest) >= 0) {
                             helps.push(__v);
                         }
-                    });
-                });
-                // filter permission
-                helps = helps.filter((_v) => {
-                    return !((_v.dmOnly && msg.channel.type !== "dm") 
-                    || (_v.reqAdmin && !this.global.isAdmin(msg.author.id)));
-                });
-                if (helps.length === 0) {
-                    await msg.channel.send(sprintf(this.lang.helpNoExists,{help:dest}));
-                } else {
-                    for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
-                        const richMsg = new Discord.RichEmbed();
-                        richMsg.setTitle(this.lang.helpTitle);
-                        richMsg.setAuthor(getNickname(msg), msg.author.avatarURL);
-                        for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
-                            const help = helps[i * 20 + k];
-                            richMsg.addField(status.isSimple ? help.stdTitle : help.title, help.description);
-                        }
-                        await msg.channel.send(richMsg);
+                    } else {
+                        helps.push(__v);
                     }
-                    result = true;
+                });
+            });
+            // filter permission
+            helps = helps.filter((_v) => {
+                return !((_v.dmOnly && msg.channel.type !== "dm")
+                    || (_v.reqAdmin && !this.global.isAdmin(msg.author.id)));
+            });
+            if (helps.length === 0) {
+                await msg.channel.send(sprintf(this.lang.helpNoExists, { help: dest }));
+            } else {
+                for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
+                    const richMsg = this.plugins[0].defaultRich;
+                    richMsg.setTitle(this.lang.helpTitle);
+                    richMsg.setAuthor(DiscordFormat.getNickname(msg), msg.author.avatarURL);
+                    for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
+                        const help = helps[i * 20 + k];
+                        richMsg.addField(status.isSimple ? help.simpleTitle : help.title, help.description);
+                    }
+                    await msg.channel.send(richMsg);
                 }
+                result = true;
             }
         }
         /**
@@ -252,8 +305,8 @@ export default class Runtime extends EventEmitter {
              * option set
              */
             if (!_set.has(ParamType.to)) {
-                if (cmd.endsWith("보여")) {
-                    _set.opticals.set(ParamType.to,"1");
+                if (_set.command === "보여") {
+                    _set.set(ParamType.to,"_");
                 } else {
                     return Promise.resolve(false);
                 }
@@ -261,7 +314,7 @@ export default class Runtime extends EventEmitter {
             /**
              * Extremely Dangerous Setting 
              */
-            if (msg.channel.type === "dm" && !cmd.endsWith("보여")) {
+            if (msg.channel.type === "dm" && !(_set.command === "보여")) {
                 let pass = true;
                 let reboot = false;
                 switch (_set.get(ParamType.dest)) {
@@ -272,6 +325,9 @@ export default class Runtime extends EventEmitter {
                     } break;
                     case "말머리" : {
                         this.global.prefix = new RegExp(_set.get(ParamType.to),"i");
+                    } break;
+                    case "색깔" : {
+                        this.global.embedColor = _set.get(ParamType.to);
                     } break;
                     default: {
                         pass = false;
@@ -290,8 +346,8 @@ export default class Runtime extends EventEmitter {
             const richE:Discord.RichEmbed[] = [];
             const from = _set.get(ParamType.dest);
             const to = _set.get(ParamType.to);
-            if (from === "프리셋" && cmd.endsWith("보여")) {
-                const rich = new Discord.RichEmbed();
+            if (from === "프리셋" && (_set.command === "보여")) {
+                const rich = this.plugins[0].defaultRich;
                 for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
                     rich.addField(presetK, presetFrom.join("\n").replace(/%g/ig, msg.guild.id));
                 }
@@ -303,14 +359,14 @@ export default class Runtime extends EventEmitter {
                     // preset execute
                     for (let preFrom of presetFrom) {
                         preFrom = preFrom.replace(/%g/ig,msg.guild.id);
-                        richE.push(await this.setConfig(preFrom,to,cmd.endsWith("보여")));
+                        richE.push(await this.setConfig(preFrom, to, _set.command === "보여"));
                     }
                     result = true;
                     break;
                 }
             }
             if (!result) {
-                richE.push(await this.setConfig(from,to,cmd.endsWith("보여")));
+                richE.push(await this.setConfig(from, to,_set.command === "보여"));
             }
             for (const rich of richE) {
                 if (rich != null) {
@@ -342,8 +398,17 @@ export default class Runtime extends EventEmitter {
         }
         return Promise.resolve(result);
     }
+    /**
+     * Set config of plugin via command
+     * @param key <Plugin's name>.<config depth>
+     * @param value to setting value (don't matter when watching)
+     * @param see Watching?
+     */
     private async setConfig(key:string, value:string, see = false):Promise<Discord.RichEmbed> {
         let say:object;
+        if (see && value == null) {
+            value = "";
+        }
         for (const plugin of this.plugins) {
             const req = await plugin.setConfig(
                 key, value, see);
@@ -354,7 +419,7 @@ export default class Runtime extends EventEmitter {
         }
         if (say != null) {
             if (say.hasOwnProperty("old")) {
-                const richMsg = new Discord.RichEmbed();
+                const richMsg = this.plugins[0].defaultRich;
                 richMsg.setTitle("설정: " + say["config"]);
                 richMsg.addField("경로", say["key"]);
                 richMsg.addField("원래 값", say["old"]);
@@ -364,29 +429,23 @@ export default class Runtime extends EventEmitter {
                 // richMsg.setDescription(say.str);
                 return Promise.resolve(richMsg);
             } else {
-                const richMsg = new Discord.RichEmbed();
+                const richMsg = this.plugins[0].defaultRich;
                 richMsg.setDescription(say["str"]);
                 return Promise.resolve(richMsg);
             }
         }
         return Promise.resolve(null);
     }
-    private filterEmpty(value:string):boolean {
-        return value.length >= 1;
-    }
 }
-export function getNickname(msg:Discord.Message) {
-    if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
-        const guildnick = msg.guild.member(msg.author).nickname;
-        return guildnick != null ? guildnick : msg.author.username;
-    } else {
-        return msg.author.username;
-    }
-}
+/**
+ * Main config with token, prefix, admins.
+ * @class Main config
+ */
 export class MainCfg extends Config {
     public token = "_";
     public authUsers:string[] = [];
     public simplePrefix = "$";
+    public embedColor = "#ffc6f5";
     public consoleLogin = false;
     protected prefixRegex = (/^(네코\s*메이드\s+)?(프레|레타|프레타|프렛땨|네코|시로)(야|[짱쨩]아?|님)/).source;
     constructor() {

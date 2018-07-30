@@ -1,7 +1,8 @@
 import * as Discord from "discord.js";
 import Log from "../log";
-import { MainCfg, safeCmd } from "./runtime";
+import { MainCfg } from "./runtime";
 
+const safeCmd = /(".+?")|('.+?')/i;
 export enum ParamType {
     thing = "이/가",
     dest = "을/를/좀",
@@ -10,96 +11,96 @@ export enum ParamType {
     from = "에서",
     do = "해줘/해/줘",
 }
+export enum ParamAccept {
+    ANY,
+    NUMBER,
+    USER,
+    CHANNEL,
+}
+// tslint:disable-next-line
+class AcceptRegex {
+    public static check(type:ParamAccept, str:string):string | null {
+        if (type === ParamAccept.ANY) {
+            return str;
+        }
+        let regex;
+        switch (type) {
+            case ParamAccept.NUMBER: regex = /[0-9]+/i; break;
+            case ParamAccept.USER: regex = /<@[0-9]+>/i; break;
+            case ParamAccept.CHANNEL: regex = /<#[0-9]+>/i; break;
+        }
+        if (regex != null && regex.test(str)) {
+            return str.match(/[0-9]+/i)[0];
+        }
+        return null;
+    }
+}
 export interface Param {
-    type:ParamType;
-    str:string;
-    require:boolean;
+    type:ParamType; // type via natural (~~to)
+    code?:string[]; // type via simple (!auth code:Pickaxe) - maybe null
+    accept?:ParamAccept; // accept types
+    desc:string; // Description of command
+    require:boolean; // require?
 }
 export class CommandHelp {
     public cmds:string[]; // allow cmds
     public params:Param[]; // parameter info
-    public description:string; // Description command
     public complex:boolean; // receive only keyword is matching?
     public reqAdmin:boolean; // require admin?
     public dmOnly:boolean; // direct message only..
+    private _description:string; // Description command
+    private example:Map<string, string>; // example parameter.. todo.
     // public singleWord:boolean; // receive only single word?
     public constructor(commands:string, desc:string,complex:boolean = false,
-        options?:{reqAdmin?:boolean,dmOnly?:boolean}) {
+        options?:{ reqAdmin?:boolean, dmOnly?:boolean, example?:Map<string, string>}) {
         this.cmds = commands.split(",");
-        this.description = desc;
+        this._description = desc;
+        this.example = this.safeGet(this.example, new Map());
         this.params = [];
         this.complex = complex;
         if (options != undefined && options != null) {
-            this.reqAdmin = options.reqAdmin && true;
-            this.dmOnly = options.dmOnly && true;
+            this.reqAdmin = this.safeGet(options.reqAdmin, false);
+            this.dmOnly = this.safeGet(options.dmOnly, false);
             // this.singleWord = options.singleWord && true;
             if (this.reqAdmin) {
-                this.description += " (관리자)";
+                this._description += " (관리자)";
             }
             if (this.dmOnly) {
-                this.description += " (1:1챗)";
+                this._description += " (1:1챗)";
             }
         } else {
             this.reqAdmin = this.dmOnly = false;
         }
     }
-    public addField(type:ParamType, content:string,require:boolean = true) {
+    public get description() {
+        return this._description;
+    }
+    public addField(type:ParamType, content:string,
+        require:boolean, options:{code?:string[], accept?:ParamAccept} = {}) {
         this.params.push({
             type,
-            str: content,
+            code: this.safeGet(options.code, []),
+            accept: this.safeGet(options.accept, ParamAccept.ANY),
+            desc: content,
             require,
-        });
+        } as Param);
     }
     public get fields():Param[] {
         return this.params;
     }
     public get title():string {
-        let out:string = "";
-        if (this.params.length >= 1) {
-            out = this.params.map((value,index) => {
-                const echo:string[] = [];
-                echo.push(value.require ? "<" : "[");
-                echo.push(value.str);
-                echo.push(` (${value.type.replace(/\//ig,",")})`);
-                echo.push(value.require ? ">" : "]");
-                return echo.join("");
-            }).join(" ");
-            out += " ";
-        }
-        out += this.cmds.join("|");
-        return out;
+        return this.getTitle(false);
     }
-    public get stdTitle():string {
-        let out:string = "";
-        out += this.cmds.join("|");
-        const designer = (value, index) => {
-            const echo:string[] = [];
-            echo.push(value.require ? "<" : "[");
-            echo.push(value.str);
-            echo.push(value.require ? ">" : "]");
-            return echo.join("");
-        };
-        if (this.params.length >= 1) {
-            const req = this.params.filter((_v) => _v.require);
-            if (req.length >= 1) {
-                out += " ";
-                out += req.map(designer).join(" ");
-            }
-            const opt = this.params.filter((_v) => !_v.require);
-            if (opt.length >= 1) {
-                out += " ";
-                out += this.params.filter((_v) => !_v.require).map(designer).join(" ");
-            }
-        }
-        return out;
+    public get simpleTitle():string {
+        return this.getTitle(true);
     }
     public check(global:MainCfg,content:string,state?:CmdParam):CommandStatus {
         const output = {
             match: false,
             reqParam: false,
-            requires: new Map<ParamType, string>(),
-            opticals: new Map<ParamType, string>(),
-            command: ""
+            requires: new Map<ParamType, FieldBlock>(),
+            opticals: new Map<ParamType, FieldBlock>(),
+            command: "",
         };
         const encoded = this.encode(content);
         let message = encoded.encoded;
@@ -107,80 +108,45 @@ export class CommandHelp {
             return new CommandStatus(output.match, output.reqParam, output.requires,
                 output.opticals, output.command);
         }
+        Log.d("Command", this.cmds.join(","));
         if (global.prefix.test(content)) {
-            // standalone mode
-            const queryDo = this.endsWith(content, ParamType.do.split("/"));
-            if (queryDo != null) {
-                message = queryDo.str;
-            }
-            const queryEnd = this.endsWith(message, this.cmds, true);
-            // check command endsWith
-            if (queryEnd == null) {
+            const blocks = this.splitByFields(content, global.prefix, this.fields);
+            if (blocks == null) {
                 // @TODO return cmd not match
                 return new CommandStatus(output.match, output.reqParam, output.requires,
                      output.opticals, output.command);
             }
-            output.match = true;
-            message = queryEnd.str.trimRight();
-            message = message.replace(global.prefix, "").trimLeft();
-            // parse param
-            const fields = this.fields;
-            const pmSuffix:string[] = [];
-            // add suffix search
-            fields.map((_v) => _v.type).forEach((_v) => {
-                _v.split("/").forEach((_v2) => {
-                    if (pmSuffix.indexOf(_v2) < 0) {
-                        pmSuffix.push(_v2);
-                    }
-                });
-            });
-            // check need param parser
-            if (pmSuffix.length >= 1) {
-                const wordsRegex = new RegExp(`.+?(${pmSuffix.join("|")})`, "ig");
-                if (wordsRegex.test(message)) {
-                    // ~~를, ~~에게, ~~를, ...
-                    const params = message.match(wordsRegex).map((_v, _i) => {
-                        const pm = this.getParamType(_v);
-                        return {
-                            type: pm.type,
-                            data: _v.substring(0, _v.lastIndexOf(pm.suffix)),
-                            suffix: pm.suffix,
-                            index: _i,
-                        }
-                    }).filter((_v) => _v.type != null);
-                    // split params
-                    let buffer = "";
-                    for (const param of params) {
-                        const duplicates = params.filter((_v) => _v.type === param.type);
-                        if (duplicates[duplicates.length - 1].index === param.index) {
-                            // flush!
-                            const field = fields.filter((_v) => _v.type === param.type);
-                            (field[0].require ? output.requires : output.opticals)
-                                .set(param.type, this.decode(buffer + param.data, encoded.key));
-                            buffer = "";
-                        } else {
-                            buffer += (param.data + param.suffix);
-                        }
-                    }
-                    message = message.replace(wordsRegex, "");
+            for (const block of blocks) {
+                const field = getFirst(this.fields.filter((v) => v.type === block.type));
+                block.content = this.decode(block.content, encoded.key);
+                if (field == null) {
+                    continue; // wtf???
+                }
+                // check subType requires
+                if (!this.complex && field.code.length >= 2 && block.subType == null) {
+                    // Require Field
+                    Log.d("Require Field!");
+                    continue;
+                }
+                if (field.code.length === 1 && block.subType == null) {
+                    block.subType = field.code[0];
+                }
+                // check type is correct
+                if (AcceptRegex.check(field.accept, block.content) == null) {
+                    Log.w("Parameter Type is wrong! Type: " + field.type + " / Accept" + field.accept);
+                    continue;
+                }
+                block.content = AcceptRegex.check(field.accept, block.content);
+                if (block.content != null) {
+                    (field.require ? output.requires : output.opticals).set(field.type, block);
                 }
             }
-            // check require paramter exsits
-            let exist = true;
-            for (const field of fields) {
-                if (field.require && !output.requires.has(field.type)) {
-                    if (this.complex && message.length >= 1) {
-                        output.requires.set(field.type, this.decode(message, encoded.key));
-                        message = "";
-                        continue;
-                    }
-                    exist = false;
-                    break;
-                }
+            const cmd = this.getCommand(this.decode(message, encoded.key));
+            if (cmd != null) {
+                output.command = cmd.long;
+                output.match = true;
             }
-            message = message + queryEnd.end;
-            output.command = this.decode(message, encoded.key);
-            output.reqParam = !exist;
+            output.reqParam = output.requires.size < this.fields.filter((v) => v.require).length;
         } else if (content.startsWith(global.simplePrefix)) {
             // simple mode
             let isVaild = false;
@@ -210,19 +176,49 @@ export class CommandHelp {
             if (requires.length + opticals.length === 1) {
                 split[0] = message;
             }
+            const parse = (field:Param, str:string) => {
+                let rCode = null;
+                for (const _code of field.code) {
+                    for (const __code of _code.split("/")) {
+                        if (str.startsWith(__code + ":")) {
+                            str = str.substr(str.indexOf(":") + 1);
+                            str = this.decode(str, encoded.key);
+                            rCode = _code;
+                        }
+                    }
+                }
+                return {
+                    content: str,
+                    type: field.type,
+                    subType: rCode,
+                    ends: "",
+                } as FieldBlock;
+            }
             for (const require of requires) {
                 if (split.length <= i) {
                     output.reqParam = true;
                     break;
                 }
-                output.requires.set(require.type, this.decode(split[i], encoded.key));
+                const block = parse(require, split[i]);
+                if (this.complex || require.code.length <= 1 || block.subType != null) {
+                    if (block.subType == null && require.code.length === 1) {
+                        block.subType = require.code[0].split("/")[0];
+                    }
+                    output.requires.set(require.type, block);   
+                }
                 i += 1;
             }
             for (const optical of opticals) {
                 if (split.length <= i) {
                     break;
                 }
-                output.opticals.set(optical.type, this.decode(split[i], encoded.key));
+                const block = parse(optical, split[i]);
+                if (this.complex || optical.code.length <= 1 || block.subType != null) {
+                    if (block.subType == null && optical.code.length === 1) {
+                        block.subType = optical.code[0].split("/")[0];
+                    }
+                    output.opticals.set(optical.type, block);   
+                }
                 i += 1;
             }
             let exist = true;
@@ -235,6 +231,147 @@ export class CommandHelp {
             output.reqParam = !exist;
         }
         return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command);
+    }
+    protected getCommand(str:string) {
+        const suffix = getFirst(
+            str.match(new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig,"|")})?$`,"ig"))
+        );
+        if (suffix == null) {
+            return null;
+        }
+        const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig,"|")})$`,"ig"), "").trim();
+        return {
+            short,
+            long: getFirst(this.cmds.filter((v) => short === v)),
+        };
+    }
+    protected splitByFields(str:string, prefix:RegExp, fields:Param[]) {
+        // cut header
+        let chain = str;
+        if (chain.match(prefix) == null) {
+            return null;
+        }
+        chain = chain.replace(prefix,"").trimLeft();
+        // cut suffix
+        const suffixReg = new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig, "|")})?$`, "ig");
+        const suffix = getFirst(chain.match(suffixReg));
+        Log.d(suffixReg.source);
+        if (suffix == null) {
+            return null;
+        }
+        chain = chain.replace(suffix, "");
+        // query field block
+        const queryBlocks:FieldBlock[] = [];
+        for (const field of fields) {
+            // generate field block
+            const destCommands = field.type.split("/");
+            const mergeCommands = [];
+            if (field.code.length >= 1) {
+                mergeCommands.push(...field.code.map((v) => this.getPreferText(v.split("/"), true)));
+            }
+            if (field.code.length < 2) {
+                mergeCommands.push(...destCommands);
+            }
+            // regex match for block
+            const fsmatch = new RegExp(`.*(${mergeCommands.join("|")})(${destCommands.join("|")})?\\s+`,"ig");
+            let regexMatch = getFirst(chain.match(fsmatch)); // regexMatch must have "TRIM" on right
+            if (regexMatch != null) {
+                // check cmd
+                regexMatch = regexMatch.trimRight();
+                const filter = this.endsWith(regexMatch, destCommands, false);
+                let codeID;
+                let ends = "";
+                if (filter != null) {
+                    const codeObj = getFirst(field.code
+                        .map((v, i) => ({ obj: this.endsWith(filter.str, v.split("/")), index:i}))
+                        .filter((v) => v.obj != null));
+                    if (codeObj != null) {
+                        codeID = field.code[codeObj.index];
+                        ends += codeObj.obj.end;
+                    }
+                    ends += filter.end;
+                }
+                queryBlocks.push({
+                    content: substrMatch(chain, 0, mergeCommands).trimRight(),
+                    subType: codeID,
+                    type: field.type,
+                    ends,
+                } as FieldBlock);
+            } else if (fields.length === 1 && this.complex && field.code.length <= 1 && chain.trim().length >= 1) {
+                // Special case: if only one parameter
+                queryBlocks.push({
+                    content: chain.trim(),
+                    type: field.type,
+                    ends: "",
+                } as FieldBlock);
+                break;
+            }
+        }
+        chain = chain.trimRight();
+        // resort ordering
+        const orderedBlocks:FieldBlock[] = [];
+        queryBlocks.sort((a, b) => {
+            const aS = a.content + a.ends
+            const aEnd = chain.indexOf(aS) + aS.length // not include
+            const bS = b.content + b.ends;
+            const bEnd = chain.indexOf(bS) + bS.length;
+            return aEnd - bEnd;
+        })
+        // make block useful.
+        for (let i = 0; i < queryBlocks.length; i += 1) {
+            const lastEnd = i === 0 ? 0 : queryBlocks[i - 1].content.length + queryBlocks[i - 1].ends.length;
+            orderedBlocks.push({
+                ...queryBlocks[i],
+                content: chain.substr(lastEnd, queryBlocks[i].content.length - lastEnd).trim(),
+            });
+        }
+        /**
+         * Return Blocks
+         */
+        return orderedBlocks;
+    }
+    protected getTitle(simple:boolean) {
+        let out:string = "";
+        if (simple) {
+            out += `${this.cmds.join("|")} `
+        }
+        if (this.params.length >= 1) {
+            out += this.params.map((value) => {
+                return this.getFieldHelp(value, !simple);
+            }).join(" ");
+        }
+        if (!simple) {
+            out += ` ${this.cmds.join("|")}`;
+        }
+        return out;
+    }
+    protected getFieldHelp(value:Param, korMode:boolean) {
+        const guideCode = value.code.length >= 2;
+        const cmds = value.code.map(
+            (_v) => this.getPreferText(_v.split("/").map((__v) => __v.trim()), korMode))
+        const splitter = this.safeGet(value.desc, "").length <= 0 ? "" : " : ";
+        let echo = "";
+        echo += value.require ? "<" : "[";
+        if (!korMode) {
+            if (guideCode) {
+                echo += `{${cmds.join(" | ")}}${splitter}`;
+            } else if (cmds.length === 1) {
+                echo += `${cmds[0]}${splitter}`; 
+            }
+        }
+        if (value.desc.length >= 1) {
+            echo += guideCode ? `[${value.desc}]` : value.desc;
+        }
+        if (korMode) {
+            if (value.code.length >= 1) {
+                echo += ` {${cmds.join("|")}}`;
+            }
+        }
+        echo += value.require ? ">" : "]";
+        if (korMode) {
+            echo += `{${value.type.replace(/\//ig,",")}}`;
+        }
+        return echo;
     }
     private encode(source:string) {
         let chain = source;
@@ -256,6 +393,9 @@ export class CommandHelp {
         });
         return chain;
     }
+    private safeGet<T>(obj:T | undefined, defaultV:T | null):T | null {
+        return obj == null ? defaultV : obj;
+    }
     private getParamType(suffix:string) {
         for (const [key, value] of Object.entries(ParamType)) {
             for (const v of value.split("/")) {
@@ -269,7 +409,30 @@ export class CommandHelp {
         }
         return null;
     }
+    private getPreferText(arr:string[], hangul = true) {
+        if (arr.length === 1) {
+            return arr[0]
+        } else if (arr.length >= 2) {
+            const alphabetCmd = /[A-Za-z0-9_]/ig;
+            const delta = (str:string) => {
+                if (str.length <= 0 || str == null) {
+                    return -1;
+                }
+                return Math.round((this.safeGet(str.match(alphabetCmd), []).length / str.length) * 1000);
+            }
+            arr.sort((a,b) => {
+                return delta(a) - delta(b);
+            });
+            return arr[hangul ? 0 : arr.length - 1];
+        } else {
+            // wtf
+            return null;
+        }
+    }
     private endsWith(source:string, ends:string[], ws = false) {
+        if (source == null) {
+            return null;
+        }
         for (const _end of ends) {
             if (source.endsWith((ws ? " " : "") + _end)) {
                 return {
@@ -282,6 +445,12 @@ export class CommandHelp {
     }
 }
 export class DiscordFormat {
+    public static formatUser(user:Discord.User) {
+        return {
+            name:user.username,
+            mention:`<@${user.id}>`
+        }
+    }
     public static mentionUser(userid:string) {
         return `<@${userid}>`;
     }
@@ -290,6 +459,14 @@ export class DiscordFormat {
     }
     public static emoji(emojiName:string, emojiId:string, animated = false) {
         return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`;
+    }
+    public static getNickname(msg:Discord.Message) {
+        if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
+            const guildnick = msg.guild.member(msg.author).nickname;
+            return guildnick != null ? guildnick : msg.author.username;
+        } else {
+            return msg.author.username;
+        }
     }
 
     private _italic = false;
@@ -358,12 +535,12 @@ export class DiscordFormat {
 export class CommandStatus {
     public commandMatch:boolean = false;
     public requireParam:boolean = false;
-    public requires:Map<ParamType, string>;
-    public opticals:Map<ParamType, string>;
+    public requires:Map<ParamType, FieldBlock>;
+    public opticals:Map<ParamType, FieldBlock>;
     public command:string;
 
-    constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, string>
-        , opt:Map<ParamType, string>, command:string) {
+    constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, FieldBlock>
+        , opt:Map<ParamType, FieldBlock>, command:string) {
             this.commandMatch = cmdMatch;
             this.requireParam = reqParam;
             this.requires = require;
@@ -377,13 +554,18 @@ export class CommandStatus {
         return this.requires.has(key) || this.opticals.has(key);
     }
     public get(key:ParamType) {
-        if (this.requires.has(key)) {
-            return this.requires.get(key);
-        } else if (this.opticals.has(key)) {
-            return this.opticals.get(key);
-        } else {
-            return undefined;
+        return this.getRaw(key) == null ? null : this.getRaw(key).content;
+    }
+    public set(key:ParamType, content:string) {
+        if (this.has(key)) {
+            this.getRaw(key).content = content;
         }
+    }
+    public code(key:ParamType) {
+        if (this.get(key) != null) {
+            return this.getRaw(key).subType;
+        }
+        return null;
     }
     public getSubCmd(start:number, end:number) {
         const commands = this.command.split(/\s+/ig);
@@ -421,6 +603,15 @@ export class CommandStatus {
             command: this.command,
         }, null, 4);
     }
+    protected getRaw(key:ParamType) {
+        if (this.requires.has(key)) {
+            return this.requires.get(key);
+        } else if (this.opticals.has(key)) {
+            return this.opticals.get(key);
+        } else {
+            return undefined;
+        }
+    }
 }
 export interface ChainData {
     type:number;
@@ -431,4 +622,62 @@ export interface CmdParam {
     isAdmin:boolean,
     isDM:boolean,
     isSimple:boolean,
+}
+interface FieldBlock {
+    content:string;
+    subType?:string;
+    type?:ParamType;
+    ends:string;
+}
+
+export function getFirst<T>(arr:T[]):T {
+    if (arr != null && arr.length >= 1) {
+        return arr[0];
+    } else {
+        return null;
+    }
+}
+export function getFirstMap<T, V>(m:Map<T, V>):V {
+    if (m != null && m.size >= 1) {
+        for (const [k, v] of m) {
+            return v;
+        }
+    }
+    return null;
+}
+export function substrMatch(str:string, start:number | string[], end:number | string[],
+    startOffset = 0, endOffset = 0) {
+    if (Array.isArray(start)) {
+        let n = -1;
+        for (const value of start) {
+            n = str.indexOf(value);
+            if (n >= 0) {
+                break;
+            }
+            n = -1;
+        }
+        if (n >= 0) {
+            start = n;
+        } else {
+            start = 0;
+        }
+    }
+    start = Math.max(0,start + startOffset);
+    if (Array.isArray(end)) {
+        let n = -1;
+        for (const value of end) {
+            n = str.lastIndexOf(value);
+            if (n >= 0) {
+                break;
+            }
+            n = -1;
+        }
+        if (n >= 0) {
+            end = n;
+        } else {
+            end = str.length - 1;
+        }
+    }
+    end = Math.min(str.length, end + endOffset);
+    return str.substring(start, end);
 }

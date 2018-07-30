@@ -10,7 +10,7 @@ import Cafe from "../../structure/cafe";
 import Comment from "../../structure/comment";
 import Profile from "../../structure/profile";
 import Plugin from "../plugin";
-import { getNickname, MainCfg } from "../runtime";
+import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 export default class Auth extends Plugin {
@@ -29,11 +29,11 @@ export default class Auth extends Plugin {
         super.ready();
         // CommandHelp: suffix, description
         this.authNaver = new CommandHelp("인증", this.lang.auth.authCmdDesc);
-        this.authNaver.addField(ParamType.to, "(ID) 아이디|(닉) 닉네임", true);
+        this.authNaver.addField(ParamType.to, "계정", true, {code: [PType.ID, PType.NICK]});
         this.authNaver.complex = true;
         // info
-        this.infoNaver = new CommandHelp("알려", "네이버 정보 갯");
-        this.infoNaver.addField(ParamType.dest, "네이버", true);
+        this.infoNaver = new CommandHelp("알려", "네이버 아이디의 정보가 필요할 때", true);
+        this.infoNaver.addField(ParamType.dest, "유저 혹은 아이디", true, {code: [PType.ID, PType.NICK, PType.DISCORD]});
         this.infoNaver.complex = true;
         // ncc-listen
         this.ncc_listen = this.onNccMessage.bind(this);
@@ -84,18 +84,14 @@ export default class Auth extends Plugin {
             /**
              * fetch naver ID
              */
-            let type;
+            let type = testAuth.code(ParamType.to);
             let member:Profile;
-            let param = testAuth.get(ParamType.to);
+            const param = testAuth.get(ParamType.to);
             const guildCfg = await this.sub(this.config, msg.guild.id);
             const cafeID = await this.ncc.parseNaver(guildCfg.commentURL);
-            if (param.endsWith("아이디")) {
-                type = PType.ID;
-                param = param.substring(0, param.lastIndexOf(" "));
+            if (type === PType.ID) {
                 member = await this.ncc.getMemberById(cafeID.cafeId, param).catch((err) => null);
-            } else if (param.endsWith("닉네임") || param.endsWith("닉")) {
-                type = PType.NICK;
-                param = param.substring(0, param.lastIndexOf(" "));
+            } else if (type === PType.NICK) {
                 member = await this.ncc.getMemberByNick(cafeID.cafeId, param).catch((err) => null);
             } else {
                 if (param.replace(/[a-zA-Z0-9]+/ig, "").length === 0) {
@@ -170,7 +166,7 @@ export default class Auth extends Plugin {
             /**
              * Send rich
              */
-            const rich = await getRichByProfile(member, getNickname(msg), msg.author.avatarURL);
+            const rich = await this.getRichByNaver(member, DiscordFormat.getNickname(msg), msg.author.avatarURL);
             const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`;
             await channel.send(roomURL,rich);
         } else if (testInfo.match) {
@@ -178,49 +174,70 @@ export default class Auth extends Plugin {
                 await channel.send(this.lang.noNaver);
                 return Promise.resolve();
             }
-            let dest = testInfo.get(ParamType.dest);
-            if (dest.endsWith(" 네이버")) {
-                dest = dest.substring(0, dest.lastIndexOf(" "));
-                if (dest.endsWith("의")) {
-                    dest = dest.substring(0, dest.lastIndexOf("의"));
-                }
-                const guildCfg = await this.sub(this.config, msg.guild.id);
-                const cafe = await this.ncc.parseNaver(guildCfg.commentURL);
-                const members = await this.getUsers(msg.guild, dest);
-                if (members.length === 0) {
-                    const naver:Profile = await this.ncc.getMemberByNick(cafe.cafeId, dest).catch((err) => null);
-                    if (naver == null) {
+            const dest = testInfo.get(ParamType.dest);
+            const guildCfg = await this.sub(this.config, msg.guild.id);
+            const cafe = await this.ncc.parseNaver(guildCfg.commentURL);
+            let naver:Profile;
+            // check member
+
+            switch (testInfo.code(ParamType.dest)) {
+                case PType.DISCORD : {
+                    const member = this.getFirst(await this.getUsers(msg.guild, dest));
+                    if (member == null) {
                         await channel.send(sprintf(this.lang.auth.nickNotFound, {
                             nick: dest,
                             type: "",
                         }));
-                    } else {
-                        await channel.send(await getRichByProfile(naver));
+                        return Promise.resolve();
                     }
-                    return Promise.resolve();
-                }
-                for (const member of members) {
-                    const gu = guildCfg.users.filter((v) => v.userID === member.user.id);
-                    let naver:Profile;
-                    try {
-                        if (gu.length === 1) {
-                            naver = await this.ncc.getMemberById(cafe.cafeId, gu[0].naverID);
-                        } else {
-                            naver = await this.ncc.getMemberByNick(cafe.cafeId, dest);
+                    const gu = this.getFirst(guildCfg.users.filter((v) => v.userID === member.user.id));
+                    if (gu != null) {
+                        try {
+                            naver = await this.ncc.getMemberById(cafe.cafeId, gu.naverID);
+                        } catch (err) {
+                            // await channel.send(err);
                         }
-                    } catch (err) {
-                        Log.w(err);
-                    }
-                    
-                    if (naver == null) {
-                        await channel.send(sprintf(this.lang.auth.nickNotFound, {
-                            nick: dest,
-                            type: "",
-                        }));
                     } else {
-                        await channel.send(await getRichByProfile(naver, member.nickname, member.user.avatarURL));
+                        await channel.send(sprintf(this.lang.auth.noAuth, {
+                            nick: dest,
+                        }));
+                        // naver = await this.ncc.getMemberByNick(cafe.cafeId, dest);
                     }
+                } break;
+                case PType.ID : {
+                    try {
+                        naver = await this.ncc.getMemberById(cafe.cafeId, dest);
+                    } catch (err) {
+                        // await channel.send(err);
+                    }
+                } break;
+                case PType.NICK : {
+                    try {
+                        naver = await this.ncc.getMemberByNick(cafe.cafeId, dest)
+                    } catch (err) {
+                        // await channel.send(err);
+                    }
+                } break;
+            }
+            if (naver == null) {
+                await channel.send(sprintf(this.lang.auth.nickNotFound, {
+                    nick: dest,
+                    type: "",
+                }));
+            } else {
+                const idOwner = this.getFirst(guildCfg.users.filter((v) => v.naverID === naver.userid));
+                let idUser:Discord.GuildMember;
+                if (idOwner != null) {
+                    idUser = guild.members.get(idOwner.userID);
                 }
+                let rich;
+                if (idUser == null) {
+                    rich = await this.getRichByNaver(naver);
+                } else {
+                    rich = await this.getRichByNaver(naver,
+                        idUser.nickname == null ? idUser.user.username : idUser.nickname, idUser.user.avatarURL);
+                }
+                await channel.send(rich);
             }
         }
         return Promise.resolve();
@@ -401,34 +418,10 @@ export async function getNaver(authlist:AuthConfig,guild:Discord.Guild, userid:s
     }
     return Promise.resolve(null);
 }
-export async function getRichByProfile(member:Profile, name?:string, icon?:string) {
-    // image
-    if (member.profileurl == null) {
-        member.profileurl = "https://ssl.pstatic.net/static/m/cafe/mobile/cafe_profile_c77.png";
-    }
-    // const image:Buffer = await request.get(member.profileurl, { encoding: null });
-    // rich message
-    const rich = new Discord.RichEmbed();
-    rich.setFooter(member.cafeDesc == null ? "네이버 카페" : member.cafeDesc, member.cafeImage);
-    // rich.attachFile(new Discord.Attachment(image, "profile.png"));
-    // rich.setThumbnail("attachment://profile.png");
-    rich.setThumbnail(member.profileurl);
-    if (name != null) {
-        rich.setAuthor(name, icon);
-    }
-    rich.addField("네이버 ID", member.userid);
-    rich.addField("네이버 닉네임", member.nickname);
-    if (member.level != null) {
-        rich.addField("등급", member.level);
-        rich.addField("총 방문 수", member.numVisits);
-        rich.addField("총 게시글 수", member.numArticles);
-        rich.addField("총 댓글 수", member.numComments);
-    }
-    return Promise.resolve(rich);
-}
 enum PType {
-    ID,
-    NICK,
+    ID = "id/아이디",
+    NICK = "nick/닉네임",
+    DISCORD = "user/유저",
 }
 class AuthUser {
     public userID:string;

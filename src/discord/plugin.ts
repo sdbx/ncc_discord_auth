@@ -7,18 +7,49 @@ import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
+import Profile from "../structure/profile";
 import Lang from "./lang";
 import { MainCfg } from "./runtime";
-import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "./runutil";
-
+import { ChainData, CmdParam, CommandHelp, CommandStatus, getFirst, getFirstMap, ParamType } from "./runutil";
+/**
+ * The base of bot command executor
+ * @class 플러그인
+ */
 export default abstract class Plugin {
+    /**
+     * This module's config at globalID
+     */
     protected config:Config;
+    /**
+     * Discord client
+     */
     protected client:Discord.Client;
+    /**
+     * Ncc client
+     */
     protected ncc:Ncc;
+    /**
+     * Language
+     */
     protected lang:Lang;
+    /**
+     * Main config (readonly)
+     * 
+     * token is hidden.
+     */
     protected global:MainCfg;
+    /**
+     * Chaining timeout. (**ms**)
+     */
     protected timeout = 1 * 60 * 1000; // 1 is minutes
+    /**
+     * Chaining cache
+     */
     private chains:Map<string, ChainData>;
+    /**
+     * Sub configs..
+     * @see runtime.locals
+     */
     private subs:Map<string, Config>;
 
     /**
@@ -31,9 +62,9 @@ export default abstract class Plugin {
         this.client = runtime.client;
         this.ncc = runtime.ncc;
         this.lang = runtime.lang
-        this.subs = runtime.subConfigs;
         this.chains = new Map();
         this.global = runtime.mainConfig;
+        this.subs = runtime.subConfigs;
     }
     /**
      * on discord ready
@@ -53,7 +84,10 @@ export default abstract class Plugin {
      * @param options options
      */
     public abstract async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void>;
-        
+    /**
+     * Give help info to runtime
+     * @returns helps
+     */
     public get help():CommandHelp[] {
         const out:CommandHelp[] = [];
         for (const [key,value] of Object.entries(this)) {
@@ -65,7 +99,9 @@ export default abstract class Plugin {
     }
     /**
      * @todo on message received
-     * DO NOT SEND MESSAGE when BOT has spoken.
+     * 
+     * **DO NOT SEND MESSAGE when BOT has spoken** unless filtering.
+     * 
      * on message received(except command)
      * @param msg 
      */
@@ -143,6 +179,9 @@ export default abstract class Plugin {
                     errorMsg = param;
                     Log.w("Config", `${_path} 퉤에엣`);
                     break;
+                } else if (view) {
+                    oldValue = depth.toString();
+                    value = depth.toString();
                 } else if (i < split.length - 1) {
                     if (typeof depth !== "object") {
                         const param = {
@@ -169,7 +208,7 @@ export default abstract class Plugin {
                         } break;
                         case "number" : {
                             const num = Number.parseFloat(value);
-                            if (!Number.isNaN(num) && !Number.isFinite(num)) {
+                            if (!Number.isNaN(num) && Number.isFinite(num)) {
                                 data = num;
                             }
                         } break;
@@ -189,10 +228,8 @@ export default abstract class Plugin {
                     }
                     if (data != null) {
                         oldValue = depth;
-                        if (!view) {
-                            set(config,_path,data);
-                            await this.onSave();
-                        }
+                        set(config, _path, data);
+                        await this.onSave();
                     }
                     break;
                 }
@@ -221,6 +258,9 @@ export default abstract class Plugin {
             return Promise.resolve(param);
         }
     }
+    /**
+     * On autosaving
+     */
     public async onSave() {
         if (this.config != null) {
             await this.config.export();
@@ -238,6 +278,12 @@ export default abstract class Plugin {
     public chaining(channel:string, user:string) {
         return this.chains.has(`${channel}$${user}`);
     }
+    /**
+     * Calling chain for receive message
+     * @param message received id (uses channelid, userid)
+     * @param channel manual channel id (useless for now)
+     * @param user manual user id (useless for now)
+     */
     public async callChain(message:Discord.Message, channel?:string, user?:string):Promise<boolean> {
         if (channel == null) {
             channel = message.channel.id;
@@ -263,6 +309,14 @@ export default abstract class Plugin {
         }
         return Promise.resolve(false);
     }
+    /**
+     * Finish chain and call onEndChain
+     * @param message Discord message
+     * @param type Type of chain(user define)
+     * @param data Received data
+     * @param channel manual channel id (useless for now)
+     * @param user manual user id (useless for now)
+     */
     public async endChain(message:Discord.Message, type:number, data:ChainData, channel?:string, user?:string) {
         if (channel == null) {
             channel = message.channel.id;
@@ -280,6 +334,9 @@ export default abstract class Plugin {
             time: -1,
         } as ChainData);
     }
+    /**
+     * on Destroy event
+     */
     public async onDestroy() {
         await this.onSave();
         return Promise.resolve();
@@ -340,19 +397,80 @@ export default abstract class Plugin {
             return sync ? cfg : proxy;
         }
         const newI:T = new (parent["constructor"] as any)(subName, parent.name) as T;
-        // newI.initialize(subName, parent.name, !sync);
+        newI.initialize(subName, parent.name);
         await newI.import(false).catch(Log.e);
         if (sync) {
             this.subs.set(key, newI);
         }
         return Promise.resolve(newI);
     }
+    /**
+     * get default formatted rich
+     */
+    public get defaultRich():Discord.RichEmbed {
+        const rich = new Discord.RichEmbed();
+        rich.setColor(this.global.embedColor);
+        if (this.global != null && this.global.authUsers.length >= 1) {
+            const admin = this.global.authUsers[0];
+            if (this.client.users.has(admin)) {
+                const user = this.client.users.get(admin);
+                rich.setThumbnail(user.avatarURL);
+            }
+        }
+        return rich;
+    }
+    /**
+     * get rich profile from naver account
+     * @param member naver accont object
+     * @param name discord author name
+     * @param icon discord author icon
+     */
+    protected async getRichByNaver(member:Profile, name?:string, icon?:string) {
+        // image
+        if (member.profileurl == null) {
+            member.profileurl = "https://ssl.pstatic.net/static/m/cafe/mobile/cafe_profile_c77.png";
+        }
+        // const image:Buffer = await request.get(member.profileurl, { encoding: null });
+        // rich message
+        const rich = this.defaultRich;
+        rich.setFooter(member.cafeDesc == null ? "네이버 카페" : member.cafeDesc, member.cafeImage);
+        // rich.attachFile(new Discord.Attachment(image, "profile.png"));
+        // rich.setThumbnail("attachment://profile.png");
+        rich.setThumbnail(member.profileurl);
+        if (name != null) {
+            rich.setAuthor(name, icon);
+        }
+        rich.addField("네이버 ID", member.userid, true);
+        rich.addField("네이버 닉네임", member.nickname, true);
+        if (member.level != null) {
+            rich.addField("등급", member.level, true);
+            rich.addField("총 방문 수", member.numVisits, true);
+            rich.addField("총 게시글 수", member.numArticles, true);
+            rich.addField("총 댓글 수", member.numComments, true);
+        }
+        return Promise.resolve(rich);
+    }
+    /**
+     * Get key of subconfig
+     * @param name module's global config name
+     * @param subName subname
+     */
     protected subKey(name:string, subName?:string) {
         return `${name}\$${subName == null ? "__default__" : subName}`;
     }
+    /**
+     * Does key have config?
+     * @param subName subname (filename)
+     * @param name directory name
+     */
     protected subHas(subName:string, name = this.config.name):boolean {
         return this.subs.has(this.subKey(name, subName));
     }
+    /**
+     * Delete subconfig (with file)
+     * @param subName subname (filename)
+     * @param name directory name
+     */
     protected async subDel(subName:string, name = this.config.name):Promise<void> {
         const key = this.subKey(name, subName);
         if (this.subs.has(key)) {
@@ -362,12 +480,10 @@ export default abstract class Plugin {
         }
         return Promise.resolve();
     }
-    protected formatUser(user:Discord.User) {
-        return {
-            name:user.username,
-            mention:`<@${user.id}>`
-        }
-    }
+    /**
+     * format value to language string
+     * @param value value
+     */
     protected toLangString(value:string | number | boolean) {
         let data:string;
         const type = typeof value;
@@ -384,22 +500,21 @@ export default abstract class Plugin {
         }
         return data;
     }
+    /**
+     * Filter editable configs
+     * 
+     * Default: all
+     * @param key config key
+     * @param obj to set value
+     * @returns editable?
+     */
     protected isValidConfig(key:string, obj:object):boolean {
         return true;
     }
     protected getFirst<T>(arr:T[]):T {
-        if (arr != null && arr.length >= 1) {
-            return arr[0];
-        } else {
-            return null;
-        }
+        return getFirst(arr);
     }
     protected getFirstMap<T, V>(m:Map<T, V>):V {
-        if (m != null && m.size >= 1) {
-            for (const [k, v] of m) {
-                return v;
-            }
-        }
-        return null;
+        return getFirstMap(m);
     }
 }

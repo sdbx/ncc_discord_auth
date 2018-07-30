@@ -3,7 +3,7 @@ import { sprintf } from "sprintf-js";
 import Config from "../../config";
 import Log from "../../log";
 import Plugin from "../plugin";
-import { getNickname, MainCfg } from "../runtime";
+import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
 
 const regexEmoji = /<:[A-Za-z0-9_]{2,}:\d+>/ig;
@@ -58,7 +58,7 @@ export default class Gather extends Plugin {
             return Promise.resolve();
         }
         // change image
-        const name = `${getNickname(msg)} (#${(msg.channel as Discord.TextChannel).name})`
+        const name = `${DiscordFormat.getNickname(msg)} (#${(msg.channel as Discord.TextChannel).name})`
         if (name !== webhook.name || msg.author.avatarURL !== cfg.lastImage) {
             await webhook.edit(name, msg.author.avatarURL);
             cfg.lastImage = msg.author.avatarURL;

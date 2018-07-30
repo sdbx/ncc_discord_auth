@@ -9,3 +9,13 @@
 ============================
 메인 서버: https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=872795200
 인증용 서버: https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=67108899
+
+<[인증할 ID]{닉네임|아이디}>{을,를} [{바로할지?}[제명]] 해줘
+
+code: 닉네임,nick | 아이디,id
+
+code: null (aka dest.)
+
+[네이버 카페]{에서} <네카채 주소>{을,를,좀} [{auth|ro|delete}]{으로} 중계
+
+auth:complete
