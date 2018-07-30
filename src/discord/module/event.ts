@@ -43,7 +43,7 @@ export default class EventNotifier extends Plugin {
             const oldNick = oldMember.nickname != null ? oldMember.nickname : oldMember.user.username + " (기본값)";
             const newNick = newMember.nickname != null ? newMember.nickname : newMember.user.username + " (기본값)";
             if (oldNick !== newNick) {
-                const rich = new Discord.RichEmbed();
+                const rich = this.defaultRich;
                 rich.setTitle(this.lang.events.changeNick);
                 rich.addField("예전 닉네임", oldNick);
                 rich.addField("바뀐 닉네임", newNick);

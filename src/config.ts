@@ -35,13 +35,16 @@ export default class Config {
      * @param _name Name of config
      * @param _version Version
      */
-    public constructor(_name:string,_sub = null, _version = Config.appVersion) {
+    public constructor(_name:string, _sub = null, _version = Config.appVersion) {
         // this.dirpath = this.saveTo.substring(0,this.saveTo.lastIndexOf("/"));
+        this.initialize(_name, _sub, _version);
+        // console.log(`${_name}'s config: ${this.saveTo}`);
+    }
+    public initialize(_name:string, _sub = null, _version = Config.appVersion) {
         this.version = _version;
         this.blacklist = [];
         this.subDir = _sub;
         this.name = _name;
-        // console.log(`${_name}'s config: ${this.saveTo}`);
     }
     public set sub(n:string) {
         this.subDir = n;

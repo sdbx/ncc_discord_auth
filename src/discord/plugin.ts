@@ -7,6 +7,7 @@ import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
 import Ncc from "../ncc/ncc";
+import Profile from "../structure/profile";
 import Lang from "./lang";
 import { MainCfg } from "./runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, getFirst, getFirstMap, ParamType } from "./runutil";
@@ -178,6 +179,9 @@ export default abstract class Plugin {
                     errorMsg = param;
                     Log.w("Config", `${_path} 퉤에엣`);
                     break;
+                } else if (view) {
+                    oldValue = depth.toString();
+                    value = depth.toString();
                 } else if (i < split.length - 1) {
                     if (typeof depth !== "object") {
                         const param = {
@@ -204,7 +208,7 @@ export default abstract class Plugin {
                         } break;
                         case "number" : {
                             const num = Number.parseFloat(value);
-                            if (!Number.isNaN(num) && !Number.isFinite(num)) {
+                            if (!Number.isNaN(num) && Number.isFinite(num)) {
                                 data = num;
                             }
                         } break;
@@ -224,10 +228,8 @@ export default abstract class Plugin {
                     }
                     if (data != null) {
                         oldValue = depth;
-                        if (!view) {
-                            set(config,_path,data);
-                            await this.onSave();
-                        }
+                        set(config, _path, data);
+                        await this.onSave();
                     }
                     break;
                 }
@@ -395,12 +397,58 @@ export default abstract class Plugin {
             return sync ? cfg : proxy;
         }
         const newI:T = new (parent["constructor"] as any)(subName, parent.name) as T;
-        // newI.initialize(subName, parent.name, !sync);
+        newI.initialize(subName, parent.name);
         await newI.import(false).catch(Log.e);
         if (sync) {
             this.subs.set(key, newI);
         }
         return Promise.resolve(newI);
+    }
+    /**
+     * get default formatted rich
+     */
+    public get defaultRich():Discord.RichEmbed {
+        const rich = new Discord.RichEmbed();
+        rich.setColor(this.global.embedColor);
+        if (this.global != null && this.global.authUsers.length >= 1) {
+            const admin = this.global.authUsers[0];
+            if (this.client.users.has(admin)) {
+                const user = this.client.users.get(admin);
+                rich.setThumbnail(user.avatarURL);
+            }
+        }
+        return rich;
+    }
+    /**
+     * get rich profile from naver account
+     * @param member naver accont object
+     * @param name discord author name
+     * @param icon discord author icon
+     */
+    protected async getRichByNaver(member:Profile, name?:string, icon?:string) {
+        // image
+        if (member.profileurl == null) {
+            member.profileurl = "https://ssl.pstatic.net/static/m/cafe/mobile/cafe_profile_c77.png";
+        }
+        // const image:Buffer = await request.get(member.profileurl, { encoding: null });
+        // rich message
+        const rich = this.defaultRich;
+        rich.setFooter(member.cafeDesc == null ? "네이버 카페" : member.cafeDesc, member.cafeImage);
+        // rich.attachFile(new Discord.Attachment(image, "profile.png"));
+        // rich.setThumbnail("attachment://profile.png");
+        rich.setThumbnail(member.profileurl);
+        if (name != null) {
+            rich.setAuthor(name, icon);
+        }
+        rich.addField("네이버 ID", member.userid, true);
+        rich.addField("네이버 닉네임", member.nickname, true);
+        if (member.level != null) {
+            rich.addField("등급", member.level, true);
+            rich.addField("총 방문 수", member.numVisits, true);
+            rich.addField("총 게시글 수", member.numArticles, true);
+            rich.addField("총 댓글 수", member.numComments, true);
+        }
+        return Promise.resolve(rich);
     }
     /**
      * Get key of subconfig

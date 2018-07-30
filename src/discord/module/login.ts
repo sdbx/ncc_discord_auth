@@ -75,7 +75,7 @@ export default class Login extends Plugin {
         }
         const _status = this.status.check(this.global,command,state);
         if (_status.match) {
-            const send = new Discord.RichEmbed();
+            const send = this.defaultRich;
             const nState =
                 await this.ncc.availableAsync() ? lang.naverOn : lang.naverOff;
             send.addField("네이버 로그인", nState);

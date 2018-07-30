@@ -11,7 +11,7 @@ import { cafePrefix } from "../../ncc/ncconstant";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
-import { AuthConfig, getNaver, getRichByProfile } from "./auth";
+import { AuthConfig, getNaver } from "./auth";
 
 export default class Cast extends Plugin {
     // declare config file: use save data
@@ -273,7 +273,7 @@ export default class Cast extends Plugin {
                     message.type === "join" ? "접속" : "퇴장"}하셨습니다.`
                 const cafeID = message.room.cafe.id;
                 const member = await this.ncc.getMemberById(cafeID,message.user.id);
-                const desc = await getRichByProfile(member);
+                const desc = await this.getRichByNaver(member);
                 await webhook.send(title,desc);
             } break;
             case "changeName": {

@@ -58,7 +58,8 @@ export default class Lang extends Config {
      */
     public auth = {
         authCmdDesc: "네이버 카페 회원인지 인증하는거다냥!",
-        nickNotFound: "%(nick)s(%(type)s) 회원을 찾을 수 없다냥..",
+        nickNotFound: "%(nick)s 회원을 찾을 수 없다냥..",
+        noAuth: "%(nick)s 유저는 인증이 안되어 있다냥..",
         roomNotMaked: "방을 못만들었다냥! 실패다냥~",
         onlyGroup: "그룹만 사용할 수 있다냥!",
         proxyFailed: "인증용 채팅방이 존재하지 않는다냥.",
