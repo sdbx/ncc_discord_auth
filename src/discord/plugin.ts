@@ -10,7 +10,7 @@ import Ncc from "../ncc/ncc";
 import Profile from "../structure/profile";
 import Lang from "./lang";
 import { MainCfg } from "./runtime";
-import { ChainData, CmdParam, CommandHelp, CommandStatus, getFirst, getFirstMap, ParamType } from "./runutil";
+import { ChainData, CmdParam, CommandHelp, getFirst, getFirstMap, getRichTemplate } from "./runutil";
 /**
  * The base of bot command executor
  * @class 플러그인
@@ -408,16 +408,7 @@ export default abstract class Plugin {
      * get default formatted rich
      */
     public get defaultRich():Discord.RichEmbed {
-        const rich = new Discord.RichEmbed();
-        rich.setColor(this.global.embedColor);
-        if (this.global != null && this.global.authUsers.length >= 1) {
-            const admin = this.global.authUsers[0];
-            if (this.client.users.has(admin)) {
-                const user = this.client.users.get(admin);
-                rich.setThumbnail(user.avatarURL);
-            }
-        }
-        return rich;
+        return getRichTemplate(this.global, this.client);
     }
     /**
      * get rich profile from naver account

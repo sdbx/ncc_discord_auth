@@ -1,6 +1,7 @@
 import * as Discord from "discord.js";
 import { EventEmitter } from "events";
 import { a } from "hangul-js";
+import * as path from "path";
 import { sprintf } from "sprintf-js";
 import Config from "../config";
 import Log from "../log";
@@ -14,7 +15,7 @@ import Gather from "./module/gather";
 import Login from "./module/login";
 import Ping from "./module/ping";
 import Plugin from "./plugin";
-import { CmdParam, CommandHelp, DiscordFormat, ParamType } from "./runutil";
+import { CmdParam, CommandHelp, DiscordFormat, getRichTemplate, ParamType } from "./runutil";
 
 /**
  * List of presets
@@ -71,8 +72,10 @@ export default class Runtime extends EventEmitter {
     constructor() {
         super();
         this.plugins = [];
+        const moduleDir = path.resolve("./module");
+        Log.d(moduleDir);
         this.plugins.push(
-         new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier());
+            new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier());
     }
     /**
      * **Async**
@@ -284,7 +287,7 @@ export default class Runtime extends EventEmitter {
                 await msg.channel.send(sprintf(this.lang.helpNoExists, { help: dest }));
             } else {
                 for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
-                    const richMsg = this.plugins[0].defaultRich;
+                    const richMsg = this.defaultRich;
                     richMsg.setTitle(this.lang.helpTitle);
                     richMsg.setAuthor(DiscordFormat.getNickname(msg), msg.author.avatarURL);
                     for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
@@ -435,6 +438,12 @@ export default class Runtime extends EventEmitter {
             }
         }
         return Promise.resolve(null);
+    }
+    /**
+     * get default formatted rich
+     */
+    private get defaultRich():Discord.RichEmbed {
+        return getRichTemplate(this.global, this.client);
     }
 }
 /**

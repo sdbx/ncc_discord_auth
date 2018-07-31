@@ -45,7 +45,7 @@ export default class ArtiNoti extends Plugin {
             } else {
                 cfg.toPostChannel.push(msg.channel.id);
             }
-            const rich = new Discord.RichEmbed();
+            const rich = this.defaultRich;
             rich.addField("수신 채널 목록",cfg.toPostChannel.length <= 0 ? "없음" : cfg.toPostChannel.join(","));
             await msg.channel.send(rich);
             await cfg.export();
@@ -83,7 +83,7 @@ export default class ArtiNoti extends Plugin {
                     try {
                         const article = await this.ncc.getArticleDetail(cafe.cafeId, _ar.articleId);
                         const user = await this.ncc.getMemberById(cafe.cafeId,article.userId);
-                        const rich = new Discord.RichEmbed();
+                        const rich = this.defaultRich;
                         rich.setTitle(article.articleTitle);
                         // tslint:disable-next-line
                         rich.setAuthor(user.nickname, user.profileurl, `${cafePrefix}/CafeMemberNetworkView.nhn?clubid=${cafe.cafeId.toString(10)}&m=view&memberid=${user.userid}`);

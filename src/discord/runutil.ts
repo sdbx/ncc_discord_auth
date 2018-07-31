@@ -108,7 +108,6 @@ export class CommandHelp {
             return new CommandStatus(output.match, output.reqParam, output.requires,
                 output.opticals, output.command);
         }
-        Log.d("Command", this.cmds.join(","));
         if (global.prefix.test(content)) {
             const blocks = this.splitByFields(content, global.prefix, this.fields);
             if (blocks == null) {
@@ -255,7 +254,6 @@ export class CommandHelp {
         // cut suffix
         const suffixReg = new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig, "|")})?$`, "ig");
         const suffix = getFirst(chain.match(suffixReg));
-        Log.d(suffixReg.source);
         if (suffix == null) {
             return null;
         }
@@ -680,4 +678,16 @@ export function substrMatch(str:string, start:number | string[], end:number | st
     }
     end = Math.min(str.length, end + endOffset);
     return str.substring(start, end);
+}
+export function getRichTemplate(global:MainCfg, client:Discord.Client) {
+    const rich = new Discord.RichEmbed();
+    rich.setColor(global.embedColor);
+    if (global != null && global.authUsers.length >= 1) {
+        const admin = global.authUsers[0];
+        if (client.users.has(admin)) {
+            const user = client.users.get(admin);
+            rich.setThumbnail(user.avatarURL);
+        }
+    }
+    return rich;
 }
