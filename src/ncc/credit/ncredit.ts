@@ -8,6 +8,7 @@ import * as request from "request-promise-native";
 import { Cookie, CookieJar, parseDate } from "tough-cookie";
 import Log from "../../log";
 import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, COOKIE_SITES } from "../ncconstant";
+import { asJSON, parseURL } from "../nccutil";
 import encryptKey from "./loginencrypt";
 
 export default class NCredit extends EventEmitter {
@@ -84,7 +85,6 @@ export default class NCredit extends EventEmitter {
             COOKIE_SITES.forEach((v) => {
                 const cookies = cookie.getCookies(v);
                 for (const _cookie of cookies) {
-                    Log.d("Cookie", _cookie.toString());
                     const tCookie = new Cookie();
                     tCookie.key = _cookie.key;
                     tCookie.value = _cookie.value;
@@ -144,19 +144,18 @@ export default class NCredit extends EventEmitter {
      * @returns username or Promise.reject() (fail)
      */
     public async validateLogin() {
-        const content = this.asJSON(await this.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`));
-        log(JSON.stringify(content));
+        const content = asJSON(await this.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`));
         if (content == null) {
             // not found.
             return Promise.reject("404 NOT FOUND");
         }
-        const errorCode = get(content, "message.error.code", {default: "-1"});
+        const errorCode = get(content, "message.status", {default: "-1"});
         if (errorCode === "1002") {
             // {"message":{"status":"500","error":{"code":"1002","msg":"로그인이 필요합니다","errorResult":null},"result":null}}
             // 로그인이 필요합니다
             return Promise.reject("1002 NEED LOGIN");
         }
-        return errorCode === "200" ? this.username : Promise.reject(`${errorCode} UNKNOWN`);
+        return errorCode === "200" ? Promise.resolve(this.username) : Promise.reject(`${errorCode} UNKNOWN`);
     }
     /**
      * set Password.
@@ -181,7 +180,7 @@ export default class NCredit extends EventEmitter {
      */
     public async reqGet(url:string, sub:{[key:string]: string} = {}, encoding = "utf-8", referer = CHAT_HOME_URL) {
         if (url.indexOf("?") >= 0) {
-            const parse = this.fromURL(url);
+            const parse = parseURL(url);
             url = parse.url;
             sub = {
                 ...sub,
@@ -213,44 +212,14 @@ export default class NCredit extends EventEmitter {
         }
     }
     public get export() {
-        return JSON.stringify(this.cookieJar.serializeSync());
+        return JSON.stringify(this.cookieJar.serializeSync(), null, "\t");
     }
     public import(cookieStr:string) {
-        this.cookieJar = new CookieJar();
         try {
-            const r = (this.cookieJar as any).deserializeSync(cookieStr);
-            if (r == null) {
-                log("Cookie parse:fail");
-            }
+            this.cookieJar = CookieJar.deserializeSync(cookieStr);
         } catch {
             log("Cookie parse:fail");
         }
-    }
-    private asJSON(str:string):object {
-        let obj = null;
-        try {
-            obj = JSON.parse(str);
-        } catch {
-            // nothing.
-        }
-        return obj;
-    }
-    private fromURL(str:string) {
-        const out = {
-            url: str.indexOf("?") >= 0 ? str.substring(0, str.indexOf("?")) : str,
-            params: {} as {[key:string]: string},
-        }
-        if (str.indexOf("?") >= 0 && str.length > str.indexOf("?") + 1) {
-            const params = str.substr(str.indexOf("?") + 1);
-            params.split("&").map((v) => {
-                if (v.indexOf("=") >= 0) {
-                    return [v.split("=")[0], v.split("=")[1]];
-                } else {
-                    return [v, ""];
-                }
-            }).forEach(([key,value]) => params[key] = value);
-        }
-        return out;
     }
 }
 export interface LoginError {

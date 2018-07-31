@@ -1,11 +1,30 @@
+import * as get from "get-value";
 import Session, { Message } from "node-ncc-es6";
+import Cache from "../cache";
+import Log from "../log";
+import NCredit from "./credit/ncredit";
+import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, COOKIE_SITES } from "./ncconstant";
+import { asJSON, parseURL } from "./nccutil";
 import NcFetch from "./ncfetch";
+import NcCredent from "./ncredent";
+import NcBaseChannel from "./talk/ncbasechannel";
 
 export default class Ncc extends NcFetch {
     protected session:Session;
     constructor() {
         super();
     }
+    /**
+     * Fetch current channels
+     */
+    public async fetchChannels() {
+        const content = asJSON(await this.credit.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`));
+        const channels = (get(content, "message.result.channelList") as object[])
+            .map((channel) => new NcBaseChannel(channel));
+        channels.forEach((v) => Log.json("Test", v));
+        return channels;
+    }
+
     public async getRoom(roomID:string) {
         if (await this.availableAsync()) {
             const rooms = (await this.chat.getRoomList()).filter((_v) => _v.id === roomID);

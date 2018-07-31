@@ -19,27 +19,23 @@ async function start() {
     await run.start();
 }
 Log.hook();
-start();
+// start();
+init();
 
 
 async function init() {
+    /*
     run = new Runtime();
     await run.start();
+    */
     const ncc = new Ncc();
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
-    /*
     if (loaded != null) {
         Log.d(`name: ${loaded}`);
         const ar = await ncc.getArticleDetail(26686242, 7382);
-        const ac = await ncc.getMember(26686242, "벨붕",true);
         if (ncc.available) {
-            const room:Room = await ncc.chat.createRoom({id: ac[0].cafeId}, [{ id: ac[0].userid }]);
-            Log.d(`https://talk.cafe.naver.com/channels/${room.id}`);
-            await ncc.chat.sendText(room, "반가워");
-            await ncc.chat.deleteRoom(room);
-            Log.d("Hello World");
+            await ncc.fetchChannels();
         }
     }
-    */
 }
 // init();
