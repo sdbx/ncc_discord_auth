@@ -41,26 +41,6 @@ export default class NcFetch extends NcCredent {
             return Promise.reject();
         }
         /**
-         * Copy tough-cookie to request-cookie
-         */
-        const cookie = request.jar();
-        if (option.useAuth) {
-            for (const url of ["https://nid.naver.com", "https://naver.com"]) {
-                await new Promise<void>((res, rej) => {
-                    this.credit.cookieJar.getCookies(url, (err, cookies) => {
-                        if (err) {
-                            rej(err);
-                        } else {
-                            cookies.forEach((value) => {
-                                cookie.setCookie(value.toString(), url);
-                            });
-                            res();
-                        }
-                    });
-                });
-            }
-        }
-        /**
          * form data modification
          */
         let post_body = null;
@@ -86,7 +66,7 @@ export default class NcFetch extends NcCredent {
                     `application/x-www-form-urlencoded; charset=${encode}` : undefined),
                 "User-Agent": userAgent,
             },
-            jar: option.useAuth ? cookie : false
+            jar: option.useAuth ? this.credit.reqCookie : false
         }
         // log url
         const query = querystring.stringify(options.qs, "&", "=");

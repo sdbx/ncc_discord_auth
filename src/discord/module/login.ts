@@ -6,7 +6,7 @@ import { sprintf } from "sprintf-js";
 import * as tmp from "tmp-promise";
 import Config from "../../config";
 import Log from "../../log";
-import { LoginError } from "../../ncc/ncredent";
+import { LoginError } from "../../ncc/credit/ncredit";
 import Plugin from "../plugin";
 import { MainCfg } from "../runtime";
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";

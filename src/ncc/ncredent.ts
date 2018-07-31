@@ -9,14 +9,15 @@ import { CookieJar } from "tough-cookie";
 import Cache from "../cache";
 import Config from "../config";
 import Log from "../log";
+import NCredit, { LoginError } from "./credit/ncredit";
 
 export default class NcCredent extends EventEmitter {
-    protected credit:Credentials;
+    protected credit:NCredit;
     protected readonly cookiePath;
     private _name:Cache<string>;
     constructor() {
         super();
-        this.credit = new Credentials("id","pw");
+        this.credit = new NCredit("id","pw");
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie");
         this._name = new Cache("",1);
     }
@@ -82,27 +83,10 @@ export default class NcCredent extends EventEmitter {
      */
     public async requestCredent(username:string,password:string,
             captcha?:{key:string,value:string}):Promise<string> {
-        this.credit = new Credentials(username,password);
-        let errorCase:string = null;
-        await this.credit.login(captcha).catch((err:Error) => errorCase = err.message);
-        if (errorCase != null) {
-            const errorCode = {
-                pwd: false,
-                captcha: false,
-            } as LoginError;
-            if (errorCase.indexOf("Invalid username or password") >= 0) {
-                // not work :(
-                errorCode.pwd = true;
-            }
-            if (errorCase.indexOf("캡차이미지") >= 0) {
-                errorCode.captcha = true;
-                const pt = errorCase.match(/https.+?"/i);
-                if (pt != null) {
-                    errorCode.captchaURL = pt[0].substring(0,pt[0].lastIndexOf("\""));
-                    const url = errorCode.captchaURL;
-                    errorCode.captchaKey = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"));
-                }
-            }
+        this.credit.set(username, password);
+        let errorCode:LoginError = null;
+        await this.credit.login(captcha).catch((err:LoginError) => errorCode = err);
+        if (errorCode != null) {
             return Promise.reject(errorCode);
         }
         const name = await this.validateLogin();
@@ -110,7 +94,7 @@ export default class NcCredent extends EventEmitter {
         if (name != null) {
             this.credit.username = name;
             this._name = new Cache(name, 43200);
-            await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
+            await fs.writeFile(this.cookiePath, this.credit.export);
             await this.onLogin(name);
         } else {
             this._name.revoke();
@@ -122,13 +106,13 @@ export default class NcCredent extends EventEmitter {
      * @returns naver username or null(error)
      */
     public async loadCredit():Promise<string> {
-        this.credit = new Credentials("id", "pw");
+        this.credit.clear();
         const cookieStr:string = await fs.readFile(this.cookiePath, "utf-8").catch(() => null);
         if (cookieStr == null) {
             return Promise.resolve(null);
         }
         try {
-            this.credit.setCookieJar(JSON.parse(cookieStr));
+            this.credit.import(cookieStr);
         } catch (err) {
             await fs.remove(this.cookiePath); 
             Log.e(err);
@@ -138,7 +122,7 @@ export default class NcCredent extends EventEmitter {
         if (result != null) {
             this.credit.username = result;
             this._name = new Cache(result, 43200);
-            await fs.writeFile(this.cookiePath, JSON.stringify(this.credit.getCookieJar()));
+            await fs.writeFile(this.cookiePath, this.credit.export);
             await this.onLogin(result);
         } else {
             this._name.revoke();
@@ -149,10 +133,4 @@ export default class NcCredent extends EventEmitter {
         Log.i("Runtime-ncc",`Logined by ${username}.`);
         return Promise.resolve();
     }
-}
-export interface LoginError {
-    pwd:boolean;
-    captcha:boolean;
-    captchaURL?:string;
-    captchaKey?:string;
 }
