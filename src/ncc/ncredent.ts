@@ -46,8 +46,33 @@ export default class NcCredent extends EventEmitter {
      */
     public async genCreditByConsole():Promise<string> {
         const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id");
-        const password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__");
-        return this.requestCredent(username,password).catch((err:LoginError) => null);
+        let password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__");
+        let result:string | LoginError;
+        let captcha = null;
+        do {
+            try {
+                result = await this.requestCredent(username,password, captcha);
+            } catch (err) {
+                result = err;
+            }
+            if (result == null) {
+                return Promise.resolve(null);
+            }
+            if (typeof result === "string") {
+                return Promise.resolve(result);
+            }
+            if (result.captcha) {
+                Log.i("Captcha-URL", result.captchaURL);
+                password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__");
+                const captchaRead = await Log.read("Captcha", {hide:false, logResult: true}).catch(() => "");
+                captcha = {
+                    key: result.captchaKey,
+                    value: captchaRead,
+                }
+            } else {
+                return Promise.resolve(null);
+            }
+        } while (true);
     }
     /**
      * get credentials from userid and password
@@ -66,6 +91,7 @@ export default class NcCredent extends EventEmitter {
                 captcha: false,
             } as LoginError;
             if (errorCase.indexOf("Invalid username or password") >= 0) {
+                // not work :(
                 errorCode.pwd = true;
             }
             if (errorCase.indexOf("캡차이미지") >= 0) {
@@ -73,12 +99,14 @@ export default class NcCredent extends EventEmitter {
                 const pt = errorCase.match(/https.+?"/i);
                 if (pt != null) {
                     errorCode.captchaURL = pt[0].substring(0,pt[0].lastIndexOf("\""));
+                    const url = errorCode.captchaURL;
+                    errorCode.captchaKey = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"));
                 }
             }
             return Promise.reject(errorCode);
         }
         const name = await this.validateLogin();
-        this.credit.password = "__";
+        // this.credit.password = "__";
         if (name != null) {
             this.credit.username = name;
             this._name = new Cache(name, 43200);
@@ -126,4 +154,5 @@ export interface LoginError {
     pwd:boolean;
     captcha:boolean;
     captchaURL?:string;
+    captchaKey?:string;
 }
