@@ -1,10 +1,11 @@
 import * as get from "get-value";
 import * as io from "socket.io-client";
+import { EventDispatcher, IEventHandler } from "strongly-typed-events";
 import Log from "../../log";
 import Cafe from "../../structure/cafe";
 import Profile from "../../structure/profile";
 import NCredit from "../credit/ncredit";
-import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, CHAT_SOCKET_IO, COOKIE_SITES } from "../ncconstant";
+import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, COOKIE_SITES, NcIDBase } from "../ncconstant";
 import { getFirst } from "../nccutil";
 import NcBaseChannel, { INcChannel } from "./ncbasechannel";
 import NcMessage from "./ncmessage";
@@ -37,11 +38,28 @@ export default class NcChannel extends NcBaseChannel {
      * Fetched messages
      */
     public messages:Map<number, NcMessage> = new Map();
+    /**
+     * events
+     */
+    public events:Events = new Events();
+    /**
+     * Credit for internal use
+     */
+    protected credit:NCredit = null;
     private constructor() {
         super(null);
     }
+    /**
+     * Register event
+     * @param dispatcher this.events 
+     * @param handler function
+     */
+    public on<V>(dispatcher:EventDispatcher<NcChannel, V>, handler:IEventHandler<NcChannel, V>) {
+        dispatcher.asEvent().subscribe(handler);
+    }
     public async connect(credit:NCredit) {
         const channel = this.channelID;
+        this.credit = credit;
         this.session = io(`${CHAT_BACKEND_URL}/chat`, {
             multiplex: false,
             timeout: 5000,
@@ -73,13 +91,7 @@ export default class NcChannel extends NcBaseChannel {
                 channelNo: channel,
             },
         });
-        /**
-         * Register message listeners.
-         */
-        // message handler
-        this.session.on(ChannelEvent.MESSAGE, this.onMessage.bind(this));
-
-        // debugs..
+        this.registerE(this.session);
         for (const errE of ["error", "connect_error", "reconnect_failed"]) {
             this.session.on(errE, (t) => {
                 Log.d(errE, t);
@@ -101,11 +113,19 @@ export default class NcChannel extends NcBaseChannel {
         }
         this.session.open();
     }
-    public async update(credit:NCredit, id = -1) {
+    public async fetchChannel() {
+        return this.update();
+    }
+    public async update(credit:NCredit = null, id = -1) {
         if (id < 0) {
             id = this.channelID;
         } else {
             this.channelID = id;
+        }
+        if (credit != null) {
+            this.credit = credit;
+        } else {
+            credit = this.credit;
         }
         try {
             const sync = JSON.parse(await credit.reqGet(`${CHAT_API_URL}/channels/${id.toString(10)}/sync`));
@@ -135,12 +155,35 @@ export default class NcChannel extends NcBaseChannel {
             return Promise.reject(err);
         }
     }
-    protected async onMessage(eventmsg:object) {
-        const message = this.serialMsg(eventmsg);
-        if (message == null) {
-            return Promise.resolve();
-        }
-        this.emit(ChannelEvent.MESSAGE, message);
+    protected registerE(s:SocketIOClient.Socket) {
+        // message
+        s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
+            const message = this.serialMsg(eventmsg);
+            if (message == null) {
+                return Promise.resolve();
+            }
+            this.events.onMessage.dispatchAsync(this, message);
+        });
+        // member join
+        s.on(ChannelEvent.JOIN, async (eventmsg:object) => {
+            const msg = {channelID: eventmsg["channelNo"]};
+            const join = new Join(this.users);
+            await this.fetchChannel();
+            join.fetch(this.users);
+            this.events.onMemberJoin.dispatchAsync(this, join);
+        });
+        // member quit
+        s.on(ChannelEvent.QUIT, async (eventmsg:object) => {
+            const users = get(eventmsg, "userIdList", { default: [] }) as string[];
+            const msg = {
+                channelID: get(eventmsg, "channelNo"),
+                userIDs: users,
+                members: users.map((v) => getFirst(this.users.filter((_v) => _v.userid === v))),
+                deletedChannel: get(eventmsg, "deletedChannel"),
+            } as Quit;
+            await this.fetchChannel();
+            this.events.onMemberQuit.dispatchAsync(this, msg);
+        });
     }
     private serialMsg(msg:object) {
         if (get(msg, "channelNo") !== this.channelID) {
@@ -168,6 +211,11 @@ export default class NcChannel extends NcBaseChannel {
         return nick == null ? fallback : nick.nickname;
     }
 }
+class Events {
+    public onMessage = new EventDispatcher<NcChannel, NcMessage>();
+    public onMemberJoin = new EventDispatcher<NcChannel, Join>();
+    public onMemberQuit = new EventDispatcher<NcChannel, Quit>();
+}
 export enum ChannelEvent {
     SYSTEM = "sys",
     MESSAGE = "msg",
@@ -184,6 +232,23 @@ export enum ChannelEvent {
 export interface NccMember extends Profile {
     kickable:boolean;
     channelManageable:boolean;
+}
+export interface Quit extends NcIDBase {
+    userIDs:string[],
+    members:Profile[],
+    deletedChannel:number,
+}
+export class Join implements NcIDBase {
+    public channelID:number;
+    public newMember:Profile;
+    protected oldUsers:string[];
+    constructor(members:Profile[]) {
+        this.oldUsers = [];
+        this.oldUsers.push(...members.map((v) => v.userid));
+    }
+    public fetch(newMembers:Profile[]) {
+        this.newMember = getFirst(newMembers.filter((v) => this.oldUsers.indexOf(v.userid) < 0));
+    }
 }
 interface IChannelMember {
     memberId:string;

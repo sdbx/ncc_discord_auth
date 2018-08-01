@@ -5,7 +5,7 @@ import Cache from "../cache";
 import Log from "../log";
 import NCredit from "./credit/ncredit";
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, CHAT_SOCKET_IO, COOKIE_SITES } from "./ncconstant";
-import { asJSON, parseURL } from "./nccutil";
+import { asJSON, getFirst, parseURL } from "./nccutil";
 import NcFetch from "./ncfetch";
 import NcCredent from "./ncredent";
 import NcBaseChannel from "./talk/ncbasechannel";
@@ -32,12 +32,18 @@ export default class Ncc extends NcFetch {
         }
         const detail = await NcChannel.from(this.credit, channel);
         await detail.connect(this.credit);
-        detail.on(ChannelEvent.MESSAGE, (msg:NcMessage) => {
+        detail.on(detail.events.onMessage, (ch, msg) => {
             Log.d(NcMessage.typeAsString(msg.type), JSON.stringify(msg.content, null, 4));
             if (msg.embed != null) {
                 Log.d("embed", JSON.stringify(msg.embed, null, 4));
             }
         });
+        detail.on(detail.events.onMemberJoin, async (ch, join) => {
+            Log.d("Joined",join.newMember.nickname);
+        });
+        detail.on(detail.events.onMemberQuit, (ch, quit) => {
+            Log.d("Quited", getFirst(quit.members).nickname);
+        })
     }
 
     public async getRoom(roomID:string) {

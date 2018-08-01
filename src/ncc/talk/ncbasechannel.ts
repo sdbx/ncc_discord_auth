@@ -4,7 +4,7 @@ import Profile from "../../structure/profile";
 import { NcIDBase } from "../ncconstant";
 import NcMessage from "./ncmessage";
 
-export default class NcBaseChannel extends EventEmitter implements NcIDBase {
+export default class NcBaseChannel implements NcIDBase {
     /**
      * Channel ID
      * 
@@ -14,7 +14,6 @@ export default class NcBaseChannel extends EventEmitter implements NcIDBase {
     protected baseinfo:INcChannel;
     private _cafe:Cafe = null;
     constructor(obj:object) {
-        super();
         if (obj != null) {
             this.baseinfo = {...obj} as INcChannel;
             this.channelID = this.baseinfo.channelId;

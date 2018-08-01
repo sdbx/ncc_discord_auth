@@ -86,6 +86,7 @@
     "sha.js": "^2.4.10",
     "socket.io-client": "^2.1.1",
     "sprintf-js": "^1.1.1",
+    "strongly-typed-events": "^1.4.6",
     "tmp-promise": "^1.0.5",
     "tough-cookie": "^2.4.3",
     "typesafe-get": "^2.0.1"
