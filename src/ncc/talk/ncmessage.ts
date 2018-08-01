@@ -2,6 +2,16 @@ import * as get from "get-value";
 import Cafe from "../../structure/cafe";
 
 export default class NcMessage {
+    public static typeAsString(t:MessageType) {
+        switch (t) {
+            case MessageType.text: return "text";
+            case MessageType.image: return "image";
+            case MessageType.sticker: return "sticker";
+            case MessageType.system: return "system";
+            default: return "unknown";
+        }
+    }
+    public readCount:number;
     private readonly instance:INcMessage;
     private _cafe:Cafe;
     private _channelID:number;
@@ -9,6 +19,7 @@ export default class NcMessage {
         this.instance = {...obj} as INcMessage;
         this._cafe = cafe;
         this._channelID = channelId;
+        this.readCount = 0;
     }
     /**
      * Cafe Info

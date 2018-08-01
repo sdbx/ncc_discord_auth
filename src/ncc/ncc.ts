@@ -9,7 +9,8 @@ import { asJSON, parseURL } from "./nccutil";
 import NcFetch from "./ncfetch";
 import NcCredent from "./ncredent";
 import NcBaseChannel from "./talk/ncbasechannel";
-import NcChannel from "./talk/ncchannel";
+import NcChannel, { ChannelEvent } from "./talk/ncchannel";
+import NcMessage from "./talk/ncmessage";
 
 export default class Ncc extends NcFetch {
     protected session:Session;
@@ -31,6 +32,12 @@ export default class Ncc extends NcFetch {
         }
         const detail = await NcChannel.from(this.credit, channel);
         await detail.connect(this.credit);
+        detail.on(ChannelEvent.MESSAGE, (msg:NcMessage) => {
+            Log.d(NcMessage.typeAsString(msg.type), JSON.stringify(msg.content, null, 4));
+            if (msg.embed != null) {
+                Log.d("embed", JSON.stringify(msg.embed, null, 4));
+            }
+        });
     }
 
     public async getRoom(roomID:string) {

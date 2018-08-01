@@ -1,11 +1,13 @@
-﻿import Cafe from "../../structure/cafe";
+﻿import { EventEmitter } from "events";
+import Cafe from "../../structure/cafe";
 import Profile from "../../structure/profile";
 import NcMessage from "./ncmessage";
 
-export default class NcBaseChannel {
+export default class NcBaseChannel extends EventEmitter {
     protected baseinfo:INcChannel;
     private _cafe:Cafe = null;
     constructor(obj:object) {
+        super();
         if (obj != null) {
             this.baseinfo = {...obj} as INcChannel;
         }
