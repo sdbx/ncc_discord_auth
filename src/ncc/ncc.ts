@@ -49,16 +49,20 @@ export default class Ncc extends NcFetch {
         });
         // member leave
         test.on(test.events.onMemberQuit, (ch, quit) => {
-            Log.d("Quited", getFirst(quit.members).nickname);
+            Log.d("Quited", quit.first.nickname);
         });
         // room name changed
         test.on(test.events.onRoomnameChanged, (ch, name) => {
             Log.d("Changed room", "Before: " + name.before + 
                 " After: " + name.after + " Sender: " + name.modifier.nickname);
-        })
+        });
         // master changed
         test.on(test.events.onMasterChanged, (ch, master) => {
             Log.d("Changed master:", "ID: " + master.newMaster.userid);
+        });
+        // kicked user
+        test.on(test.events.onMemberKick, (ch, user) => {
+            Log.d("Kicked:", "ID: " + user.first.nickname);
         })
     }
     public async getRoom(roomID:string) {

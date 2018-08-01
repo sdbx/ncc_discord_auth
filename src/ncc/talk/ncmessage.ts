@@ -211,6 +211,7 @@ export enum MessageType {
 export enum SystemType {
     unknown = -1,
     changed_Roomname = 105,
+    kick = 106,
     changed_Master = 121,
 }
 export interface INcMessage {

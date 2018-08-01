@@ -174,41 +174,38 @@ export default class NcChannel extends NcBaseChannel {
         });
         // member quit
         s.on(ChannelEvent.QUIT, async (eventmsg:object) => {
-            const users = get(eventmsg, "userIdList", { default: [] }) as string[];
-            const msg = {
-                channelID: get(eventmsg, "channelNo"),
-                userIDs: users,
-                members: users.map((v) => getFirst(this.users.filter((_v) => _v.userid === v))),
-                deletedChannel: get(eventmsg, "deletedChannel"),
-            } as Quit;
+            const msg = this.serialQueryMsg(eventmsg);
             await this.syncChannel();
             this.events.onMemberQuit.dispatchAsync(this, msg);
+        });
+        s.on(ChannelEvent.KICK, async (eventmsg:object) => {
+            const action = this.serialQueryMsg(eventmsg);
+            const sys = this.serialSysMsg(eventmsg);
+            await this.syncChannel();
+            const msg = {
+                message: sys.msg,
+                ...action,
+                ...sys,
+            } as SysUserAction;
+            this.events.onMemberKick.dispatchAsync(this, msg);
         });
         // system message;;
         s.on(ChannelEvent.SYSTEM, async (eventmsg:object) => {
             const sync = get(eventmsg, "isSync", {default:false}) as boolean;
-            const message = this.serialMsg(eventmsg);
-            if (message == null || message.type !== MessageType.system) {
-                return Promise.resolve();
-            }
             if (sync) {
                 await this.syncChannel();
             }
-            const modifier = getFirst(this.users.filter((v) => v.userid === get(message.sender, "naverId")));
-            let actionDest = null;
-            try {
-                const extras = JSON.parse(get(eventmsg, "message.extras"));
-                const _json = JSON.parse(get(extras, "cafeChatEventJson"));
-                actionDest = get(_json, "actionItem", { default: null });
-            } catch {
-                // :)
+            const serialMsg = this.serialSysMsg(eventmsg);
+            const message = serialMsg.msg;
+            if (message == null || message.type !== MessageType.system) {
+                return Promise.resolve();
             }
             switch (message.systemType) {
                 // type: room name change
                 case SystemType.changed_Roomname: {
                     let content = (message.content as string);
                     let before = null;
-                    let after = actionDest;
+                    let after = serialMsg.actionDest;
                     if (after != null) {
                         // fixed
                         content = content.substring(0, content.lastIndexOf(after) - 3);
@@ -226,16 +223,16 @@ export default class NcChannel extends NcBaseChannel {
                         before,
                         after,
                         message,
-                        modifier,
+                        modifier: serialMsg.modifier,
                     } as RoomName);
                 } break;
                 case SystemType.changed_Master: {
                     this.events.onMasterChanged.dispatchAsync(this, {
-                        newMasterNick: actionDest,
-                        newMaster: getFirst(this.users.filter((v) => v.nickname === actionDest)),
+                        newMasterNick: serialMsg.actionDest,
+                        newMaster: getFirst(this.users.filter((v) => v.nickname === serialMsg.actionDest)),
                         channelID: this.channelID,
                         message,
-                        modifier,
+                        modifier: serialMsg.modifier,
                     } as Master);
                 }
             }
@@ -262,6 +259,35 @@ export default class NcChannel extends NcBaseChannel {
         ncMsg.readCount = Math.max(0, _message.readCount);
         return ncMsg;
     }
+    private serialSysMsg(msg:object) {
+        const message = this.serialMsg(msg);
+        const modifier = getFirst(this.users.filter((v) => v.userid === get(message.sender, "naverId")));
+        let actionDest = null;
+        try {
+            const extras = JSON.parse(get(msg, "message.extras"));
+            const _json = JSON.parse(get(extras, "cafeChatEventJson"));
+            actionDest = get(_json, "actionItem", { default: null });
+        } catch {
+            // :)
+        }
+        return {
+            msg:message,
+            modifier,
+            actionDest,
+        }
+    }
+    private serialQueryMsg(param:object) {
+        const users = get(param, "userIdList", { default: [] }) as string[];
+        const members = users.map((v) => getFirst(this.users.filter((_v) => _v.userid === v)));
+        const msg = {
+            channelID: get(param, "channelNo"),
+            userIDs: users,
+            members,
+            first: getFirst(members),
+            deletedChannel: get(param, "deletedChannel"),
+        } as UserAction;
+        return msg;
+    }
     private getNick(id:string, fallback:string = null) {
         const nick = getFirst(this.users.filter((v) => v.userid === id));
         return nick == null ? fallback : nick.nickname;
@@ -270,7 +296,8 @@ export default class NcChannel extends NcBaseChannel {
 class Events {
     public onMessage = new EventDispatcher<NcChannel, NcMessage>();
     public onMemberJoin = new EventDispatcher<NcChannel, Join>();
-    public onMemberQuit = new EventDispatcher<NcChannel, Quit>();
+    public onMemberQuit = new EventDispatcher<NcChannel, UserAction>();
+    public onMemberKick = new EventDispatcher<NcChannel, SysUserAction>();
     public onRoomnameChanged = new EventDispatcher<NcChannel, RoomName>();
     public onMasterChanged = new EventDispatcher<NcChannel, Master>();
 }
@@ -291,10 +318,14 @@ export interface NccMember extends Profile {
     kickable:boolean;
     channelManageable:boolean;
 }
-export interface Quit extends NcIDBase {
+export interface UserAction extends NcIDBase {
     userIDs:string[];
+    first:Profile;
     members:Profile[];
     deletedChannel:number;
+}
+export interface SysUserAction extends UserAction, SysMsg {
+    // ?
 }
 export class Join implements NcIDBase {
     public channelID:number;
