@@ -1,7 +1,8 @@
 import * as get from "get-value";
 import Cafe from "../../structure/cafe";
+import { NcIDBase } from "../ncconstant";
 
-export default class NcMessage {
+export default class NcMessage implements NcIDBase {
     public static typeAsString(t:MessageType) {
         switch (t) {
             case MessageType.text: return "text";
@@ -11,14 +12,22 @@ export default class NcMessage {
             default: return "unknown";
         }
     }
+    /**
+     * Channel ID (only ID)
+     * 
+     * 보낸 방의 ID (오직 ID만)
+     */
+    public channelID:number;
+    /**
+     * 안읽은 숫자
+     */
     public readCount:number;
     private readonly instance:INcMessage;
     private _cafe:Cafe;
-    private _channelID:number;
     constructor(obj:object, cafe:Cafe, channelId:number) {
         this.instance = {...obj} as INcMessage;
         this._cafe = cafe;
-        this._channelID = channelId;
+        this.channelID = channelId;
         this.readCount = 0;
     }
     /**
@@ -28,14 +37,6 @@ export default class NcMessage {
      */
     public get cafe() {
         return this._cafe;
-    }
-    /**
-     * Channel ID (only ID)
-     * 
-     * 보낸 방의 ID (오직 ID만)
-     */
-    public get channelId() {
-        return this._channelID;
     }
     /**
      * Message ID

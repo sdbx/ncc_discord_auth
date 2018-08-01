@@ -16,7 +16,7 @@ export default class NcChannel extends NcBaseChannel {
      * @param id 
      */
     public static async from(credit:NCredit, id:number | NcBaseChannel) {
-        id = (typeof id === "number") ? id : id.channelId;
+        id = (typeof id === "number") ? id : id.channelID;
         const instance = new NcChannel();
         try {
             await instance.update(credit, id);
@@ -41,7 +41,7 @@ export default class NcChannel extends NcBaseChannel {
         super(null);
     }
     public async connect(credit:NCredit) {
-        const channel = this.channelId;
+        const channel = this.channelID;
         this.session = io(`${CHAT_BACKEND_URL}/chat`, {
             multiplex: false,
             timeout: 5000,
@@ -103,7 +103,9 @@ export default class NcChannel extends NcBaseChannel {
     }
     public async update(credit:NCredit, id = -1) {
         if (id < 0) {
-            id = this.channelId;
+            id = this.channelID;
+        } else {
+            this.channelID = id;
         }
         try {
             const sync = JSON.parse(await credit.reqGet(`${CHAT_API_URL}/channels/${id.toString(10)}/sync`));
@@ -141,7 +143,7 @@ export default class NcChannel extends NcBaseChannel {
         this.emit(ChannelEvent.MESSAGE, message);
     }
     private serialMsg(msg:object) {
-        if (get(msg, "channelNo") !== this.channelId) {
+        if (get(msg, "channelNo") !== this.channelID) {
             Log.w("Message's channelID doesn't match.");
             return null;
         }
@@ -157,7 +159,8 @@ export default class NcChannel extends NcBaseChannel {
             type: _message.typeCode,
             createdTime: _message.createTime,
             extras: _message.extras,
-        }, this.cafe, this.channelId);
+        }, this.cafe, this.channelID);
+        ncMsg.readCount = Math.max(0, _message.readCount);
         return ncMsg;
     }
     private getNick(id:string, fallback:string = null) {

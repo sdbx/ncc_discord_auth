@@ -9,3 +9,6 @@ export enum CHAT_APIS {
 export const COOKIE_SITES = ["https://nid.naver.com", "https://naver.com", CHAT_HOME_URL];
 export const CHAT_BACKEND_URL = "https://talkwss.cafe.naver.com";
 export const CHAT_SOCKET_IO = "https://talkwss.cafe.naver.com/socket.io/";
+export interface NcIDBase {
+    channelID:number;
+}

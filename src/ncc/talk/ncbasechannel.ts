@@ -1,24 +1,24 @@
 ﻿import { EventEmitter } from "events";
 import Cafe from "../../structure/cafe";
 import Profile from "../../structure/profile";
+import { NcIDBase } from "../ncconstant";
 import NcMessage from "./ncmessage";
 
-export default class NcBaseChannel extends EventEmitter {
+export default class NcBaseChannel extends EventEmitter implements NcIDBase {
+    /**
+     * Channel ID
+     * 
+     * 채널 고유 ID
+     */
+    public channelID:number;
     protected baseinfo:INcChannel;
     private _cafe:Cafe = null;
     constructor(obj:object) {
         super();
         if (obj != null) {
             this.baseinfo = {...obj} as INcChannel;
+            this.channelID = this.baseinfo.channelId;
         }
-    }
-    /**
-     * Channel ID
-     * 
-     * 채널 고유 ID
-     */
-    public get channelId() {
-        return this.baseinfo.channelId;
     }
     /**
      * Unread count
@@ -92,7 +92,7 @@ export default class NcBaseChannel extends EventEmitter {
      * 최근 메세지
      */
     public get lastMessage():NcMessage {
-        return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelId);
+        return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelID);
     }
 }
 export interface INcChannel {

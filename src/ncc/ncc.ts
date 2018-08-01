@@ -28,7 +28,7 @@ export default class Ncc extends NcFetch {
     }
     public async connect(channel:number | NcBaseChannel) {
         if (typeof channel !== "number") {
-            channel = channel.channelId;
+            channel = channel.channelID;
         }
         const detail = await NcChannel.from(this.credit, channel);
         await detail.connect(this.credit);
