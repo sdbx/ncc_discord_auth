@@ -8,7 +8,7 @@ import NCredit from "../credit/ncredit";
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, COOKIE_SITES, NcIDBase } from "../ncconstant";
 import { getFirst } from "../nccutil";
 import NcBaseChannel, { INcChannel } from "./ncbasechannel";
-import NcMessage from "./ncmessage";
+import NcMessage, { MessageType, SystemType } from "./ncmessage";
 
 export default class NcChannel extends NcBaseChannel {
     /**
@@ -113,7 +113,7 @@ export default class NcChannel extends NcBaseChannel {
         }
         this.session.open();
     }
-    public async fetchChannel() {
+    public async syncChannel() {
         return this.update();
     }
     public async update(credit:NCredit = null, id = -1) {
@@ -168,7 +168,7 @@ export default class NcChannel extends NcBaseChannel {
         s.on(ChannelEvent.JOIN, async (eventmsg:object) => {
             const msg = {channelID: eventmsg["channelNo"]};
             const join = new Join(this.users);
-            await this.fetchChannel();
+            await this.syncChannel();
             join.fetch(this.users);
             this.events.onMemberJoin.dispatchAsync(this, join);
         });
@@ -181,9 +181,53 @@ export default class NcChannel extends NcBaseChannel {
                 members: users.map((v) => getFirst(this.users.filter((_v) => _v.userid === v))),
                 deletedChannel: get(eventmsg, "deletedChannel"),
             } as Quit;
-            await this.fetchChannel();
+            await this.syncChannel();
             this.events.onMemberQuit.dispatchAsync(this, msg);
         });
+        // system message;;
+        s.on(ChannelEvent.SYSTEM, async (eventmsg:object) => {
+            const sync = get(eventmsg, "isSync", {default:false}) as boolean;
+            const message = this.serialMsg(eventmsg);
+            if (message == null || message.type !== MessageType.system) {
+                return Promise.resolve();
+            }
+            if (sync) {
+                await this.syncChannel();
+            }
+            switch (message.systemType) {
+                // type: room name change
+                case SystemType.changed_roomname: {
+                    let content = (message.content as string);
+                    let before = null;
+                    let after = null;
+                    try {
+                        const extras = get(eventmsg, "message.extras");
+                        after = get(extras, "cafeChatEventJson.actionItem", {default: null});
+                    } catch {
+                        // :)
+                    }
+                    if (after != null) {
+                        // fixed
+                        content = content.substring(0, content.lastIndexOf(after) - 3);
+                        content = content.replace(/^.+?(님이 채팅방 이름을)\s/, "");
+                        before = content;
+                    } else {
+                        // acculate
+                        content = content.replace(/^.+?(님이 채팅방 이름을)\s/, "");
+                        before =  content.substring(0, content.lastIndexOf("에서"));
+                        content = content.substr(content.lastIndexOf("에서") + 3);
+                        after = content.substring(0, content.lastIndexOf("(으)로"));
+                    }
+                    this.events.onChangedRoomname.dispatchAsync(this,{
+                        channelID: this.channelID,
+                        before,
+                        after,
+                        message,
+                        modifier: getFirst(this.users.filter((v) => v.userid === message.sender.naverId)),
+                    } as RoomName);
+                }
+            }
+        })
     }
     private serialMsg(msg:object) {
         if (get(msg, "channelNo") !== this.channelID) {
@@ -215,6 +259,7 @@ class Events {
     public onMessage = new EventDispatcher<NcChannel, NcMessage>();
     public onMemberJoin = new EventDispatcher<NcChannel, Join>();
     public onMemberQuit = new EventDispatcher<NcChannel, Quit>();
+    public onChangedRoomname = new EventDispatcher<NcChannel, RoomName>();
 }
 export enum ChannelEvent {
     SYSTEM = "sys",
@@ -249,6 +294,12 @@ export class Join implements NcIDBase {
     public fetch(newMembers:Profile[]) {
         this.newMember = getFirst(newMembers.filter((v) => this.oldUsers.indexOf(v.userid) < 0));
     }
+}
+export interface RoomName extends NcIDBase {
+    before:string,
+    after:string,
+    message:NcMessage,
+    modifier?:Profile,
 }
 interface IChannelMember {
     memberId:string;

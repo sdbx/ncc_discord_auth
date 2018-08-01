@@ -71,6 +71,9 @@ export default class NcMessage implements NcIDBase {
             case MessageType.text: {
                 return this.instance.body;
             }
+            case MessageType.system: {
+                return this.instance.body;
+            }
             default: {
                 // system message
                 return this.instance.body;
@@ -89,8 +92,21 @@ export default class NcMessage implements NcIDBase {
         if ([1,10,11].indexOf(t) >= 0) {
             return t as MessageType;  
         } else {
-            return MessageType.system;
+            // 105: change room name
+            if ([101,102,103,105,106,121].indexOf(t) >= 0) {
+                return MessageType.system;
+            }
+            return MessageType.unknown;
         }
+    }
+    public get systemType():SystemType {
+        const t = this.instance.type;
+        for (const value of Object.values(SystemType)) {
+            if (t === value) {
+                return value;
+            }
+        }
+        return SystemType.unknown;
     }
     /**
      * Embed (세부 정보)
@@ -115,14 +131,34 @@ export default class NcMessage implements NcIDBase {
         return embed;
     }
     /**
-     * sender
+     * sender (system: null)
      * 
-     * 보낸 사람
+     * 보낸 사람 (system: null)
      */
-    public get sender() {
-        return {
-            naverId: this.instance.writerId,
-            nick: this.instance.writerName,
+    public get sender():{naverId:string, nick:string} {
+        if (this.type === MessageType.system) {
+            if (this.instance.extras == null) {
+                return null;
+            }
+            try {
+                const extra = JSON.parse(this.instance.extras);
+                const _sender = JSON.parse(get(extra, "cafeChatEventJson"));
+                const sender = get(_sender, "sender", { default: null });
+                if (sender == null) {
+                    return null;
+                }
+                return {
+                    naverId: get(sender, "id"),
+                    nick: get(sender, "nickName"),
+                }
+            } catch {
+                return null;
+            }
+        } else {
+            return {
+                naverId: this.instance.writerId,
+                nick: this.instance.writerName,
+            }
         }
     }
     /**
@@ -170,8 +206,12 @@ export enum MessageType {
     image = 11,
     sticker = 10,
     system = -1,
+    unknown = -2,
 }
-
+export enum SystemType {
+    unknown = -1,
+    changed_roomname = 105,
+}
 export interface INcMessage {
     id:number;
     body:string;

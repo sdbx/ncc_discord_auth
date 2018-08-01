@@ -43,6 +43,10 @@ export default class Ncc extends NcFetch {
         });
         detail.on(detail.events.onMemberQuit, (ch, quit) => {
             Log.d("Quited", getFirst(quit.members).nickname);
+        });
+        detail.on(detail.events.onChangedRoomname, (ch, name) => {
+            Log.d("Changed room", "Before: " + name.before + 
+                " After: " + name.after + " Sender: " + name.modifier.nickname);
         })
     }
 
