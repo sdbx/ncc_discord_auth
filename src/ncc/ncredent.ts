@@ -39,7 +39,11 @@ export default class NcCredent extends EventEmitter {
      * @returns naver username or null(error)
      */
     public async validateLogin():Promise<string> {
-        return this.credit.validateLogin().then((u) => u).catch(() => null);
+        const username:string = await this.credit.validateLogin().then((u) => u).catch(() => null);
+        if (username != null) {
+            this._name = new Cache(username, 43200);
+        }
+        return username;
     }
     /**
      * get credentials from console
@@ -118,16 +122,17 @@ export default class NcCredent extends EventEmitter {
             Log.e(err);
             return Promise.resolve(null);
         }
-        const result:string = await this.validateLogin();
-        if (result != null) {
-            this.credit.username = result;
-            this._name = new Cache(result, 43200);
+        const valid:string = await this.validateLogin().catch((err) => null);
+        let userid:string = null;
+        if (valid != null) {
+            userid = await this.credit.fetchUserID();
+            this._name = new Cache(userid, 43200);
             await fs.writeFile(this.cookiePath, this.credit.export);
-            await this.onLogin(result);
+            await this.onLogin(userid);
         } else {
             this._name.revoke();
         }
-        return Promise.resolve(result);
+        return Promise.resolve(userid == null ? valid : userid);
     }
     protected async onLogin(username:string):Promise<void> {
         Log.i("Runtime-ncc",`Logined by ${username}.`);

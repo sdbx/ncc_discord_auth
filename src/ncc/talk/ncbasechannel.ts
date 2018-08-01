@@ -3,10 +3,12 @@ import Profile from "../../structure/profile";
 import NcMessage from "./ncmessage";
 
 export default class NcBaseChannel {
-    private readonly instance:INcChannel;
+    protected baseinfo:INcChannel;
     private _cafe:Cafe = null;
     constructor(obj:object) {
-        this.instance = obj as INcChannel;
+        if (obj != null) {
+            this.baseinfo = {...obj} as INcChannel;
+        }
     }
     /**
      * Channel ID
@@ -14,7 +16,7 @@ export default class NcBaseChannel {
      * 채널 고유 ID
      */
     public get channelId() {
-        return this.instance.channelId;
+        return this.baseinfo.channelId;
     }
     /**
      * Unread count
@@ -22,7 +24,7 @@ export default class NcBaseChannel {
      * 안 읽은 메세지
      */
     public get unreads() {
-        return this.instance.newMessageCount;
+        return this.baseinfo.newMessageCount;
     }
     /**
      * User count
@@ -30,7 +32,7 @@ export default class NcBaseChannel {
      * 유저 **수**
      */
     public get userCount() {
-        return this.instance.userCount;
+        return this.baseinfo.userCount;
     }
     /**
      * Cafe Info
@@ -40,12 +42,12 @@ export default class NcBaseChannel {
     public get cafe() {
         if (this._cafe == null) {
             const cafe = {
-                cafeId: this.instance.categoryId,
-                cafeName: this.instance.categoryUrl,
-                cafeDesc: this.instance.categoryName,
+                cafeId: this.baseinfo.categoryId,
+                cafeName: this.baseinfo.categoryUrl,
+                cafeDesc: this.baseinfo.categoryName,
             } as Cafe;
-            if (this.instance.thumbnailList.length >= 1) {
-                cafe.cafeImage = this.instance.thumbnailList[0];
+            if (this.baseinfo.thumbnailList.length >= 1) {
+                cafe.cafeImage = this.baseinfo.thumbnailList[0];
             }
             this._cafe = cafe;
         }
@@ -57,7 +59,7 @@ export default class NcBaseChannel {
      * 채팅방 정보
      */
     public get description() {
-        return this.instance.description;
+        return this.baseinfo.description;
     }
     /**
      * Open chat
@@ -65,7 +67,7 @@ export default class NcBaseChannel {
      * 오픈채팅방 여부
      */
     public get openChat() {
-        return this.instance.open;
+        return this.baseinfo.open;
     }
     /**
      * Owner
@@ -73,7 +75,7 @@ export default class NcBaseChannel {
      * 채팅방 방장
      */
     public get owner():Profile {
-        const owner = this.instance.owner;
+        const owner = this.baseinfo.owner;
         const cafe = this.cafe;
         return {
             ...cafe,
@@ -88,10 +90,10 @@ export default class NcBaseChannel {
      * 최근 메세지
      */
     public get lastMessage():NcMessage {
-        return new NcMessage(this.instance.latestMessage, this.cafe, this.channelId);
+        return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelId);
     }
 }
-interface INcChannel {
+export interface INcChannel {
     name:string;
     type:number;
     channelId:number;
@@ -135,8 +137,4 @@ interface Owner {
     manager:boolean;
     cafeMember:boolean;
     status:string;
-}
-interface NccMember extends Profile {
-    kickable:boolean;
-    channelManageable:boolean;
 }

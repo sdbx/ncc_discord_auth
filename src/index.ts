@@ -5,6 +5,7 @@ import * as readline from "readline";
 import Runtime from "./discord/runtime";
 import Log from "./log";
 import Ncc from "./ncc/ncc";
+import NcChannel from "./ncc/talk/ncchannel";
 import Cafe from "./structure/cafe";
 
 let run:Runtime;
@@ -32,9 +33,10 @@ async function init() {
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole());
     if (loaded != null) {
         Log.d(`name: ${loaded}`);
-        const ar = await ncc.getArticleDetail(26686242, 7382);
+        // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (ncc.available) {
             await ncc.fetchChannels();
+            await ncc.connect(45528313105);
         }
     }
 }

@@ -59,6 +59,10 @@ export default class NcMessage {
             case MessageType.text: {
                 return this.instance.body;
             }
+            default: {
+                // system message
+                return this.instance.body;
+            }
         }
         // fallback
         return "";
@@ -70,7 +74,11 @@ export default class NcMessage {
      */
     public get type() {
         const t = this.instance.type;
-        return t as MessageType;   
+        if ([1,10,11].indexOf(t) >= 0) {
+            return t as MessageType;  
+        } else {
+            return MessageType.system;
+        }
     }
     /**
      * Embed (세부 정보)
@@ -149,6 +157,7 @@ export enum MessageType {
     text = 1,
     image = 11,
     sticker = 10,
+    system = -1,
 }
 
 export interface INcMessage {

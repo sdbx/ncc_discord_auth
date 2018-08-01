@@ -39,6 +39,7 @@ export default class NCredit extends EventEmitter {
      * Validate Naver logined.
      * Recommand Caching value
      * @param captcha Naver captcha parameter(check other class for detail)
+     * @returns captcha if false
      */
     public async login(captcha:{key:string, value:string} = null) {
         log("Starting logging in");
@@ -103,6 +104,7 @@ export default class NCredit extends EventEmitter {
         const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/");
         if (cookieText.indexOf("NID_AUT") !== -1) {
             log("Successfully logged in");
+            await this.fetchUserID();
             this.emit("login");
             return Promise.resolve();
         } else {
@@ -128,6 +130,14 @@ export default class NCredit extends EventEmitter {
             }
             return Promise.reject(errorCode);
         }
+    }
+    public async fetchUserID() {
+        const home = await this.reqGet(CHAT_HOME_URL);
+        const q1 = home.match(/userId.+/i)[0]
+        const userid = q1.substring(q1.indexOf("'") + 1, q1.lastIndexOf("'")).trim();
+        Log.d("Username", userid);
+        this.username = userid;
+        return userid;
     }
     /**
      * Logout credit
@@ -163,6 +173,9 @@ export default class NCredit extends EventEmitter {
     public set password(value:string) {
         this._password = value;
     }
+    /**
+     * get cookie for request-promise-native
+     */
     public get reqCookie():orgrq.CookieJar {
         const cookie = request.jar();
         for (const url of COOKIE_SITES) {
@@ -170,6 +183,12 @@ export default class NCredit extends EventEmitter {
                 .forEach((value) => cookie.setCookie(value.toString(), url));
         }
         return cookie;
+    }
+    public get accessToken():string {
+        const cookies = this.cookieJar.getCookiesSync("https://naver.com/");
+        const skey = cookies.filter((value) => value.key === "NID_AUT" || value.key === "NID_SES")
+            .map((value) => `${value.key}=${value.value};`).join(" ");
+        return skey;
     }
     /**
      * request get
@@ -187,6 +206,13 @@ export default class NCredit extends EventEmitter {
                 ...parse.params,
             };
         }
+        const originRegex = /http(s)?:\/\/.+?\//;
+        let origin;
+        if (originRegex.test(referer)) {
+            origin = referer.match(originRegex)[0];
+        } else {
+            origin = referer;
+        }
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: "GET",
             url,
@@ -196,6 +222,7 @@ export default class NCredit extends EventEmitter {
             strictSSL: true,
             headers: {
                 "Referer": referer,
+                "Origin": origin,
             },
             jar: this.reqCookie,
         }

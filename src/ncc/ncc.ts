@@ -1,13 +1,15 @@
 import * as get from "get-value";
 import Session, { Message } from "node-ncc-es6";
+import * as io from "socket.io-client";
 import Cache from "../cache";
 import Log from "../log";
 import NCredit from "./credit/ncredit";
-import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, COOKIE_SITES } from "./ncconstant";
+import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, CHAT_SOCKET_IO, COOKIE_SITES } from "./ncconstant";
 import { asJSON, parseURL } from "./nccutil";
 import NcFetch from "./ncfetch";
 import NcCredent from "./ncredent";
 import NcBaseChannel from "./talk/ncbasechannel";
+import NcChannel from "./talk/ncchannel";
 
 export default class Ncc extends NcFetch {
     protected session:Session;
@@ -21,8 +23,14 @@ export default class Ncc extends NcFetch {
         const content = asJSON(await this.credit.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`));
         const channels = (get(content, "message.result.channelList") as object[])
             .map((channel) => new NcBaseChannel(channel));
-        channels.forEach((v) => Log.json("Test", v));
         return channels;
+    }
+    public async connect(channel:number | NcBaseChannel) {
+        if (typeof channel !== "number") {
+            channel = channel.channelId;
+        }
+        const detail = await NcChannel.from(this.credit, channel);
+        await detail.connect(this.credit);
     }
 
     public async getRoom(roomID:string) {
