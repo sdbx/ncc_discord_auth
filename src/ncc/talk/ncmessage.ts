@@ -210,7 +210,8 @@ export enum MessageType {
 }
 export enum SystemType {
     unknown = -1,
-    changed_roomname = 105,
+    changed_Roomname = 105,
+    changed_Master = 121,
 }
 export interface INcMessage {
     id:number;

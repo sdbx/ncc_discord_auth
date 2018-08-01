@@ -194,18 +194,21 @@ export default class NcChannel extends NcBaseChannel {
             if (sync) {
                 await this.syncChannel();
             }
+            const modifier = getFirst(this.users.filter((v) => v.userid === get(message.sender, "naverId")));
+            let actionDest = null;
+            try {
+                const extras = JSON.parse(get(eventmsg, "message.extras"));
+                const _json = JSON.parse(get(extras, "cafeChatEventJson"));
+                actionDest = get(_json, "actionItem", { default: null });
+            } catch {
+                // :)
+            }
             switch (message.systemType) {
                 // type: room name change
-                case SystemType.changed_roomname: {
+                case SystemType.changed_Roomname: {
                     let content = (message.content as string);
                     let before = null;
-                    let after = null;
-                    try {
-                        const extras = get(eventmsg, "message.extras");
-                        after = get(extras, "cafeChatEventJson.actionItem", {default: null});
-                    } catch {
-                        // :)
-                    }
+                    let after = actionDest;
                     if (after != null) {
                         // fixed
                         content = content.substring(0, content.lastIndexOf(after) - 3);
@@ -218,13 +221,22 @@ export default class NcChannel extends NcBaseChannel {
                         content = content.substr(content.lastIndexOf("에서") + 3);
                         after = content.substring(0, content.lastIndexOf("(으)로"));
                     }
-                    this.events.onChangedRoomname.dispatchAsync(this,{
+                    this.events.onRoomnameChanged.dispatchAsync(this,{
                         channelID: this.channelID,
                         before,
                         after,
                         message,
-                        modifier: getFirst(this.users.filter((v) => v.userid === message.sender.naverId)),
+                        modifier,
                     } as RoomName);
+                } break;
+                case SystemType.changed_Master: {
+                    this.events.onMasterChanged.dispatchAsync(this, {
+                        newMasterNick: actionDest,
+                        newMaster: getFirst(this.users.filter((v) => v.nickname === actionDest)),
+                        channelID: this.channelID,
+                        message,
+                        modifier,
+                    } as Master);
                 }
             }
         })
@@ -259,7 +271,8 @@ class Events {
     public onMessage = new EventDispatcher<NcChannel, NcMessage>();
     public onMemberJoin = new EventDispatcher<NcChannel, Join>();
     public onMemberQuit = new EventDispatcher<NcChannel, Quit>();
-    public onChangedRoomname = new EventDispatcher<NcChannel, RoomName>();
+    public onRoomnameChanged = new EventDispatcher<NcChannel, RoomName>();
+    public onMasterChanged = new EventDispatcher<NcChannel, Master>();
 }
 export enum ChannelEvent {
     SYSTEM = "sys",
@@ -279,9 +292,9 @@ export interface NccMember extends Profile {
     channelManageable:boolean;
 }
 export interface Quit extends NcIDBase {
-    userIDs:string[],
-    members:Profile[],
-    deletedChannel:number,
+    userIDs:string[];
+    members:Profile[];
+    deletedChannel:number;
 }
 export class Join implements NcIDBase {
     public channelID:number;
@@ -295,11 +308,17 @@ export class Join implements NcIDBase {
         this.newMember = getFirst(newMembers.filter((v) => this.oldUsers.indexOf(v.userid) < 0));
     }
 }
-export interface RoomName extends NcIDBase {
-    before:string,
-    after:string,
-    message:NcMessage,
-    modifier?:Profile,
+interface SysMsg extends NcIDBase {
+    message:NcMessage;
+    modifier?:Profile;
+}
+export interface Master extends SysMsg {
+    newMasterNick:string;
+    newMaster?:Profile;
+}
+export interface RoomName extends SysMsg {
+    before:string;
+    after:string;
 }
 interface IChannelMember {
     memberId:string;

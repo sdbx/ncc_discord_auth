@@ -26,30 +26,41 @@ export default class Ncc extends NcFetch {
             .map((channel) => new NcBaseChannel(channel));
         return channels;
     }
-    public async connect(channel:number | NcBaseChannel) {
+    /**
+     * Test channel..
+     * @param channel what? 
+     */
+    public async testChannel(channel:number | NcBaseChannel) {
         if (typeof channel !== "number") {
             channel = channel.channelID;
         }
-        const detail = await NcChannel.from(this.credit, channel);
-        await detail.connect(this.credit);
-        detail.on(detail.events.onMessage, (ch, msg) => {
+        const test = await NcChannel.from(this.credit, channel);
+        await test.connect(this.credit);
+        // message
+        test.on(test.events.onMessage, (ch, msg) => {
             Log.d(NcMessage.typeAsString(msg.type), JSON.stringify(msg.content, null, 4));
             if (msg.embed != null) {
                 Log.d("embed", JSON.stringify(msg.embed, null, 4));
             }
         });
-        detail.on(detail.events.onMemberJoin, async (ch, join) => {
+        // member join
+        test.on(test.events.onMemberJoin, async (ch, join) => {
             Log.d("Joined",join.newMember.nickname);
         });
-        detail.on(detail.events.onMemberQuit, (ch, quit) => {
+        // member leave
+        test.on(test.events.onMemberQuit, (ch, quit) => {
             Log.d("Quited", getFirst(quit.members).nickname);
         });
-        detail.on(detail.events.onChangedRoomname, (ch, name) => {
+        // room name changed
+        test.on(test.events.onRoomnameChanged, (ch, name) => {
             Log.d("Changed room", "Before: " + name.before + 
                 " After: " + name.after + " Sender: " + name.modifier.nickname);
         })
+        // master changed
+        test.on(test.events.onMasterChanged, (ch, master) => {
+            Log.d("Changed master:", "ID: " + master.newMaster.userid);
+        })
     }
-
     public async getRoom(roomID:string) {
         if (await this.availableAsync()) {
             const rooms = (await this.chat.getRoomList()).filter((_v) => _v.id === roomID);

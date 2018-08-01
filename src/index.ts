@@ -36,7 +36,7 @@ async function init() {
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (ncc.available) {
             await ncc.fetchChannels();
-            await ncc.connect(45528313105);
+            await ncc.testChannel(106977317649);
         }
     }
 }
