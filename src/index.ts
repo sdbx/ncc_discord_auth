@@ -2,6 +2,7 @@ import chalk from "chalk"
 import * as Discord from "discord.js"
 import { Room } from "node-ncc-es6"
 import * as readline from "readline"
+import * as request from "request-promise-native"
 import Runtime from "./discord/runtime"
 import Log from "./log"
 import Ncc from "./ncc/ncc"
@@ -38,8 +39,10 @@ async function init() {
             try {
                 await ncc.fetchChannels()
                 await ncc.testChannel(106977317649)
-                const channel = await ncc.createChannel(26686242, await Log.read("ID"))
-                await channel.leave()
+                const captcha = await ncc.genCaptchaByConsole()
+                // tslint:disable-next-line
+                const channel = await ncc.createOpenChannel(26686242, { channelName: "Hello", desc: "World"}, captcha)
+                // await channel.leave()
             } catch (err) {
                 Log.e(err)
             }

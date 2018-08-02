@@ -82,24 +82,7 @@ export default class NCredit extends EventEmitter {
             jar: cookie,
         })
         // copy cookie to cookieJar
-        try {
-            COOKIE_SITES.forEach((v) => {
-                const cookies = cookie.getCookies(v)
-                for (const _cookie of cookies) {
-                    const tCookie = new Cookie()
-                    tCookie.key = _cookie.key
-                    tCookie.value = _cookie.value
-                    tCookie.expires = _cookie.expires
-                    tCookie.domain = _cookie.domain
-                    tCookie.path = _cookie.path
-                    tCookie.httpOnly = _cookie.httpOnly
-                    tCookie.secure = _cookie.secure
-                    this.cookieJar.setCookieSync(tCookie, v)
-                }
-            })
-        } catch (err) {
-            Log.e(err)
-        }
+        this.saveCookie(COOKIE_SITES, cookie)
         // check cookie valid
         const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
@@ -252,6 +235,7 @@ export default class NCredit extends EventEmitter {
             post_body = iconv.convert(
                 querystring.stringify(postD, "&", "=", { encodeURIComponent: convFn }), "utf-8")
         }
+        const jar = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: sendType,
             url,
@@ -261,13 +245,15 @@ export default class NCredit extends EventEmitter {
             encoding: encoding === "utf-8" ? encoding : null,
             strictSSL: true,
             headers: {
+                // "cache-control": "no-cache, no-store, max-age=0",
                 "referer": referer,
                 "origin": origin,
                 "content-type": (sendType === "POST" ? 
                     `application/x-www-form-urlencoded; charset=${encoding}` : undefined)
             },
-            jar: this.reqCookie,
+            jar,
         }
+        this.saveCookie(COOKIE_SITES, jar)
         try {
             const buffer:Buffer | string = await request(options).catch((e) => Log.e(e))
             if (typeof buffer === "string") {
@@ -288,6 +274,26 @@ export default class NCredit extends EventEmitter {
             this.cookieJar = CookieJar.deserializeSync(cookieStr)
         } catch {
             log("Cookie parse:fail")
+        }
+    }
+    private saveCookie(sites:string[], cookie:orgrq.CookieJar) {
+        try {
+            sites.forEach((v) => {
+                const cookies = cookie.getCookies(v)
+                for (const _cookie of cookies) {
+                    const tCookie = new Cookie()
+                    tCookie.key = _cookie.key
+                    tCookie.value = _cookie.value
+                    tCookie.expires = _cookie.expires
+                    tCookie.domain = _cookie.domain
+                    tCookie.path = _cookie.path
+                    tCookie.httpOnly = _cookie.httpOnly
+                    tCookie.secure = _cookie.secure
+                    this.cookieJar.setCookieSync(tCookie, v)
+                }
+            })
+        } catch (err) {
+            Log.e(err)
         }
     }
 }

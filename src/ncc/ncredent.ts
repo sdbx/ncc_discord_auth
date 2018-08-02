@@ -10,6 +10,7 @@ import Cache from "../cache"
 import Config from "../config"
 import Log from "../log"
 import NCredit, { LoginError } from "./credit/ncredit"
+import NCaptcha from "./ncaptcha"
 
 export default class NcCredent extends EventEmitter {
     protected credit:NCredit
@@ -44,6 +45,18 @@ export default class NcCredent extends EventEmitter {
             this._name = new Cache(username, 43200)
         }
         return username
+    }
+    /**
+     * make captcha from console
+     * 
+     * Require **LOGIN**
+     */
+    public async genCaptchaByConsole() {
+        const captcha = await NCaptcha.gen(this.credit)
+        Log.i("Captcha URL", captcha.url)
+        const captchaRead = await Log.read("Captcha", { hide: false, logResult: true }).catch(() => "")
+        captcha.value = captchaRead
+        return captcha
     }
     /**
      * get credentials from console
