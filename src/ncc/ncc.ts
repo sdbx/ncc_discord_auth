@@ -49,7 +49,7 @@ export default class Ncc extends NcFetch {
         const cafeid = typeof cafe === "number" ? cafe : cafe.cafeId
         cafe = cafeid
         const memberids:string[] = []
-        if (this.isChannelDesc(member) !== (type === ChatType.OpenGroup)) {
+        if (typeof member === "object" && this.isChannelDesc(member) !== (type === ChatType.OpenGroup)) {
             return Promise.reject("Invalid parameter.")
         }
         if (Array.isArray(member)) {
