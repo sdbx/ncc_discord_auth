@@ -1,4 +1,4 @@
-import Profile from "./profile";
+import Profile from "./profile"
 
 export default interface Comment extends Profile {
     content:string;
@@ -7,5 +7,5 @@ export default interface Comment extends Profile {
     stickerurl?:string;
 }
 export function getTimeDiffer(cmt:Comment) {
-    return new Date().getTime() - cmt.timestamp;
+    return new Date().getTime() - cmt.timestamp
 }

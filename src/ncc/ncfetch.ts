@@ -1,27 +1,27 @@
-import * as cheerio from "cheerio";
-import * as encoding from "encoding";
-import * as Entities from "html-entities";
-import { Agent } from "https";
-import * as querystring from "querystring";
-import * as request from "request-promise-native";
-import Cache from "../cache";
-import Log from "../log";
-import Article from "../structure/article";
-import Cafe from "../structure/cafe";
-import Comment from "../structure/comment";
-import Profile from "../structure/profile";
-import { cafePrefix, mCafePrefix, whitelistDig } from "./ncconstant";
-import NcCredent from "./ncredent";
-const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0";
+import * as cheerio from "cheerio"
+import * as encoding from "encoding"
+import * as Entities from "html-entities"
+import { Agent } from "https"
+import * as querystring from "querystring"
+import * as request from "request-promise-native"
+import Cache from "../cache"
+import Log from "../log"
+import Article from "../structure/article"
+import Cafe from "../structure/cafe"
+import Comment from "../structure/comment"
+import Profile from "../structure/profile"
+import { cafePrefix, mCafePrefix, whitelistDig } from "./ncconstant"
+import NcCredent from "./ncredent"
+const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0"
 export default class NcFetch extends NcCredent {
-    protected parser = new Entities.AllHtmlEntities();
-    private cacheDetail = new Map<number, Cache<Cafe>>();
-    private cacheCafeID = new Map<string, Cache<number>>();
+    protected parser = new Entities.AllHtmlEntities()
+    private cacheDetail = new Map<number, Cache<Cafe>>()
+    private cacheCafeID = new Map<string, Cache<number>>()
     private httpsAgent = new Agent({
         keepAlive: true
-    });
+    })
     constructor() {
-        super();
+        super()
     }
     /**
      * Get Cheerio(jquery) object from url
@@ -35,18 +35,18 @@ export default class NcFetch extends NcCredent {
         /**
          * Check cookie status
          */
-        const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl);
+        const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl)
         if (option.useAuth && (!isNaver || !await this.availableAsync())) {
-            Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`);
-            return Promise.reject();
+            Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`)
+            return Promise.reject()
         }
         /**
          * form data modification
          */
-        let post_body = null;
+        let post_body = null
         if (option.type === SendType.POST) {
             post_body = encoding.convert(
-                querystring.stringify(option.postdata, "&", "=", { encodeURIComponent: (v) => v }), "utf-8");
+                querystring.stringify(option.postdata, "&", "=", { encodeURIComponent: (v) => v }), "utf-8")
         }
         const encode = option.eucKR ? "euc-kr" : "utf-8"
         /**
@@ -69,50 +69,50 @@ export default class NcFetch extends NcCredent {
             jar: option.useAuth ? this.credit.reqCookie : false
         }
         // log url
-        const query = querystring.stringify(options.qs, "&", "=");
-        Log.i("Fetch URL", requrl + "?" + query);
-        Log.time();
-        const buffer:Buffer | string = await request(options);
+        const query = querystring.stringify(options.qs, "&", "=")
+        Log.i("Fetch URL", requrl + "?" + query)
+        Log.time()
+        const buffer:Buffer | string = await request(options)
         
-        let body:string;
+        let body:string
         /**
          * Naver cafe uses euc-kr f***.
          */
         if (option.eucKR) {
-            body = encoding.convert(buffer, "utf-8", "ms949").toString();
+            body = encoding.convert(buffer, "utf-8", "ms949").toString()
         } else {
-            body = buffer as string;
+            body = buffer as string
         }
         
-        const cio = cheerio.load(body);
-        Log.time("Req");
-        return Promise.resolve(cio);
+        const cio = cheerio.load(body)
+        Log.time("Req")
+        return Promise.resolve(cio)
     }
     /**
      * 네이버 게시글 링크로 네이버 카페 정보를 받아옵니다.
      * @param purl 게시글 링크
      */
     public async parseNaver(purl:string):Promise<Cafe> {
-        const cut = purl.match(/^https?:\/\/cafe\.naver\.com\/[A-Za-z0-9]+(\/)?/i);
-        let cafename = "";
+        const cut = purl.match(/^https?:\/\/cafe\.naver\.com\/[A-Za-z0-9]+(\/)?/i)
+        let cafename = ""
         if (cut != null) {
-            purl = cut[0];
-            const query = cut[0].match(/\/[A-Za-z0-9]+/ig);
-            cafename = query[query.length - 1].substr(1);
+            purl = cut[0]
+            const query = cut[0].match(/\/[A-Za-z0-9]+/ig)
+            cafename = query[query.length - 1].substr(1)
         } else {
-            return Promise.reject("Wrong url: " + purl);
+            return Promise.reject("Wrong url: " + purl)
         }
-        let id:number;
+        let id:number
         // find cache
         if (this.cacheCafeID.has(cafename) && !this.cacheCafeID.get(cafename).expired) {
-            id = this.cacheCafeID.get(cafename).cache;
+            id = this.cacheCafeID.get(cafename).cache
         } else {
-            const $ = await this.getWeb(purl);
-            const src = $("#main-area > script").html();
-            id = Number.parseInt(src.match(/clubid=[0-9]+/m)[0].split("=")[1]);
-            this.cacheCafeID.set(cafename,new Cache(id, 86400));
+            const $ = await this.getWeb(purl)
+            const src = $("#main-area > script").html()
+            id = Number.parseInt(src.match(/clubid=[0-9]+/m)[0].split("=")[1])
+            this.cacheCafeID.set(cafename,new Cache(id, 86400))
         }
-        return this.parseNaverDetail(id);
+        return this.parseNaverDetail(id)
     }
     /**
      * 네이버 카페 ID로 네이버 카페 정보를 받아옵니다.
@@ -121,32 +121,32 @@ export default class NcFetch extends NcCredent {
     public async parseNaverDetail(cafeid:number):Promise<Cafe> {
         // check cache
         if (this.cacheDetail.has(cafeid) && !this.cacheDetail.get(cafeid).expired) {
-            return this.cacheDetail.get(cafeid).cache;
+            return this.cacheDetail.get(cafeid).cache
         }
-        const url = `${cafePrefix}/CafeProfileView.nhn?clubid=${cafeid.toString(10)}`;
-        const $ = await this.getWeb(url);
+        const url = `${cafePrefix}/CafeProfileView.nhn?clubid=${cafeid.toString(10)}`
+        const $ = await this.getWeb(url)
         let members:string[] = $(".invite-padd02").map((index, element) => {
-            const o = $(element);
+            const o = $(element)
             switch (index) {
                 case 0:
-                return o.text();
+                return o.text()
                 case 1:
-                return o.text();
+                return o.text()
                 case 2:
-                return o.find("img").length >= 1 ? o.find("img")[0].attribs["src"] : "";
+                return o.find("img").length >= 1 ? o.find("img")[0].attribs["src"] : ""
                 default:
-                return null;
+                return null
             }
-        }).get();
-        members = members.filter((_v) => _v != null);
+        }).get()
+        members = members.filter((_v) => _v != null)
         const cafe = {
             cafeId: cafeid,
             cafeName: members[1].substr(members[1].lastIndexOf("/") + 1),
             cafeDesc: members[0].trim(),
             cafeImage: members[2].length <= 0 ? null : members[2],
-        } as Cafe;
-        this.cacheDetail.set(cafeid, new Cache(cafe, 86400));
-        return Promise.resolve(cafe);
+        } as Cafe
+        this.cacheDetail.set(cafeid, new Cache(cafe, 86400))
+        return Promise.resolve(cafe)
     }
     /**
      * 최근 게시글 목록을 받아옵니다.(5개)
@@ -155,20 +155,20 @@ export default class NcFetch extends NcCredent {
      * @param privateCafe 비공개 카페 여부
      */
     public async getRecentArticles(cafeid:number,privateCafe = false):Promise<Article[]> {
-        const articlesURL = `${cafePrefix}/ArticleList.nhn`;
+        const articlesURL = `${cafePrefix}/ArticleList.nhn`
         const params = {
             "search.clubid": cafeid.toString(),
             "search.boardtype": "L",
             "userDisplay": "5",
-        };
-        const opt = new RequestOption();
-        opt.useAuth = privateCafe;
-        const $ = await this.getWeb(articlesURL, params, opt);
+        }
+        const opt = new RequestOption()
+        opt.useAuth = privateCafe
+        const $ = await this.getWeb(articlesURL, params, opt)
         const articleList:Article[] = $('[name="ArticleList"] > table > tbody > tr:nth-child(2n+1)')
             .map((i, el) => { // console.log($(el).children('td:nth-child(3)').html());
-                const clickscript:string = $(el).children("td:nth-child(3)").find(".m-tcol-c").attr("onclick");
-                const arid:number = parseInt($(el).children("td:nth-child(1)").text(), 10);
-                const cluburl = clickscript.split(",")[8].split("'")[1];
+                const clickscript:string = $(el).children("td:nth-child(3)").find(".m-tcol-c").attr("onclick")
+                const arid:number = parseInt($(el).children("td:nth-child(1)").text(), 10)
+                const cluburl = clickscript.split(",")[8].split("'")[1]
                 return {
                     articleId: arid,
                     articleTitle: $(el).children("td:nth-child(2)").find(".m-tcol-c").text(),
@@ -184,9 +184,9 @@ export default class NcFetch extends NcCredent {
                     },
                     cafeId: cafeid,
                     cafeName: cluburl,
-                } as Article;
-            }).get() as any;
-        return Promise.resolve<Article[]>(articleList);
+                } as Article
+            }).get() as any
+        return Promise.resolve<Article[]>(articleList)
     }
     /**
      * 게시글의 댓글들을 받아옵니다.
@@ -195,51 +195,51 @@ export default class NcFetch extends NcCredent {
      * @param orderNew 최신순으로 정렬
      */
     public async getComments(cafeid:number, articleid:number, orderNew = true):Promise<Comment[]> {
-        const commentURL = `${mCafePrefix}/CommentView.nhn`;
+        const commentURL = `${mCafePrefix}/CommentView.nhn`
         const params = {
             "search.clubid": cafeid.toString(),
             "search.articleid": articleid.toString(),
             "search.orderby": orderNew ? "desc" : "asc",
-        };
-        const opt = new RequestOption();
-        opt.eucKR = false;
-        const $ = await this.getWeb(commentURL, params, opt);
+        }
+        const opt = new RequestOption()
+        opt.eucKR = false
+        const $ = await this.getWeb(commentURL, params, opt)
         if ($ == null) {
-            return Promise.reject("Error");
+            return Promise.reject("Error")
         }
 
         if ($("title").text().indexOf("로그인") >= 0) {
-            Log.e("로그인이 안되어 있습니다.");
-            return Promise.reject("로그인 안 됨");
+            Log.e("로그인이 안되어 있습니다.")
+            return Promise.reject("로그인 안 됨")
         } else if ($(".error_content").length > 0) {
-            Log.e($(".error_content_body h2").text());
-            return Promise.reject($(".error_content_body h2").text());
+            Log.e($(".error_content_body h2").text())
+            return Promise.reject($(".error_content_body h2").text())
         }
         // console.log( $('.u_cbox_comment').html());
         const comments:Comment[] = $(".u_cbox_comment").filter((i, el) => {
-            return !$(el).hasClass("re");
+            return !$(el).hasClass("re")
         }).map((i, el) => {
-            const author:any = $(el).find(".u_cbox_info_main").find("a");
-            const reft:string = author.attr("href");
-            const tstring:string = $(el).find(".u_cbox_date").text();
+            const author:any = $(el).find(".u_cbox_info_main").find("a")
+            const reft:string = author.attr("href")
+            const tstring:string = $(el).find(".u_cbox_date").text()
 
-            const ymd:string[] = tstring.split(".");
-            const hm:string[] = ymd[ymd.length - 1].split(":");
+            const ymd:string[] = tstring.split(".")
+            const hm:string[] = ymd[ymd.length - 1].split(":")
 
-            let imgurl = null;
+            let imgurl = null
             if ($(el).find(".u_cbox_image_wrap").length >= 1) {
                 imgurl = this.orgURI($(el).find(".u_cbox_image_wrap").find("a").attr("class")
-                .match(/(http|https):\/\/.+\)/i)[0]);
+                .match(/(http|https):\/\/.+\)/i)[0])
             }
 
-            let stickerurl = null;
+            let stickerurl = null
             if ($(el).find(".u_cbox_sticker_wrap").length >= 1) {
-                stickerurl = $(el).find(".u_cbox_sticker_wrap").find("a").find("img").attr("src");
+                stickerurl = $(el).find(".u_cbox_sticker_wrap").find("a").find("img").attr("src")
             }
 
-            let profileurl = null;
+            let profileurl = null
             if ($(el).find(".thumb").length >= 1) {
-                profileurl = this.orgURI($(el).find(".thumb").find("img").attr("src"));
+                profileurl = this.orgURI($(el).find(".thumb").find("img").attr("src"))
             }
 
             const time = {
@@ -249,7 +249,7 @@ export default class NcFetch extends NcCredent {
                 hour: parseInt(hm[0].substr(1), 10),
                 minute: parseInt(hm[1], 10),
                 offset: 3600 * 9 * 1000,
-            };
+            }
             return {
                 cafeId: cafeid,
                 userid: reft.substring(reft.lastIndexOf("=") + 1),
@@ -259,13 +259,13 @@ export default class NcFetch extends NcCredent {
                 imageurl: imgurl,
                 stickerurl,
                 profileurl,
-            } as Comment;
-        }).get() as any;
+            } as Comment
+        }).get() as any
 
         for (const comment of comments) {
-            Log.json("Comment", comment);
+            Log.json("Comment", comment)
         }
-        return Promise.resolve<Comment[]>(comments);
+        return Promise.resolve<Comment[]>(comments)
         // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
     }
     /**
@@ -274,60 +274,60 @@ export default class NcFetch extends NcCredent {
      * @param articleid 게시글 ID
      */
     public async getArticleDetail(cafeid:number,articleid:number):Promise<Article> {
-        const articleURL = `${cafePrefix}/ArticleRead.nhn`;
+        const articleURL = `${cafePrefix}/ArticleRead.nhn`
         const params = {
             "clubid": cafeid.toString(),
             "articleid": articleid.toString(),
-        };
-        const comments = await this.getComments(cafeid,articleid,false);
-        const $ = await this.getWeb(articleURL, params);
+        }
+        const comments = await this.getComments(cafeid,articleid,false)
+        const $ = await this.getWeb(articleURL, params)
         if ($ == null) {
-            return Promise.reject("Error");
+            return Promise.reject("Error")
         }
 
-        const infos = $(".etc-box .p-nick a").attr("onclick").split(",");
-        const link = $(".etc-box #linkUrl").text();
-        const title = $(".tit-box span").text();
+        const infos = $(".etc-box .p-nick a").attr("onclick").split(",")
+        const link = $(".etc-box #linkUrl").text()
+        const title = $(".tit-box span").text()
         // parse article names
-        const tbody = $("#tbody");
-        const contents = [];
-        const whitelist = ["img","iframe", "embed", "br"];
+        const tbody = $("#tbody")
+        const contents = []
+        const whitelist = ["img","iframe", "embed", "br"]
         tbody.children().map((i,el) => {
             const parsedContent = this.getTextsR(el, [])
             .filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
                 if (whitelist.indexOf(value.tagName) >= 0) {
-                    let type = "embed";
-                    let data = value.attribs["src"];
+                    let type = "embed"
+                    let data = value.attribs["src"]
                     if (value.tagName === "img") {
-                        type = "image";
+                        type = "image"
                     }else if (value.tagName === "br") {
-                        type = "newline";
-                        data = "br";
+                        type = "newline"
+                        data = "br"
                     }
                     if (data == null) {
-                        data = "";
+                        data = ""
                     }
-                    return {type,data};
+                    return {type,data}
                 } else {
-                    return {type:"text",data:value.data};
+                    return {type:"text",data:value.data}
                 }
             })
-            .filter((value) => (value.type !== "text") || (value.data.replace(/\s+/igm, "").length >= 1));
-            parsedContent.forEach((value) => contents.push(value));
+            .filter((value) => (value.type !== "text") || (value.data.replace(/\s+/igm, "").length >= 1))
+            parsedContent.forEach((value) => contents.push(value))
             if (i >= 1 && parsedContent.filter((value) => value.type === "newline").length <= 0) {
-                contents.push({type: "newline", data: "div"});
+                contents.push({type: "newline", data: "div"})
             }
-        });
-        const images = contents.filter((value) => value.type === "image");
-        let image = null;
+        })
+        const images = contents.filter((value) => value.type === "image")
+        let image = null
         if (images.length >= 1) {
-            image = images[0].data;
+            image = images[0].data
         }
         // name
-        const _titles = this.parser.decode($("head").html()).match(/var cafeNameTitle =.+/ig);
-        let titles:string = null;
+        const _titles = this.parser.decode($("head").html()).match(/var cafeNameTitle =.+/ig)
+        let titles:string = null
         if (_titles != null && _titles.length >= 1) {
-            titles = _titles[0].substring(_titles[0].indexOf('"') + 1,_titles[0].lastIndexOf('"'));
+            titles = _titles[0].substring(_titles[0].indexOf('"') + 1,_titles[0].lastIndexOf('"'))
         }
 
         const out = {
@@ -349,8 +349,8 @@ export default class NcFetch extends NcCredent {
             comments,
             contents,
             imageURL: image,
-        } as Article;
-        return Promise.resolve(out);
+        } as Article
+        return Promise.resolve(out)
         // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&
         // page=1&boardtype=L&articleid=7446&referrerAllArticles=true
     }
@@ -366,26 +366,26 @@ export default class NcFetch extends NcCredent {
             "clubid": cafeid.toString(10),
             "memberid": userid,
         }
-        const $ = await this.getWeb(`${cafePrefix}/CafeMemberNetworkView.nhn`, paramLevel);
-        const cafe = await this.parseNaverDetail(cafeid);
+        const $ = await this.getWeb(`${cafePrefix}/CafeMemberNetworkView.nhn`, paramLevel)
+        const cafe = await this.parseNaverDetail(cafeid)
         if ($ == null) {
-            return Promise.reject("Error");
+            return Promise.reject("Error")
         }
         if ($(".m-tcol-c").text() === "탈퇴멤버") {
-            return Promise.reject(`${userid} 아이디는 가입을 안했음`);
+            return Promise.reject(`${userid} 아이디는 가입을 안했음`)
         }
-        let nick = $(".ellipsis").text();
+        let nick = $(".ellipsis").text()
         // userid = nick.substring(nick.indexOf("(") + 1, nick.indexOf(")"));
-        nick = nick.substring(0,nick.indexOf("("));
+        nick = nick.substring(0,nick.indexOf("("))
         if (nick.length <= 0) {
-            return Promise.reject(`${userid} 아이디는 없음`);
+            return Promise.reject(`${userid} 아이디는 없음`)
         }
-        const image = this.orgURI($(".thumb").find("img").attr("src"),false);
-        const check = $(".m_info_area").find(".m-tcol-c");
-        const level = $(check[0]).text().trim();
-        const visit = Number.parseInt($(check[2]).find(".num").text());
-        const article = Number.parseInt($(check[4]).find(".num").text());
-        const comment = Number.parseInt($(check[6]).find(".num").text());
+        const image = this.orgURI($(".thumb").find("img").attr("src"),false)
+        const check = $(".m_info_area").find(".m-tcol-c")
+        const level = $(check[0]).text().trim()
+        const visit = Number.parseInt($(check[2]).find(".num").text())
+        const article = Number.parseInt($(check[4]).find(".num").text())
+        const comment = Number.parseInt($(check[6]).find(".num").text())
         return Promise.resolve({
             profileurl:image,
             nickname: nick,
@@ -398,7 +398,7 @@ export default class NcFetch extends NcCredent {
             numVisits: visit,
             numComments : comment,
             level,
-        } as Profile);
+        } as Profile)
     }
     /**
      * 네이버 카페의 회원을 닉네임으로 검색하여 받아옵니다.
@@ -408,14 +408,14 @@ export default class NcFetch extends NcCredent {
      * @param nickname 회원의 별명
      */
     public async getMemberByNick(cafeid:number, nickname:string) {
-        const profiles = await this.queryMemberByNick(cafeid,nickname);
-        const real = profiles.filter((_v) => _v.nickname === nickname);
+        const profiles = await this.queryMemberByNick(cafeid,nickname)
+        const real = profiles.filter((_v) => _v.nickname === nickname)
         if (real.length === 0) {
-            return Promise.reject(`${nickname} 닉의 유저는 없음`);
+            return Promise.reject(`${nickname} 닉의 유저는 없음`)
         } else if (real.length >= 2) {
-            real.splice(1,real.length - 1);
+            real.splice(1,real.length - 1)
         }
-        return this.getMemberById(cafeid, real[0].userid);
+        return this.getMemberById(cafeid, real[0].userid)
     }
     /**
      * 닉네임 검색
@@ -436,35 +436,35 @@ export default class NcFetch extends NcCredent {
             "memberId": this.username,
             "cmd": 1000010,
         }
-        const opt = new RequestOption();
-        opt.eucKR = false;
-        opt.referer = "https://chat.cafe.naver.com/ChatHome.nhn";
-        const $ = await this.getWeb("https://chat.cafe.naver.com/api/CafeMemberSearchAjax.nhn", param, opt);
-        const memberList:Profile[] = [];
-        const ids = $("body").text().match(/\{\s+"id"[\S\s]+?\}/igm);
+        const opt = new RequestOption()
+        opt.eucKR = false
+        opt.referer = "https://chat.cafe.naver.com/ChatHome.nhn"
+        const $ = await this.getWeb("https://chat.cafe.naver.com/api/CafeMemberSearchAjax.nhn", param, opt)
+        const memberList:Profile[] = []
+        const ids = $("body").text().match(/\{\s+"id"[\S\s]+?\}/igm)
         if (ids != null) {
             ids.forEach((json:string) => {
                 try {
-                    const data = JSON.parse(json);
+                    const data = JSON.parse(json)
                     memberList.push({
                         cafeId: cafeid,
                         userid: data["id"],
                         nickname: data["nickname"],
                         profileurl: data["profileImage"],
-                    } as Profile);
+                    } as Profile)
                 } catch (err) {
-                    Log.e(err);
+                    Log.e(err)
                 }
-            });
+            })
         }
-        return Promise.resolve(memberList);
+        return Promise.resolve(memberList)
     }
     /**
      * Query string... at ('aa','bb','cc').split(",");
      * @param str string
      */
     private querystr(str:string):string {
-        return str.substring(str.indexOf("'") + 1,str.lastIndexOf("'"));
+        return str.substring(str.indexOf("'") + 1,str.lastIndexOf("'"))
     }
     /**
      * f*ck euc-kr, naver.
@@ -475,13 +475,13 @@ export default class NcFetch extends NcCredent {
     }
     private orgURI(str:string,decode = false):string {
         if (str == null) {
-            return null;
+            return null
         }
-        str = str.replace(/\+/ig,"");
+        str = str.replace(/\+/ig,"")
         if (str.indexOf("?") >= 0) {
-            str = str.substring(0, str.lastIndexOf("?"));
+            str = str.substring(0, str.lastIndexOf("?"))
         }
-        return decode ? decodeURI(str) : str;
+        return decode ? decodeURI(str) : str
     }
     /**
      * get "no child" elements 
@@ -492,21 +492,21 @@ export default class NcFetch extends NcCredent {
         if (el.children != null && el.children.length >= 1) {
             for (const _el of el.children) {
                 if (whitelistDig.indexOf(el.tagName) >= 0) {
-                    arr = this.getTextsR(_el, arr);
+                    arr = this.getTextsR(_el, arr)
                 }
             }
         } else {
-            arr.push(el);
+            arr.push(el)
         }
-        return arr;
+        return arr
     }
 }
 class RequestOption {
-    public type:SendType = SendType.GET;
-    public postdata?:{[key:string]: string | number };
-    public eucKR:boolean = true;
-    public useAuth:boolean = true;
-    public referer:string = `${cafePrefix}/`;
+    public type:SendType = SendType.GET
+    public postdata?:{[key:string]: string | number }
+    public eucKR:boolean = true
+    public useAuth:boolean = true
+    public referer:string = `${cafePrefix}/`
 }
 enum SendType {
     GET = "GET",

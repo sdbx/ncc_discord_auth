@@ -1,15 +1,15 @@
-import * as get from "get-value";
-import Cafe from "../../structure/cafe";
-import { NcIDBase } from "../ncconstant";
+import * as get from "get-value"
+import Cafe from "../../structure/cafe"
+import { NcIDBase } from "../ncconstant"
 
 export default class NcMessage implements NcIDBase {
     public static typeAsString(t:MessageType) {
         switch (t) {
-            case MessageType.text: return "text";
-            case MessageType.image: return "image";
-            case MessageType.sticker: return "sticker";
-            case MessageType.system: return "system";
-            default: return "unknown";
+            case MessageType.text: return "text"
+            case MessageType.image: return "image"
+            case MessageType.sticker: return "sticker"
+            case MessageType.system: return "system"
+            default: return "unknown"
         }
     }
     /**
@@ -17,18 +17,18 @@ export default class NcMessage implements NcIDBase {
      * 
      * 보낸 방의 ID (오직 ID만)
      */
-    public channelID:number;
+    public channelID:number
     /**
      * 안읽은 숫자
      */
-    public readCount:number;
-    private readonly instance:INcMessage;
-    private _cafe:Cafe;
+    public readCount:number
+    private readonly instance:INcMessage
+    private _cafe:Cafe
     constructor(obj:object, cafe:Cafe, channelId:number) {
-        this.instance = {...obj} as INcMessage;
-        this._cafe = cafe;
-        this.channelID = channelId;
-        this.readCount = 0;
+        this.instance = {...obj} as INcMessage
+        this._cafe = cafe
+        this.channelID = channelId
+        this.readCount = 0
     }
     /**
      * Cafe Info
@@ -36,7 +36,7 @@ export default class NcMessage implements NcIDBase {
      * 네이버 카페 정보
      */
     public get cafe() {
-        return this._cafe;
+        return this._cafe
     }
     /**
      * Message ID
@@ -44,7 +44,7 @@ export default class NcMessage implements NcIDBase {
      * 메세지 ID
      */
     public get messageId() {
-        return this.instance.id;
+        return this.instance.id
     }
     /**
      * Content (내용)
@@ -52,35 +52,35 @@ export default class NcMessage implements NcIDBase {
      * 내용.. TextOnly
      */
     public get content():string | NcImage | NcSticker {
-        const extras = this.instance.extras;
+        const extras = this.instance.extras
         switch (this.type) {
             case MessageType.image: {
                 if (extras == null) {
-                    return null;
+                    return null
                 }
-                const parse = JSON.parse(extras);
-                return this.parseImage(parse["image"]);
+                const parse = JSON.parse(extras)
+                return this.parseImage(parse["image"])
             }
             case MessageType.sticker: {
                 if (extras == null) {
-                    return null;
+                    return null
                 }
-                const parse = JSON.parse(extras);
-                return {...parse["sticker"]} as NcSticker;
+                const parse = JSON.parse(extras)
+                return {...parse["sticker"]} as NcSticker
             }
             case MessageType.text: {
-                return this.instance.body;
+                return this.instance.body
             }
             case MessageType.system: {
-                return this.instance.body;
+                return this.instance.body
             }
             default: {
                 // system message
-                return this.instance.body;
+                return this.instance.body
             }
         }
         // fallback
-        return "";
+        return ""
     }
     /**
      * Type (타입)
@@ -88,25 +88,25 @@ export default class NcMessage implements NcIDBase {
      * Image / Sticker / text (with RichEmbed)
      */
     public get type() {
-        const t = this.instance.type;
+        const t = this.instance.type
         if ([1,10,11].indexOf(t) >= 0) {
-            return t as MessageType;  
+            return t as MessageType  
         } else {
             // 105: change room name
             if ([101,102,103,105,106,121].indexOf(t) >= 0) {
-                return MessageType.system;
+                return MessageType.system
             }
-            return MessageType.unknown;
+            return MessageType.unknown
         }
     }
     public get systemType():SystemType {
-        const t = this.instance.type;
+        const t = this.instance.type
         for (const value of Object.values(SystemType)) {
             if (t === value) {
-                return value;
+                return value
             }
         }
-        return SystemType.unknown;
+        return SystemType.unknown
     }
     /**
      * Embed (세부 정보)
@@ -115,20 +115,20 @@ export default class NcMessage implements NcIDBase {
      */
     public get embed() {
         if (this.type !== MessageType.text) {
-            return null;
+            return null
         }
-        const extras = this.instance.extras;
+        const extras = this.instance.extras
         if (extras == null) {
             // No embed.
-            return null;
+            return null
         }
         // snipet (embed)
-        const parse = JSON.parse(extras);
+        const parse = JSON.parse(extras)
         const embed = {
             image: this.parseImage(get(parse, "snippet.image")),
             ...parse["snippet"],
-        } as NcEmbed;
-        return embed;
+        } as NcEmbed
+        return embed
     }
     /**
      * sender (system: null)
@@ -138,21 +138,21 @@ export default class NcMessage implements NcIDBase {
     public get sender():{naverId:string, nick:string} {
         if (this.type === MessageType.system) {
             if (this.instance.extras == null) {
-                return null;
+                return null
             }
             try {
-                const extra = JSON.parse(this.instance.extras);
-                const _sender = JSON.parse(get(extra, "cafeChatEventJson"));
-                const sender = get(_sender, "sender", { default: null });
+                const extra = JSON.parse(this.instance.extras)
+                const _sender = JSON.parse(get(extra, "cafeChatEventJson"))
+                const sender = get(_sender, "sender", { default: null })
                 if (sender == null) {
-                    return null;
+                    return null
                 }
                 return {
                     naverId: get(sender, "id"),
                     nick: get(sender, "nickName"),
                 }
             } catch {
-                return null;
+                return null
             }
         } else {
             return {
@@ -167,7 +167,7 @@ export default class NcMessage implements NcIDBase {
      * 메세지 보낸 시기
      */
     public get timestamp() {
-        return this.instance.createdTime;
+        return this.instance.createdTime
     }
     /**
      * timestamp (GMT, EpochTime) as Date
@@ -175,18 +175,18 @@ export default class NcMessage implements NcIDBase {
      * 메세지 보낸 시기
      */
     public get sentDate() {
-        return new Date(this.timestamp);
+        return new Date(this.timestamp)
     }
     private parseImage(json:object) {
         if (json["url"] == null) {
-            // Not vaild image
-            return null;
+            // Not valid image
+            return null
         }
         const safeParse = (value:number | null) => {
             if (value == null) {
-                return -1;
+                return -1
             } else {
-                return value;
+                return value
             }
         }
         return {
@@ -194,7 +194,7 @@ export default class NcMessage implements NcIDBase {
             width: safeParse(json["width"]),
             height: safeParse(json["height"]),
             is_original_size: json["is_original_size"],
-        } as NcImage;
+        } as NcImage
     }
 }
 /**

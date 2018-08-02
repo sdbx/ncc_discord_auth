@@ -1,8 +1,8 @@
-﻿import { EventEmitter } from "events";
-import Cafe from "../../structure/cafe";
-import Profile from "../../structure/profile";
-import { NcIDBase } from "../ncconstant";
-import NcMessage from "./ncmessage";
+﻿import { EventEmitter } from "events"
+import Cafe from "../../structure/cafe"
+import Profile from "../../structure/profile"
+import { NcIDBase } from "../ncconstant"
+import NcMessage from "./ncmessage"
 
 export default class NcBaseChannel implements NcIDBase {
     /**
@@ -10,13 +10,13 @@ export default class NcBaseChannel implements NcIDBase {
      * 
      * 채널 고유 ID
      */
-    public channelID:number;
-    protected baseinfo:INcChannel;
-    private _cafe:Cafe = null;
+    public channelID:number
+    protected baseinfo:INcChannel
+    private _cafe:Cafe = null
     constructor(obj:object) {
         if (obj != null) {
-            this.baseinfo = {...obj} as INcChannel;
-            this.channelID = this.baseinfo.channelId;
+            this.baseinfo = {...obj} as INcChannel
+            this.channelID = this.baseinfo.channelId
         }
     }
     /**
@@ -25,7 +25,7 @@ export default class NcBaseChannel implements NcIDBase {
      * 안 읽은 메세지
      */
     public get unreads() {
-        return this.baseinfo.newMessageCount;
+        return this.baseinfo.newMessageCount
     }
     /**
      * User count
@@ -33,7 +33,7 @@ export default class NcBaseChannel implements NcIDBase {
      * 유저 **수**
      */
     public get userCount() {
-        return this.baseinfo.userCount;
+        return this.baseinfo.userCount
     }
     /**
      * Cafe Info
@@ -46,13 +46,13 @@ export default class NcBaseChannel implements NcIDBase {
                 cafeId: this.baseinfo.categoryId,
                 cafeName: this.baseinfo.categoryUrl,
                 cafeDesc: this.baseinfo.categoryName,
-            } as Cafe;
+            } as Cafe
             if (this.baseinfo.thumbnailList.length >= 1) {
-                cafe.cafeImage = this.baseinfo.thumbnailList[0];
+                cafe.cafeImage = this.baseinfo.thumbnailList[0]
             }
-            this._cafe = cafe;
+            this._cafe = cafe
         }
-        return this._cafe;
+        return this._cafe
     }
     /**
      * Chat info
@@ -60,7 +60,7 @@ export default class NcBaseChannel implements NcIDBase {
      * 채팅방 정보
      */
     public get description() {
-        return this.baseinfo.description;
+        return this.baseinfo.description
     }
     /**
      * Open chat
@@ -68,7 +68,7 @@ export default class NcBaseChannel implements NcIDBase {
      * 오픈채팅방 여부
      */
     public get openChat() {
-        return this.baseinfo.open;
+        return this.baseinfo.open
     }
     /**
      * Owner
@@ -76,14 +76,14 @@ export default class NcBaseChannel implements NcIDBase {
      * 채팅방 방장
      */
     public get owner():Profile {
-        const owner = this.baseinfo.owner;
-        const cafe = this.cafe;
+        const owner = this.baseinfo.owner
+        const cafe = this.cafe
         return {
             ...cafe,
             profileurl: owner.memberProfileImageUrl,
             nickname: owner.nickname,
             userid: owner.memberId,
-        } as Profile;
+        } as Profile
     }
     /**
      * Last message
@@ -91,7 +91,7 @@ export default class NcBaseChannel implements NcIDBase {
      * 최근 메세지
      */
     public get lastMessage():NcMessage {
-        return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelID);
+        return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelID)
     }
 }
 export interface INcChannel {

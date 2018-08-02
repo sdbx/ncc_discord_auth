@@ -1,8 +1,8 @@
-import * as Discord from "discord.js";
-import Log from "../log";
-import { MainCfg } from "./runtime";
+import * as Discord from "discord.js"
+import Log from "../log"
+import { MainCfg } from "./runtime"
 
-const safeCmd = /(".+?")|('.+?')/i;
+const safeCmd = /(".+?")|('.+?')/i
 export enum ParamType {
     thing = "이/가",
     dest = "을/를/좀",
@@ -21,18 +21,18 @@ export enum ParamAccept {
 class AcceptRegex {
     public static check(type:ParamAccept, str:string):string | null {
         if (type === ParamAccept.ANY) {
-            return str;
+            return str
         }
-        let regex;
+        let regex
         switch (type) {
-            case ParamAccept.NUMBER: regex = /[0-9]+/i; break;
-            case ParamAccept.USER: regex = /<@[0-9]+>/i; break;
-            case ParamAccept.CHANNEL: regex = /<#[0-9]+>/i; break;
+            case ParamAccept.NUMBER: regex = /[0-9]+/i; break
+            case ParamAccept.USER: regex = /<@[0-9]+>/i; break
+            case ParamAccept.CHANNEL: regex = /<#[0-9]+>/i; break
         }
         if (regex != null && regex.test(str)) {
-            return str.match(/[0-9]+/i)[0];
+            return str.match(/[0-9]+/i)[0]
         }
-        return null;
+        return null
     }
 }
 export interface Param {
@@ -43,37 +43,37 @@ export interface Param {
     require:boolean; // require?
 }
 export class CommandHelp {
-    public cmds:string[]; // allow cmds
-    public params:Param[]; // parameter info
-    public complex:boolean; // receive only keyword is matching?
-    public reqAdmin:boolean; // require admin?
-    public dmOnly:boolean; // direct message only..
-    private _description:string; // Description command
-    private example:Map<string, string>; // example parameter.. todo.
+    public cmds:string[] // allow cmds
+    public params:Param[] // parameter info
+    public complex:boolean // receive only keyword is matching?
+    public reqAdmin:boolean // require admin?
+    public dmOnly:boolean // direct message only..
+    private _description:string // Description command
+    private example:Map<string, string> // example parameter.. todo.
     // public singleWord:boolean; // receive only single word?
     public constructor(commands:string, desc:string,complex:boolean = false,
         options?:{ reqAdmin?:boolean, dmOnly?:boolean, example?:Map<string, string>}) {
-        this.cmds = commands.split(",");
-        this._description = desc;
-        this.example = this.safeGet(this.example, new Map());
-        this.params = [];
-        this.complex = complex;
+        this.cmds = commands.split(",")
+        this._description = desc
+        this.example = this.safeGet(this.example, new Map())
+        this.params = []
+        this.complex = complex
         if (options != undefined && options != null) {
-            this.reqAdmin = this.safeGet(options.reqAdmin, false);
-            this.dmOnly = this.safeGet(options.dmOnly, false);
+            this.reqAdmin = this.safeGet(options.reqAdmin, false)
+            this.dmOnly = this.safeGet(options.dmOnly, false)
             // this.singleWord = options.singleWord && true;
             if (this.reqAdmin) {
-                this._description += " (관리자)";
+                this._description += " (관리자)"
             }
             if (this.dmOnly) {
-                this._description += " (1:1챗)";
+                this._description += " (1:1챗)"
             }
         } else {
-            this.reqAdmin = this.dmOnly = false;
+            this.reqAdmin = this.dmOnly = false
         }
     }
     public get description() {
-        return this._description;
+        return this._description
     }
     public addField(type:ParamType, content:string,
         require:boolean, options:{code?:string[], accept?:ParamAccept} = {}) {
@@ -83,16 +83,16 @@ export class CommandHelp {
             accept: this.safeGet(options.accept, ParamAccept.ANY),
             desc: content,
             require,
-        } as Param);
+        } as Param)
     }
     public get fields():Param[] {
-        return this.params;
+        return this.params
     }
     public get title():string {
-        return this.getTitle(false);
+        return this.getTitle(false)
     }
     public get simpleTitle():string {
-        return this.getTitle(true);
+        return this.getTitle(true)
     }
     public check(global:MainCfg,content:string,state?:CmdParam):CommandStatus {
         const output = {
@@ -101,88 +101,88 @@ export class CommandHelp {
             requires: new Map<ParamType, FieldBlock>(),
             opticals: new Map<ParamType, FieldBlock>(),
             command: "",
-        };
-        const encoded = this.encode(content);
-        let message = encoded.encoded;
+        }
+        const encoded = this.encode(content)
+        let message = encoded.encoded
         if ((this.reqAdmin && !state.isAdmin) || (this.dmOnly && !state.isDM)) {
             return new CommandStatus(output.match, output.reqParam, output.requires,
-                output.opticals, output.command);
+                output.opticals, output.command)
         }
         if (global.prefix.test(content)) {
-            const blocks = this.splitByFields(content, global.prefix, this.fields);
+            const blocks = this.splitByFields(content, global.prefix, this.fields)
             if (blocks == null) {
                 // @TODO return cmd not match
                 return new CommandStatus(output.match, output.reqParam, output.requires,
-                     output.opticals, output.command);
+                     output.opticals, output.command)
             }
             for (const block of blocks) {
-                const field = getFirst(this.fields.filter((v) => v.type === block.type));
-                block.content = this.decode(block.content, encoded.key);
+                const field = getFirst(this.fields.filter((v) => v.type === block.type))
+                block.content = this.decode(block.content, encoded.key)
                 if (field == null) {
-                    continue; // wtf???
+                    continue // wtf???
                 }
                 // check subType requires
                 if (!this.complex && field.code.length >= 2 && block.subType == null) {
                     // Require Field
-                    Log.d("Require Field!");
-                    continue;
+                    Log.d("Require Field!")
+                    continue
                 }
                 if (field.code.length === 1 && block.subType == null) {
-                    block.subType = field.code[0];
+                    block.subType = field.code[0]
                 }
                 // check type is correct
                 if (AcceptRegex.check(field.accept, block.content) == null) {
-                    Log.w("Parameter Type is wrong! Type: " + field.type + " / Accept" + field.accept);
-                    continue;
+                    Log.w("Parameter Type is wrong! Type: " + field.type + " / Accept" + field.accept)
+                    continue
                 }
-                block.content = AcceptRegex.check(field.accept, block.content);
+                block.content = AcceptRegex.check(field.accept, block.content)
                 if (block.content != null) {
-                    (field.require ? output.requires : output.opticals).set(field.type, block);
+                    (field.require ? output.requires : output.opticals).set(field.type, block)
                 }
             }
-            const cmd = this.getCommand(this.decode(message, encoded.key));
+            const cmd = this.getCommand(this.decode(message, encoded.key))
             if (cmd != null) {
-                output.command = cmd.long;
-                output.match = true;
+                output.command = cmd.long
+                output.match = true
             }
-            output.reqParam = output.requires.size < this.fields.filter((v) => v.require).length;
+            output.reqParam = output.requires.size < this.fields.filter((v) => v.require).length
         } else if (content.startsWith(global.simplePrefix)) {
             // simple mode
-            let isVaild = false;
+            let isvalid = false
             for (const commandSuffix of this.cmds) {
-                const str = global.simplePrefix + commandSuffix;
+                const str = global.simplePrefix + commandSuffix
                 if (message.startsWith(str)) {
-                    output.command = commandSuffix;
-                    message = message.length < str.length ? "" : message.substr(str.length);
-                    isVaild = true;
-                    break;
+                    output.command = commandSuffix
+                    message = message.length < str.length ? "" : message.substr(str.length)
+                    isvalid = true
+                    break
                 }
             }
-            if (!isVaild) {
-                // @TODO not vaild action
+            if (!isvalid) {
+                // @TODO not valid action
                 return new CommandStatus(output.match, output.reqParam,
-                    output.requires, output.opticals, output.command);
+                    output.requires, output.opticals, output.command)
             }
-            message = message.trim();
-            const split = message.split(/\s+/ig);
+            message = message.trim()
+            const split = message.split(/\s+/ig)
 
-            output.match = true;
-            output.reqParam = false;
-            const fields = this.fields;
-            const requires = fields.filter((_v) => _v.require);
-            const opticals = fields.filter((_v) => !_v.require);
-            let i = 0;
+            output.match = true
+            output.reqParam = false
+            const fields = this.fields
+            const requires = fields.filter((_v) => _v.require)
+            const opticals = fields.filter((_v) => !_v.require)
+            let i = 0
             if (requires.length + opticals.length === 1) {
-                split[0] = message;
+                split[0] = message
             }
             const parse = (field:Param, str:string) => {
-                let rCode = null;
+                let rCode = null
                 for (const _code of field.code) {
                     for (const __code of _code.split("/")) {
                         if (str.startsWith(__code + ":")) {
-                            str = str.substr(str.indexOf(":") + 1);
-                            str = this.decode(str, encoded.key);
-                            rCode = _code;
+                            str = str.substr(str.indexOf(":") + 1)
+                            str = this.decode(str, encoded.key)
+                            rCode = _code
                         }
                     }
                 }
@@ -191,193 +191,193 @@ export class CommandHelp {
                     type: field.type,
                     subType: rCode,
                     ends: "",
-                } as FieldBlock;
+                } as FieldBlock
             }
             for (const require of requires) {
                 if (split.length <= i) {
-                    output.reqParam = true;
-                    break;
+                    output.reqParam = true
+                    break
                 }
-                const block = parse(require, split[i]);
+                const block = parse(require, split[i])
                 if (this.complex || require.code.length <= 1 || block.subType != null) {
                     if (block.subType == null && require.code.length === 1) {
-                        block.subType = require.code[0].split("/")[0];
+                        block.subType = require.code[0].split("/")[0]
                     }
-                    output.requires.set(require.type, block);   
+                    output.requires.set(require.type, block)   
                 }
-                i += 1;
+                i += 1
             }
             for (const optical of opticals) {
                 if (split.length <= i) {
-                    break;
+                    break
                 }
-                const block = parse(optical, split[i]);
+                const block = parse(optical, split[i])
                 if (this.complex || optical.code.length <= 1 || block.subType != null) {
                     if (block.subType == null && optical.code.length === 1) {
-                        block.subType = optical.code[0].split("/")[0];
+                        block.subType = optical.code[0].split("/")[0]
                     }
-                    output.opticals.set(optical.type, block);   
+                    output.opticals.set(optical.type, block)   
                 }
-                i += 1;
+                i += 1
             }
-            let exist = true;
+            let exist = true
             for (const field of fields) {
                 if (field.require && !output.requires.has(field.type)) {
-                    exist = false;
-                    break;
+                    exist = false
+                    break
                 }
             }
-            output.reqParam = !exist;
+            output.reqParam = !exist
         }
-        return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command);
+        return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command)
     }
     protected getCommand(str:string) {
         const suffix = getFirst(
             str.match(new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig,"|")})?$`,"ig"))
-        );
+        )
         if (suffix == null) {
-            return null;
+            return null
         }
-        const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig,"|")})$`,"ig"), "").trim();
+        const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig,"|")})$`,"ig"), "").trim()
         return {
             short,
             long: getFirst(this.cmds.filter((v) => short === v)),
-        };
+        }
     }
     protected splitByFields(str:string, prefix:RegExp, fields:Param[]) {
         // cut header
-        let chain = str;
+        let chain = str
         if (chain.match(prefix) == null) {
-            return null;
+            return null
         }
-        chain = chain.replace(prefix,"").trimLeft();
+        chain = chain.replace(prefix,"").trimLeft()
         // cut suffix
-        const suffixReg = new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig, "|")})?$`, "ig");
-        const suffix = getFirst(chain.match(suffixReg));
+        const suffixReg = new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig, "|")})?$`, "ig")
+        const suffix = getFirst(chain.match(suffixReg))
         if (suffix == null) {
-            return null;
+            return null
         }
-        chain = chain.replace(suffix, "");
+        chain = chain.replace(suffix, "")
         // query field block
-        const queryBlocks:FieldBlock[] = [];
+        const queryBlocks:FieldBlock[] = []
         for (const field of fields) {
             // generate field block
-            const destCommands = field.type.split("/");
-            const mergeCommands = [];
+            const destCommands = field.type.split("/")
+            const mergeCommands = []
             if (field.code.length >= 1) {
-                mergeCommands.push(...field.code.map((v) => this.getPreferText(v.split("/"), true)));
+                mergeCommands.push(...field.code.map((v) => this.getPreferText(v.split("/"), true)))
             }
             if (field.code.length < 2) {
-                mergeCommands.push(...destCommands);
+                mergeCommands.push(...destCommands)
             }
             // regex match for block
-            const fsmatch = new RegExp(`.*(${mergeCommands.join("|")})(${destCommands.join("|")})?\\s+`,"ig");
-            let regexMatch = getFirst(chain.match(fsmatch)); // regexMatch must have "TRIM" on right
+            const fsmatch = new RegExp(`.*(${mergeCommands.join("|")})(${destCommands.join("|")})?\\s+`,"ig")
+            let regexMatch = getFirst(chain.match(fsmatch)) // regexMatch must have "TRIM" on right
             if (regexMatch != null) {
                 // check cmd
-                regexMatch = regexMatch.trimRight();
-                const filter = this.endsWith(regexMatch, destCommands, false);
-                let codeID;
-                let ends = "";
+                regexMatch = regexMatch.trimRight()
+                const filter = this.endsWith(regexMatch, destCommands, false)
+                let codeID
+                let ends = ""
                 if (filter != null) {
                     const codeObj = getFirst(field.code
                         .map((v, i) => ({ obj: this.endsWith(filter.str, v.split("/")), index:i}))
-                        .filter((v) => v.obj != null));
+                        .filter((v) => v.obj != null))
                     if (codeObj != null) {
-                        codeID = field.code[codeObj.index];
-                        ends += codeObj.obj.end;
+                        codeID = field.code[codeObj.index]
+                        ends += codeObj.obj.end
                     }
-                    ends += filter.end;
+                    ends += filter.end
                 }
                 queryBlocks.push({
                     content: substrMatch(chain, 0, mergeCommands).trimRight(),
                     subType: codeID,
                     type: field.type,
                     ends,
-                } as FieldBlock);
+                } as FieldBlock)
             } else if (fields.length === 1 && this.complex && field.code.length <= 1 && chain.trim().length >= 1) {
                 // Special case: if only one parameter
                 queryBlocks.push({
                     content: chain.trim(),
                     type: field.type,
                     ends: "",
-                } as FieldBlock);
-                break;
+                } as FieldBlock)
+                break
             }
         }
-        chain = chain.trimRight();
+        chain = chain.trimRight()
         // resort ordering
-        const orderedBlocks:FieldBlock[] = [];
+        const orderedBlocks:FieldBlock[] = []
         queryBlocks.sort((a, b) => {
             const aS = a.content + a.ends
             const aEnd = chain.indexOf(aS) + aS.length // not include
-            const bS = b.content + b.ends;
-            const bEnd = chain.indexOf(bS) + bS.length;
-            return aEnd - bEnd;
+            const bS = b.content + b.ends
+            const bEnd = chain.indexOf(bS) + bS.length
+            return aEnd - bEnd
         })
         // make block useful.
         for (let i = 0; i < queryBlocks.length; i += 1) {
-            const lastEnd = i === 0 ? 0 : queryBlocks[i - 1].content.length + queryBlocks[i - 1].ends.length;
+            const lastEnd = i === 0 ? 0 : queryBlocks[i - 1].content.length + queryBlocks[i - 1].ends.length
             orderedBlocks.push({
                 ...queryBlocks[i],
                 content: chain.substr(lastEnd, queryBlocks[i].content.length - lastEnd).trim(),
-            });
+            })
         }
         /**
          * Return Blocks
          */
-        return orderedBlocks;
+        return orderedBlocks
     }
     protected getTitle(simple:boolean) {
-        let out:string = "";
+        let out:string = ""
         if (simple) {
             out += `${this.cmds.join("|")} `
         }
         if (this.params.length >= 1) {
             out += this.params.map((value) => {
-                return this.getFieldHelp(value, !simple);
-            }).join(" ");
+                return this.getFieldHelp(value, !simple)
+            }).join(" ")
         }
         if (!simple) {
-            out += ` ${this.cmds.join("|")}`;
+            out += ` ${this.cmds.join("|")}`
         }
-        return out;
+        return out
     }
     protected getFieldHelp(value:Param, korMode:boolean) {
-        const guideCode = value.code.length >= 2;
+        const guideCode = value.code.length >= 2
         const cmds = value.code.map(
             (_v) => this.getPreferText(_v.split("/").map((__v) => __v.trim()), korMode))
-        const splitter = this.safeGet(value.desc, "").length <= 0 ? "" : " : ";
-        let echo = "";
-        echo += value.require ? "<" : "[";
+        const splitter = this.safeGet(value.desc, "").length <= 0 ? "" : " : "
+        let echo = ""
+        echo += value.require ? "<" : "["
         if (!korMode) {
             if (guideCode) {
-                echo += `{${cmds.join(" | ")}}${splitter}`;
+                echo += `{${cmds.join(" | ")}}${splitter}`
             } else if (cmds.length === 1) {
-                echo += `${cmds[0]}${splitter}`; 
+                echo += `${cmds[0]}${splitter}` 
             }
         }
         if (value.desc.length >= 1) {
-            echo += guideCode ? `[${value.desc}]` : value.desc;
+            echo += guideCode ? `[${value.desc}]` : value.desc
         }
         if (korMode) {
             if (value.code.length >= 1) {
-                echo += ` {${cmds.join("|")}}`;
+                echo += ` {${cmds.join("|")}}`
             }
         }
-        echo += value.require ? ">" : "]";
+        echo += value.require ? ">" : "]"
         if (korMode) {
-            echo += `{${value.type.replace(/\//ig,",")}}`;
+            echo += `{${value.type.replace(/\//ig,",")}}`
         }
-        return echo;
+        return echo
     }
     private encode(source:string) {
-        let chain = source;
-        const safeList:string[] = [];
+        let chain = source
+        const safeList:string[] = []
         while (safeCmd.test(chain)) {
-            const value = source.match(safeCmd)[0];
-            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")));
-            chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}");
+            const value = source.match(safeCmd)[0]
+            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")))
+            chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}")
         }
         return {
             encoded: chain,
@@ -385,14 +385,14 @@ export class CommandHelp {
         }
     }
     private decode(encoded:string, key:string[]) {
-        let chain = encoded;
+        let chain = encoded
         key.forEach((value, index) => {
-            chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value);
-        });
-        return chain;
+            chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value)
+        })
+        return chain
     }
     private safeGet<T>(obj:T | undefined, defaultV:T | null):T | null {
-        return obj == null ? defaultV : obj;
+        return obj == null ? defaultV : obj
     }
     private getParamType(suffix:string) {
         for (const [key, value] of Object.entries(ParamType)) {
@@ -401,45 +401,45 @@ export class CommandHelp {
                     return {
                         type: value as ParamType,
                         suffix: v as string,
-                    };
+                    }
                 }
             }
         }
-        return null;
+        return null
     }
     private getPreferText(arr:string[], hangul = true) {
         if (arr.length === 1) {
             return arr[0]
         } else if (arr.length >= 2) {
-            const alphabetCmd = /[A-Za-z0-9_]/ig;
+            const alphabetCmd = /[A-Za-z0-9_]/ig
             const delta = (str:string) => {
                 if (str.length <= 0 || str == null) {
-                    return -1;
+                    return -1
                 }
-                return Math.round((this.safeGet(str.match(alphabetCmd), []).length / str.length) * 1000);
+                return Math.round((this.safeGet(str.match(alphabetCmd), []).length / str.length) * 1000)
             }
             arr.sort((a,b) => {
-                return delta(a) - delta(b);
-            });
-            return arr[hangul ? 0 : arr.length - 1];
+                return delta(a) - delta(b)
+            })
+            return arr[hangul ? 0 : arr.length - 1]
         } else {
             // wtf
-            return null;
+            return null
         }
     }
     private endsWith(source:string, ends:string[], ws = false) {
         if (source == null) {
-            return null;
+            return null
         }
         for (const _end of ends) {
             if (source.endsWith((ws ? " " : "") + _end)) {
                 return {
                     str: source.substr(0, source.length - _end.length),
                     end: _end,
-                };
+                }
             }
         }
-        return null;
+        return null
     }
 }
 export class DiscordFormat {
@@ -450,148 +450,148 @@ export class DiscordFormat {
         }
     }
     public static mentionUser(userid:string) {
-        return `<@${userid}>`;
+        return `<@${userid}>`
     }
     public static mentionChannel(channelid:string) {
-        return `<#${channelid}>`;
+        return `<#${channelid}>`
     }
     public static emoji(emojiName:string, emojiId:string, animated = false) {
-        return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`;
+        return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`
     }
     public static getNickname(msg:Discord.Message) {
         if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
-            const guildnick = msg.guild.member(msg.author).nickname;
-            return guildnick != null ? guildnick : msg.author.username;
+            const guildnick = msg.guild.member(msg.author).nickname
+            return guildnick != null ? guildnick : msg.author.username
         } else {
-            return msg.author.username;
+            return msg.author.username
         }
     }
 
-    private _italic = false;
-    private _bold = false;
-    private _underline = false;
-    private _namu = false;
-    private _block = false;
-    private _blockBig = false;
-    private readonly _content:string;
+    private _italic = false
+    private _bold = false
+    private _underline = false
+    private _namu = false
+    private _block = false
+    private _blockBig = false
+    private readonly _content:string
     public constructor(str:string) {
-        this._content = str;
+        this._content = str
     }
     public get normal() {
-        this._italic = this._bold = this._underline = this._namu = false;
-        return this;
+        this._italic = this._bold = this._underline = this._namu = false
+        return this
     }
     public get italic() {
-        this._italic = true;
-        return this;
+        this._italic = true
+        return this
     }
     public get bold() {
-        this._bold = true;
-        return this;
+        this._bold = true
+        return this
     }
     public get underline() {
-        this._underline = true;
-        return this;
+        this._underline = true
+        return this
     }
     public get namu() {
-        this._namu = true;
-        return this;
+        this._namu = true
+        return this
     }
     public get block() {
-        this._block = true;
-        return this;
+        this._block = true
+        return this
     }
     public get blockBig() {
-        this._blockBig = true;
-        return this;
+        this._blockBig = true
+        return this
     }
     public toString() {
-        let format = "%s";
+        let format = "%s"
         if (this._underline) {
-            format = format.replace("%s","__%s__");
+            format = format.replace("%s","__%s__")
         }
         if (this._namu) {
-            format = format.replace("%s","~~%s~~");
+            format = format.replace("%s","~~%s~~")
         }
         if (this._italic) {
-            format = format.replace("%s","*%s*");
+            format = format.replace("%s","*%s*")
         }
         if (this._bold) {
-            format = format.replace("%s","**%s**");
+            format = format.replace("%s","**%s**")
         }
         if (this._block || this._blockBig) {
-            format = "%s";
+            format = "%s"
             if (this._block) {
-                format = format.replace("%s", "`%s`");
+                format = format.replace("%s", "`%s`")
             } else {
-                format = format.replace("%s","```%s```");
+                format = format.replace("%s","```%s```")
             }
         }
-        return format.replace("%s",this._content);
+        return format.replace("%s",this._content)
     }
 }
 export class CommandStatus {
-    public commandMatch:boolean = false;
-    public requireParam:boolean = false;
-    public requires:Map<ParamType, FieldBlock>;
-    public opticals:Map<ParamType, FieldBlock>;
-    public command:string;
+    public commandMatch:boolean = false
+    public requireParam:boolean = false
+    public requires:Map<ParamType, FieldBlock>
+    public opticals:Map<ParamType, FieldBlock>
+    public command:string
 
     constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, FieldBlock>
         , opt:Map<ParamType, FieldBlock>, command:string) {
-            this.commandMatch = cmdMatch;
-            this.requireParam = reqParam;
-            this.requires = require;
-            this.opticals = opt;
-            this.command = command;
+            this.commandMatch = cmdMatch
+            this.requireParam = reqParam
+            this.requires = require
+            this.opticals = opt
+            this.command = command
     }
     public has(key:ParamType) {
-        return this.exist(key);
+        return this.exist(key)
     }
     public exist(key:ParamType) {
-        return this.requires.has(key) || this.opticals.has(key);
+        return this.requires.has(key) || this.opticals.has(key)
     }
     public get(key:ParamType) {
-        return this.getRaw(key) == null ? null : this.getRaw(key).content;
+        return this.getRaw(key) == null ? null : this.getRaw(key).content
     }
     public set(key:ParamType, content:string) {
         if (this.has(key)) {
-            this.getRaw(key).content = content;
+            this.getRaw(key).content = content
         }
     }
     public code(key:ParamType) {
         if (this.get(key) != null) {
-            return this.getRaw(key).subType;
+            return this.getRaw(key).subType
         }
-        return null;
+        return null
     }
     public getSubCmd(start:number, end:number) {
-        const commands = this.command.split(/\s+/ig);
+        const commands = this.command.split(/\s+/ig)
         if (end >= commands.length || start > end) {
-            return null;
+            return null
         } else {
-            const filter = commands.filter((_v,_i) => _i >= start && _i < end);
-            return filter.length >= 1 ? filter.join(" ") : null;
+            const filter = commands.filter((_v,_i) => _i >= start && _i < end)
+            return filter.length >= 1 ? filter.join(" ") : null
         }
     }
     public getLastCmd(depth:number = 1) {
-        const commands = this.command.split(/\s+/ig);
+        const commands = this.command.split(/\s+/ig)
         if (depth >= commands.length) {
-            return null;
+            return null
         }
-        return commands[Math.max(0,commands.length - depth)];
+        return commands[Math.max(0,commands.length - depth)]
     }
     public get match():boolean {
-        return this.commandMatch && !this.requireParam;
+        return this.commandMatch && !this.requireParam
     }
     public toString():string {
-        const require = {};
-        const opt = {};
+        const require = {}
+        const opt = {}
         for (const [key, value] of this.requires) {
-            require[key] = value;
+            require[key] = value
         }
         for (const [key, value] of this.opticals) {
-            opt[key] = value;
+            opt[key] = value
         }
         return JSON.stringify({
             commandMatch: this.commandMatch,
@@ -599,15 +599,15 @@ export class CommandStatus {
             requires: require,
             opticals: opt,
             command: this.command,
-        }, null, 4);
+        }, null, 4)
     }
     protected getRaw(key:ParamType) {
         if (this.requires.has(key)) {
-            return this.requires.get(key);
+            return this.requires.get(key)
         } else if (this.opticals.has(key)) {
-            return this.opticals.get(key);
+            return this.opticals.get(key)
         } else {
-            return undefined;
+            return undefined
         }
     }
 }
@@ -630,64 +630,64 @@ interface FieldBlock {
 
 export function getFirst<T>(arr:T[]):T {
     if (arr != null && arr.length >= 1) {
-        return arr[0];
+        return arr[0]
     } else {
-        return null;
+        return null
     }
 }
 export function getFirstMap<T, V>(m:Map<T, V>):V {
     if (m != null && m.size >= 1) {
         for (const [k, v] of m) {
-            return v;
+            return v
         }
     }
-    return null;
+    return null
 }
 export function substrMatch(str:string, start:number | string[], end:number | string[],
     startOffset = 0, endOffset = 0) {
     if (Array.isArray(start)) {
-        let n = -1;
+        let n = -1
         for (const value of start) {
-            n = str.indexOf(value);
+            n = str.indexOf(value)
             if (n >= 0) {
-                break;
+                break
             }
-            n = -1;
+            n = -1
         }
         if (n >= 0) {
-            start = n;
+            start = n
         } else {
-            start = 0;
+            start = 0
         }
     }
-    start = Math.max(0,start + startOffset);
+    start = Math.max(0,start + startOffset)
     if (Array.isArray(end)) {
-        let n = -1;
+        let n = -1
         for (const value of end) {
-            n = str.lastIndexOf(value);
+            n = str.lastIndexOf(value)
             if (n >= 0) {
-                break;
+                break
             }
-            n = -1;
+            n = -1
         }
         if (n >= 0) {
-            end = n;
+            end = n
         } else {
-            end = str.length - 1;
+            end = str.length - 1
         }
     }
-    end = Math.min(str.length, end + endOffset);
-    return str.substring(start, end);
+    end = Math.min(str.length, end + endOffset)
+    return str.substring(start, end)
 }
 export function getRichTemplate(global:MainCfg, client:Discord.Client) {
-    const rich = new Discord.RichEmbed();
-    rich.setColor(global.embedColor);
+    const rich = new Discord.RichEmbed()
+    rich.setColor(global.embedColor)
     if (global != null && global.authUsers.length >= 1) {
-        const admin = global.authUsers[0];
+        const admin = global.authUsers[0]
         if (client.users.has(admin)) {
-            const user = client.users.get(admin);
-            rich.setThumbnail(user.avatarURL);
+            const user = client.users.get(admin)
+            rich.setThumbnail(user.avatarURL)
         }
     }
-    return rich;
+    return rich
 }

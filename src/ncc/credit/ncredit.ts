@@ -1,38 +1,38 @@
-import * as caller from "caller";
-import * as iconv from "encoding";
-import { EventEmitter } from "events";
-import * as get from "get-value";
-import { Agent } from "https";
-import * as orgrq from "request";
-import * as request from "request-promise-native";
-import { Cookie, CookieJar, parseDate } from "tough-cookie";
-import Log from "../../log";
-import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, COOKIE_SITES } from "../ncconstant";
-import { asJSON, parseURL } from "../nccutil";
-import encryptKey from "./loginencrypt";
+import * as caller from "caller"
+import * as iconv from "encoding"
+import { EventEmitter } from "events"
+import * as get from "get-value"
+import { Agent } from "https"
+import * as orgrq from "request"
+import * as request from "request-promise-native"
+import { Cookie, CookieJar, parseDate } from "tough-cookie"
+import Log from "../../log"
+import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, COOKIE_SITES } from "../ncconstant"
+import { asJSON, parseURL } from "../nccutil"
+import encryptKey from "./loginencrypt"
 
 export default class NCredit extends EventEmitter {
-    public username:string;
-    protected _password:string;
-    protected cookieJar:CookieJar = new CookieJar();
+    public username:string
+    protected _password:string
+    protected cookieJar:CookieJar = new CookieJar()
     private httpsAgent = new Agent({
         keepAlive: true
-    });
+    })
     constructor(username?:string, password?:string) {
-        super();
-        this.username = username;
-        this._password = password;
+        super()
+        this.username = username
+        this._password = password
     }
     public clear() {
-        this.cookieJar = new CookieJar();
+        this.cookieJar = new CookieJar()
     }
     public set(username?:string, password?:string) {
-        this.clear();
+        this.clear()
         if (username != null) {
-            this.username = username;
+            this.username = username
         }
         if (password != null) {
-            this._password = password;
+            this._password = password
         }
     }
     /**
@@ -42,18 +42,18 @@ export default class NCredit extends EventEmitter {
      * @returns captcha if false
      */
     public async login(captcha:{key:string, value:string} = null) {
-        log("Starting logging in");
-        log("Creating new cookie jar");
-        this.cookieJar = new CookieJar();
+        log("Starting logging in")
+        log("Creating new cookie jar")
+        this.cookieJar = new CookieJar()
         const rsaKey = await this.reqGet("https://static.nid.naver.com/enclogin/keys.nhn")
-            .catch((e) => {Log.e(e); return "";}); // RSA Key
+            .catch((e) => {Log.e(e); return ""}) // RSA Key
         try {
-            const keyO = encryptKey(rsaKey, this.username, this._password);
-            Log.json("Test",keyO);
+            const keyO = encryptKey(rsaKey, this.username, this._password)
+            Log.json("Test",keyO)
         } catch (err) {
-            Log.e(err);
+            Log.e(err)
         }
-        const {key, keyName} = encryptKey(rsaKey, this.username, this._password);
+        const {key, keyName} = encryptKey(rsaKey, this.username, this._password)
         const form = {
             enctp: 1,
             encnm: keyName,
@@ -64,13 +64,13 @@ export default class NCredit extends EventEmitter {
             encpw: key
         }
         if (captcha != null) {
-            form["smart_LEVEL"] = -1;
-            form["chptchakey"] = captcha.key; // Not a typo; Naver uses CHptcha
-            form["chptcha"] = captcha.value;
-            form["captcha_type"] = "image"; // but in this case Naver uses CAptcha
+            form["smart_LEVEL"] = -1
+            form["chptchakey"] = captcha.key // Not a typo; Naver uses CHptcha
+            form["chptcha"] = captcha.value
+            form["captcha_type"] = "image" // but in this case Naver uses CAptcha
         }
-        log("Sending encrypted login request");
-        const cookie = this.reqCookie;
+        log("Sending encrypted login request")
+        const cookie = this.reqCookie
         const body:string = await request({
             url: "https://nid.naver.com/nidlogin.login",
             headers: {
@@ -80,115 +80,115 @@ export default class NCredit extends EventEmitter {
             method: "POST",
             form,
             jar: cookie,
-        });
+        })
         // copy cookie to cookieJar
         try {
             COOKIE_SITES.forEach((v) => {
-                const cookies = cookie.getCookies(v);
+                const cookies = cookie.getCookies(v)
                 for (const _cookie of cookies) {
-                    const tCookie = new Cookie();
-                    tCookie.key = _cookie.key;
-                    tCookie.value = _cookie.value;
-                    tCookie.expires = _cookie.expires;
-                    tCookie.domain = _cookie.domain;
-                    tCookie.path = _cookie.path;
-                    tCookie.httpOnly = _cookie.httpOnly;
-                    tCookie.secure = _cookie.secure;
-                    this.cookieJar.setCookieSync(tCookie, v);
+                    const tCookie = new Cookie()
+                    tCookie.key = _cookie.key
+                    tCookie.value = _cookie.value
+                    tCookie.expires = _cookie.expires
+                    tCookie.domain = _cookie.domain
+                    tCookie.path = _cookie.path
+                    tCookie.httpOnly = _cookie.httpOnly
+                    tCookie.secure = _cookie.secure
+                    this.cookieJar.setCookieSync(tCookie, v)
                 }
-            });
+            })
         } catch (err) {
-            Log.e(err);
+            Log.e(err)
         }
-        // check cookie vaild
-        const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/");
+        // check cookie valid
+        const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
-            log("Successfully logged in");
-            await this.fetchUserID();
-            this.emit("login");
-            return Promise.resolve();
+            log("Successfully logged in")
+            await this.fetchUserID()
+            this.emit("login")
+            return Promise.resolve()
         } else {
-            log("Failed to log in");
+            log("Failed to log in")
             // Parse captcha image if it exists
-            const captchaes = body.match(/<img id="captchaimg"[\s\S]+?>/im);
+            const captchaes = body.match(/<img id="captchaimg"[\s\S]+?>/im)
             if (captchaes == null || captchaes.length <= 0) {
-                return Promise.reject({captcha: false} as LoginError);
+                return Promise.reject({captcha: false} as LoginError)
             }
-            const captchaHTML = captchaes[0];
+            const captchaHTML = captchaes[0]
             const errorCode = {
                 captcha: false,
-            } as LoginError;
+            } as LoginError
             if (captchaHTML.indexOf("캡차이미지") >= 0) {
-                errorCode.captcha = true;
-                const pt = captchaHTML.match(/https.+?"/i);
+                errorCode.captcha = true
+                const pt = captchaHTML.match(/https.+?"/i)
                 if (pt != null) {
-                    log("Captcha need!");
-                    errorCode.captchaURL = pt[0].substring(0,pt[0].lastIndexOf("\""));
-                    const url = errorCode.captchaURL;
-                    errorCode.captchaKey = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"));
+                    log("Captcha need!")
+                    errorCode.captchaURL = pt[0].substring(0,pt[0].lastIndexOf("\""))
+                    const url = errorCode.captchaURL
+                    errorCode.captchaKey = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"))
                 }
             }
-            return Promise.reject(errorCode);
+            return Promise.reject(errorCode)
         }
     }
     public async fetchUserID() {
-        const home = await this.reqGet(CHAT_HOME_URL);
+        const home = await this.reqGet(CHAT_HOME_URL)
         const q1 = home.match(/userId.+/i)[0]
-        const userid = q1.substring(q1.indexOf("'") + 1, q1.lastIndexOf("'")).trim();
-        Log.d("Username", userid);
-        this.username = userid;
-        return userid;
+        const userid = q1.substring(q1.indexOf("'") + 1, q1.lastIndexOf("'")).trim()
+        Log.d("Username", userid)
+        this.username = userid
+        return userid
     }
     /**
      * Logout credit
      * useless?
      */
     public async logout() {
-        this.cookieJar = new CookieJar();
-        log("Logging out");
-        this.emit("logout");
-        return Promise.resolve();
+        this.cookieJar = new CookieJar()
+        log("Logging out")
+        this.emit("logout")
+        return Promise.resolve()
     }
     /**
      * Validate naver login
      * @returns username or Promise.reject() (fail)
      */
     public async validateLogin() {
-        const content = asJSON(await this.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`));
+        const content = asJSON(await this.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`))
         if (content == null) {
             // not found.
-            return Promise.reject("404 NOT FOUND");
+            return Promise.reject("404 NOT FOUND")
         }
-        const errorCode = get(content, "message.status", {default: "-1"});
+        const errorCode = get(content, "message.status", {default: "-1"})
         if (errorCode === "1002") {
             // {"message":{"status":"500","error":{"code":"1002","msg":"로그인이 필요합니다","errorResult":null},"result":null}}
             // 로그인이 필요합니다
-            return Promise.reject("1002 NEED LOGIN");
+            return Promise.reject("1002 NEED LOGIN")
         }
-        return errorCode === "200" ? Promise.resolve(this.username) : Promise.reject(`${errorCode} UNKNOWN`);
+        return errorCode === "200" ? Promise.resolve(this.username) : Promise.reject(`${errorCode} UNKNOWN`)
     }
     /**
      * set Password.
      */
     public set password(value:string) {
-        this._password = value;
+        this._password = value
     }
     /**
      * get cookie for request-promise-native
      */
     public get reqCookie():orgrq.CookieJar {
-        const cookie = request.jar();
+        const cookie = request.jar()
         for (const url of COOKIE_SITES) {
             this.cookieJar.getCookiesSync(url)
-                .forEach((value) => cookie.setCookie(value.toString(), url));
+                .forEach((value) => cookie.setCookie(value.toString(), url))
         }
-        return cookie;
+        return cookie
     }
     public get accessToken():string {
-        const cookies = this.cookieJar.getCookiesSync("https://naver.com/");
+        const cookies = this.cookieJar.getCookiesSync("https://naver.com/")
         const skey = cookies.filter((value) => value.key === "NID_AUT" || value.key === "NID_SES")
-            .map((value) => `${value.key}=${value.value};`).join(" ");
-        return skey;
+            .map((value) => `${value.key}=${value.value};`).join(" ")
+        return skey
     }
     /**
      * request get
@@ -199,19 +199,19 @@ export default class NCredit extends EventEmitter {
      */
     public async reqGet(url:string, sub:{[key:string]: string} = {}, encoding = "utf-8", referer = CHAT_HOME_URL) {
         if (url.indexOf("?") >= 0) {
-            const parse = parseURL(url);
-            url = parse.url;
+            const parse = parseURL(url)
+            url = parse.url
             sub = {
                 ...sub,
                 ...parse.params,
-            };
+            }
         }
-        const originRegex = /http(s)?:\/\/.+?\//;
-        let origin;
+        const originRegex = /http(s)?:\/\/.+?\//
+        let origin
         if (originRegex.test(referer)) {
-            origin = referer.match(originRegex)[0];
+            origin = referer.match(originRegex)[0]
         } else {
-            origin = referer;
+            origin = referer
         }
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: "GET",
@@ -227,25 +227,25 @@ export default class NCredit extends EventEmitter {
             jar: this.reqCookie,
         }
         try {
-            const buffer:Buffer | string = await request(options).catch((e) => Log.e(e));
+            const buffer:Buffer | string = await request(options).catch((e) => Log.e(e))
             if (typeof buffer === "string") {
-                return Promise.resolve(buffer);
+                return Promise.resolve(buffer)
             } else {
-                return iconv.convert(buffer, "utf-8", encoding).toString() as string;
+                return iconv.convert(buffer, "utf-8", encoding).toString() as string
             }
         } catch (err) {
-            Log.e(err);
-            return Promise.resolve(null as string);
+            Log.e(err)
+            return Promise.resolve(null as string)
         }
     }
     public get export() {
-        return JSON.stringify(this.cookieJar.serializeSync(), null, "\t");
+        return JSON.stringify(this.cookieJar.serializeSync(), null, "\t")
     }
     public import(cookieStr:string) {
         try {
-            this.cookieJar = CookieJar.deserializeSync(cookieStr);
+            this.cookieJar = CookieJar.deserializeSync(cookieStr)
         } catch {
-            log("Cookie parse:fail");
+            log("Cookie parse:fail")
         }
     }
 }
@@ -255,5 +255,5 @@ export interface LoginError {
     captchaKey?:string;
 }
 function log(str:string) {
-    Log.d(str);
+    Log.d(str)
 }

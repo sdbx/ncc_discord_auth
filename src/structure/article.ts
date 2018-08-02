@@ -1,5 +1,5 @@
-import Cafe from "./cafe";
-import Comment from "./comment";
+import Cafe from "./cafe"
+import Comment from "./comment"
 
 export default interface Article extends Cafe {
     articleId:number; // int, article id

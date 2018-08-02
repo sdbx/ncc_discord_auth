@@ -1,45 +1,45 @@
-import * as Discord from "discord.js";
-import * as fs from "fs-extra";
-import * as Hangul from "hangul-js";
-import * as request from "request-promise-native";
-import { sprintf } from "sprintf-js";
-import * as tmp from "tmp-promise";
-import Config from "../../config";
-import Log from "../../log";
-import { LoginError } from "../../ncc/credit/ncredit";
-import Plugin from "../plugin";
-import { MainCfg } from "../runtime";
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil";
+import * as Discord from "discord.js"
+import * as fs from "fs-extra"
+import * as Hangul from "hangul-js"
+import * as request from "request-promise-native"
+import { sprintf } from "sprintf-js"
+import * as tmp from "tmp-promise"
+import Config from "../../config"
+import Log from "../../log"
+import { LoginError } from "../../ncc/credit/ncredit"
+import Plugin from "../plugin"
+import { MainCfg } from "../runtime"
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
 
 export default class Login extends Plugin {
     // declare config file: use save data
-    protected config = new LoginConfig();
+    protected config = new LoginConfig()
     // declare command.
-    private naverLogin:CommandHelp;
+    private naverLogin:CommandHelp
     // status
-    private status:CommandHelp;
+    private status:CommandHelp
     /**
      * Initialize command
      */
     public async ready() {
         // super: load config
-        super.ready();
+        super.ready()
         // CommandHelp: suffix, description
-        this.naverLogin = new CommandHelp("네이버 로그인", this.lang.sample.hello, true, {reqAdmin:true, dmOnly:true});
+        this.naverLogin = new CommandHelp("네이버 로그인", this.lang.sample.hello, true, {reqAdmin:true, dmOnly:true})
         // add parameter
-        this.naverLogin.addField(ParamType.to,"네이버 아이디", false);
+        this.naverLogin.addField(ParamType.to,"네이버 아이디", false)
         // get parameter as complex
-        this.naverLogin.complex = true;
-        this.status = new CommandHelp("상태 알려", "상태 확인", true, {reqAdmin:true});
-        return Promise.resolve();
+        this.naverLogin.complex = true
+        this.status = new CommandHelp("상태 알려", "상태 확인", true, {reqAdmin:true})
+        return Promise.resolve()
     }
     /**
      * on Command Received.
      */
     public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
-        const lang = this.lang.login;
-        const testNaver = this.naverLogin.check(this.global,command,state);
+        const lang = this.lang.login
+        const testNaver = this.naverLogin.check(this.global,command,state)
         /**
          * naver login
          * I don't have server with https or TLS.... sh**.
@@ -47,10 +47,10 @@ export default class Login extends Plugin {
          */
         if (testNaver.match) {
             // check naver status
-            const _naverID = await this.ncc.validateLogin();
+            const _naverID = await this.ncc.validateLogin()
             if (_naverID != null) {
                 // ok.
-                await msg.channel.send(sprintf(lang.naverAlreadyOn, {id: _naverID}));
+                await msg.channel.send(sprintf(lang.naverAlreadyOn, {id: _naverID}))
             } else {
                 // set chain item
                 const req = {
@@ -60,54 +60,54 @@ export default class Login extends Plugin {
                 }
                 // optical param push
                 if (testNaver.has(ParamType.to)) {
-                    req.id = testNaver.get(ParamType.to);
+                    req.id = testNaver.get(ParamType.to)
                 }
                 // tell what to type
-                const type = req.id == null ? "아이디" : "비밀번호";
+                const type = req.id == null ? "아이디" : "비밀번호"
                 await msg.channel.send(sprintf(lang.naverRequest, {
                     type,
                     suffix: Hangul.endsWithConsonant(type) ? "을" : "를"
-                }));
+                }))
                 // chain start
-                this.startChain(msg.channel.id, msg.author.id, ChainType.NAVER, req);
-                return Promise.resolve();
+                this.startChain(msg.channel.id, msg.author.id, ChainType.NAVER, req)
+                return Promise.resolve()
             }
         }
-        const _status = this.status.check(this.global,command,state);
+        const _status = this.status.check(this.global,command,state)
         if (_status.match) {
-            const send = this.defaultRich;
+            const send = this.defaultRich
             const nState =
-                await this.ncc.availableAsync() ? lang.naverOn : lang.naverOff;
-            send.addField("네이버 로그인", nState);
-            send.addField("봇 관리자 여부", this.toLangString(this.global.authUsers.indexOf(msg.author.id) >= 0));
+                await this.ncc.availableAsync() ? lang.naverOn : lang.naverOff
+            send.addField("네이버 로그인", nState)
+            send.addField("봇 관리자 여부", this.toLangString(this.global.authUsers.indexOf(msg.author.id) >= 0))
             send.author = {
                 name: msg.author.username,
                 icon_url: msg.author.avatarURL,
             }
-            await msg.channel.send(send);
+            await msg.channel.send(send)
         }
-        return Promise.resolve();
+        return Promise.resolve()
     }
     /**
      * Receiving userid, password
      */
     protected async onChainMessage(message:Discord.Message, type:number, data:ChainData):Promise<ChainData> {
-        const typing = data.data as {id:string,pw:string,captcha:string};
-        const content = message.content;
-        const lang = this.lang.login;
-        data.time = Date.now();
+        const typing = data.data as {id:string,pw:string,captcha:string}
+        const content = message.content
+        const lang = this.lang.login
+        data.time = Date.now()
         // fill
         if (typing.id == null) {
             await message.channel.send(sprintf(lang.naverRequest, {
                 type: "비밀번호",
                 suffix: "를",
-            }));
-            typing.id = content;
+            }))
+            typing.id = content
         } else if (typing.pw == null || typing.captcha != null) {
             // end chain
-            let captchaValue:{key:string,value:string} = null;
+            let captchaValue:{key:string,value:string} = null
             if (typing.pw == null) {
-                typing.pw = content;
+                typing.pw = content
             } else {
                 captchaValue = {
                     key: typing.captcha,
@@ -115,44 +115,44 @@ export default class Login extends Plugin {
                 }
             }
             const result:LoginError = await this.ncc.requestCredent(typing.id,typing.pw,captchaValue)
-                .then((username) => null).catch((err) => err);
+                .then((username) => null).catch((err) => err)
             if (result == null) {
-                await message.reply(lang.naverOn + "\n" + lang.passwordDelete);
+                await message.reply(lang.naverOn + "\n" + lang.passwordDelete)
                 // await message.channel.send(result.pwd ? lang.naverWrongPW : lang.naverOn);
-                return this.endChain(message, type, data);
+                return this.endChain(message, type, data)
             } else {
                 if (result.captcha) {
-                    const url = result.captchaURL;
-                    typing.captcha = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"));
-                    const image:Buffer = await request.get(url, {encoding:null});
+                    const url = result.captchaURL
+                    typing.captcha = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"))
+                    const image:Buffer = await request.get(url, {encoding:null})
 
-                    const rich = new Discord.RichEmbed();
-                    rich.setTitle(lang.naverReqCaptcha);
-                    rich.attachFile(new Discord.Attachment(image,"captcha.png"));
-                    rich.setImage("attachment://captcha.png");
-                    await message.channel.send(rich);
+                    const rich = new Discord.RichEmbed()
+                    rich.setTitle(lang.naverReqCaptcha)
+                    rich.attachFile(new Discord.Attachment(image,"captcha.png"))
+                    rich.setImage("attachment://captcha.png")
+                    await message.channel.send(rich)
                 } else {
                     // pwd wrong
-                    await message.channel.send(lang.naverWrongPW);
-                    return this.endChain(message, type, data);
+                    await message.channel.send(lang.naverWrongPW)
+                    return this.endChain(message, type, data)
                 }
             }    
         } else {
             // this should never happen.
-            Log.w("WTF", "login.ts - onChainMessage");
-            return this.endChain(message, type, data);
+            Log.w("WTF", "login.ts - onChainMessage")
+            return this.endChain(message, type, data)
         }
-        return Promise.resolve(data);
+        return Promise.resolve(data)
     }
     protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
         // on receive all data
-        return Promise.resolve();
+        return Promise.resolve()
     }
 }
 class LoginConfig extends Config {
-    public admins:string[] = [];
+    public admins:string[] = []
     constructor() {
-        super("login");
+        super("login")
     }
 }
 /**

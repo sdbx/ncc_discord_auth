@@ -1,14 +1,14 @@
-import * as hangul from 'hangul-js';
-import Config from "../config";
+import * as hangul from 'hangul-js'
+import Config from "../config"
 
 export default class Lang extends Config {
-    public valTrue = "ㅇ";
-    public valFalse = "ㄴ";
+    public valTrue = "ㅇ"
+    public valFalse = "ㄴ"
 
-    public nameString = "문자열";
-    public nameNumber = "숫자";
-    public nameBoolean = "논리";
-    public valNull = "null";
+    public nameString = "문자열"
+    public nameNumber = "숫자"
+    public nameBoolean = "논리"
+    public valNull = "null"
     /*
      * Module: ping
      */
@@ -30,7 +30,7 @@ export default class Lang extends Config {
         successAdmin: "%(user)s님 관리자인걸 환영한다냥!",
         failAdmin_invalidToken: "토큰이 안맞다냥..",
         failAdmin_noToken: "멍청한 %(user)s야 토큰이 없다냥!",
-    };
+    }
     /*
      * module: events
      */
@@ -104,34 +104,34 @@ export default class Lang extends Config {
     /**
      * Global..
      */
-    public paramFew = "%(param)s 파라메터가 필요하다냥!";
+    public paramFew = "%(param)s 파라메터가 필요하다냥!"
     // help
-    public helpTitle = "도움말이다냥!";
-    public helpNoExists = "%(help)s 명령어는 없다냥!";
-    public helpDesc = "도움말 그 자체";
+    public helpTitle = "도움말이다냥!"
+    public helpNoExists = "%(help)s 명령어는 없다냥!"
+    public helpDesc = "도움말 그 자체"
     // set
-    public setNotFound = "%(depth)s에서 %(name)s을 찾을 수 없어양!";
-    public setTypeError = "%(depth)s의 타입이 %(type)s이당!";
-    public setSuccess = "%(config)s의 %(key)s을 %(old)s에서 %(value)s%(to)s 설정했다냥!";
+    public setNotFound = "%(depth)s에서 %(name)s을 찾을 수 없어양!"
+    public setTypeError = "%(depth)s의 타입이 %(type)s이당!"
+    public setSuccess = "%(config)s의 %(key)s을 %(old)s에서 %(value)s%(to)s 설정했다냥!"
     // admin
-    public sudoNeed = "관리자 명령어다냥!";
-    public adminGranted = "%(mention)s님 인증완료.";
+    public sudoNeed = "관리자 명령어다냥!"
+    public adminGranted = "%(mention)s님 인증완료."
     // notlogin
-    public noNaver = "네이버 계정으로 로그인 안되어 있다냥..";
+    public noNaver = "네이버 계정으로 로그인 안되어 있다냥.."
 
     constructor() {
-        super("lang");
+        super("lang")
     }
     public getType(obj:any) {
         switch (typeof obj) {
-            case "boolean": return this.nameBoolean;
-            case "function": return "Function";
-            case "number": return this.nameNumber;
-            case "object": return "Object";
-            case "string": return this.nameString;
-            case "symbol": return "Symbol";
-            case "undefined" : return "Undefined";
+            case "boolean": return this.nameBoolean
+            case "function": return "Function"
+            case "number": return this.nameNumber
+            case "object": return "Object"
+            case "string": return this.nameString
+            case "symbol": return "Symbol"
+            case "undefined" : return "Undefined"
         }
-        throw new Error(".");
+        throw new Error(".")
     }
 }
