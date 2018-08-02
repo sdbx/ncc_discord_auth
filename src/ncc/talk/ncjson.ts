@@ -9,11 +9,21 @@ export default class NcJson<T extends object> {
     public status:string
     public error:NcError
     public result:T
-    public constructor(response:object, parser:(obj:object) => T) {
-        this.status = get(response, "message.status", {default: "-1"})
-        this.error = get(response, "message.error") as NcError
+    public constructor(response:object | string, parser:(obj:object) => T) {
+        let resObj:object
+        if (typeof response === "string") {
+            try {
+                resObj = JSON.parse(response)
+            } catch {
+                return
+            }
+        } else {
+            resObj = response
+        }
+        this.status = get(resObj, "message.status", {default: "-1"})
+        this.error = get(resObj, "message.error") as NcError
         if (this.valid) {
-            this.result = parser(get(response, "message.result"))
+            this.result = parser(get(resObj, "message.result"))
         }
     }
     public get valid() {

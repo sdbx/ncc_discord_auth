@@ -2,12 +2,12 @@ import * as get from "get-value"
 import * as io from "socket.io-client"
 import { EventDispatcher, IEventHandler } from "strongly-typed-events"
 import Log from "../../log"
-import Cafe from "../../structure/cafe"
-import Profile from "../../structure/profile"
 import NCredit from "../credit/ncredit"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
     CHAT_CHANNEL_URL, CHAT_HOME_URL, CHATAPI_CHANNEL_SYNC, COOKIE_SITES, NcIDBase } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
+import Cafe from "../structure/cafe"
+import Profile from "../structure/profile"
 import NcBaseChannel, { INcChannel } from "./ncbasechannel"
 import NcJson from "./ncjson"
 import NcMessage, { MessageType, SystemType } from "./ncmessage"
@@ -391,6 +391,10 @@ export interface Master extends SysMsg {
 export interface RoomName extends SysMsg {
     before:string;
     after:string;
+}
+export enum ChatType {
+    OnetoOne = 1,
+    Group = 2,
 }
 interface IChannelMember {
     memberId:string;

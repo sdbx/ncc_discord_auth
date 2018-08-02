@@ -1,7 +1,7 @@
 ﻿import { EventEmitter } from "events"
-import Cafe from "../../structure/cafe"
-import Profile from "../../structure/profile"
 import { NcIDBase } from "../ncconstant"
+import Cafe from "../structure/cafe"
+import Profile from "../structure/profile"
 import NcMessage from "./ncmessage"
 
 export default class NcBaseChannel implements NcIDBase {

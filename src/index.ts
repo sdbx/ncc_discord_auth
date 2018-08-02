@@ -5,8 +5,8 @@ import * as readline from "readline"
 import Runtime from "./discord/runtime"
 import Log from "./log"
 import Ncc from "./ncc/ncc"
+import Cafe from "./ncc/structure/cafe"
 import NcChannel from "./ncc/talk/ncchannel"
-import Cafe from "./structure/cafe"
 
 let run:Runtime
 async function start() {

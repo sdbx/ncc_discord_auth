@@ -1,6 +1,6 @@
 import * as get from "get-value"
-import Cafe from "../../structure/cafe"
 import { NcIDBase } from "../ncconstant"
+import Cafe from "../structure/cafe"
 
 export default class NcMessage implements NcIDBase {
     public static typeAsString(t:MessageType) {

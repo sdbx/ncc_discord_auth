@@ -1,6 +1,6 @@
 import * as get from "get-value"
-import Cafe from "../structure/cafe"
-import Profile from "../structure/profile"
+import Cafe from "./structure/cafe"
+import Profile from "./structure/profile"
 
 export function asJSON(str:string):object {
     let obj = null

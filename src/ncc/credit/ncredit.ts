@@ -3,11 +3,12 @@ import * as iconv from "encoding"
 import { EventEmitter } from "events"
 import * as get from "get-value"
 import { Agent } from "https"
+import * as querystring from "querystring"
 import * as orgrq from "request"
 import * as request from "request-promise-native"
 import { Cookie, CookieJar, parseDate } from "tough-cookie"
 import Log from "../../log"
-import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, COOKIE_SITES } from "../ncconstant"
+import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, CHATAPI_CHANNELS, COOKIE_SITES } from "../ncconstant"
 import { asJSON, parseURL } from "../nccutil"
 import encryptKey from "./loginencrypt"
 
@@ -49,7 +50,6 @@ export default class NCredit extends EventEmitter {
             .catch((e) => {Log.e(e); return ""}) // RSA Key
         try {
             const keyO = encryptKey(rsaKey, this.username, this._password)
-            Log.json("Test",keyO)
         } catch (err) {
             Log.e(err)
         }
@@ -154,7 +154,7 @@ export default class NCredit extends EventEmitter {
      * @returns username or Promise.reject() (fail)
      */
     public async validateLogin() {
-        const content = asJSON(await this.reqGet(`${CHAT_API_URL}/${CHAT_APIS.CHANNEL}?onlyVisible=true`))
+        const content = asJSON(await this.reqGet(CHATAPI_CHANNELS))
         if (content == null) {
             // not found.
             return Promise.reject("404 NOT FOUND")
@@ -192,12 +192,12 @@ export default class NCredit extends EventEmitter {
     }
     /**
      * request get
-     * @param url Request URL without ?**=**&**=**
-     * @param sub Parmaters (**=**&**=**)
+     * @param url Request URL without ?**=**&**=** or with **NOT** encoded.
+     * @param sub Parmaters (**=**&**=**) **NOT** encoded.
      * @param encoding Encoding
      * @param referer Referer
      */
-    public async reqGet(url:string, sub:{[key:string]: string} = {}, encoding = "utf-8", referer = CHAT_HOME_URL) {
+    public async reqGet(url:string, sub:{[key:string]: string} = {}, referer = CHAT_HOME_URL, encoding = "utf-8") {
         if (url.indexOf("?") >= 0) {
             const parse = parseURL(url)
             url = parse.url
@@ -206,6 +206,33 @@ export default class NCredit extends EventEmitter {
                 ...parse.params,
             }
         }
+        return this.req("GET", url, sub, {}, encoding, referer)
+    }
+    /**
+     * request post 
+     * @param url Request URL without ?**=**&**=** or with **NOT** encoded.
+     * @param sub Parmaters (**=**&**=**) **NOT** encoded.
+     * @param postD Form Data
+     * @param referer Referer
+     * @param encoding Encoding
+     */
+    public async reqPost(url:string, sub:{[key:string]: string}, postD:{[key:string]: any} = {},
+        referer = CHAT_HOME_URL, encoding = "utf-8") {
+        if (url.indexOf("?") >= 0) {
+            const parse = parseURL(url)
+            url = parse.url
+            sub = {
+                ...sub,
+                ...parse.params,
+            }
+        }
+        return this.req("POST", url, sub, postD, encoding, referer)
+    }
+    // request raw
+    public async req(sendType:"POST" | "GET", url:string,
+        sub:{[key:string]: string} = {}, postD:{[key:string]: any} = {},
+        encoding = "utf-8", referer = CHAT_HOME_URL) {
+        // set origin
         const originRegex = /http(s)?:\/\/.+?\//
         let origin
         if (originRegex.test(referer)) {
@@ -213,16 +240,31 @@ export default class NCredit extends EventEmitter {
         } else {
             origin = referer
         }
+        // post data encode
+        let post_body = null
+        if (sendType === "POST") {
+            let convFn:(v:string) => string
+            if (encoding === "utf-8") {
+                convFn = (v) => encodeURIComponent(v)
+            } else {
+                convFn = (v) => v
+            }
+            post_body = iconv.convert(
+                querystring.stringify(postD, "&", "=", { encodeURIComponent: convFn }), "utf-8")
+        }
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
-            method: "GET",
+            method: sendType,
             url,
             qs: sub,
+            body: post_body,
             agent: this.httpsAgent,
             encoding: encoding === "utf-8" ? encoding : null,
             strictSSL: true,
             headers: {
-                "Referer": referer,
-                "Origin": origin,
+                "referer": referer,
+                "origin": origin,
+                "content-type": (sendType === "POST" ? 
+                    `application/x-www-form-urlencoded; charset=${encoding}` : undefined)
             },
             jar: this.reqCookie,
         }

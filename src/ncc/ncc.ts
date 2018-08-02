@@ -5,12 +5,14 @@ import Cache from "../cache"
 import Log from "../log"
 import NCredit from "./credit/ncredit"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, 
-    CHAT_SOCKET_IO, CHATAPI_CHANNELS, COOKIE_SITES } from "./ncconstant"
+    CHAT_SOCKET_IO, CHATAPI_CAFES, CHATAPI_CHANNELS, COOKIE_SITES } from "./ncconstant"
 import { asJSON, getFirst, parseURL } from "./nccutil"
 import NcFetch from "./ncfetch"
 import NcCredent from "./ncredent"
+import Cafe from "./structure/cafe"
+import Profile from "./structure/profile"
 import NcBaseChannel from "./talk/ncbasechannel"
-import NcChannel, { ChannelEvent } from "./talk/ncchannel"
+import NcChannel, { ChannelEvent, ChatType } from "./talk/ncchannel"
 import NcJson from "./talk/ncjson"
 import NcMessage from "./talk/ncmessage"
 
@@ -24,17 +26,42 @@ export default class Ncc extends NcFetch {
      */
     public async fetchChannels() {
         const content = asJSON(await this.credit.reqGet(CHATAPI_CHANNELS))
-        const response = new NcJson(content, (obj) => {
-            return {
-                channelList: (get(content, "channelList") as object[])
+        const response = new NcJson(content, (obj) => ({
+            channelList: (get(obj, "channelList") as object[])
                     .map((channel) => new NcBaseChannel(channel)),
-            }
-        })
+        }))
         if (response.valid) {
             return response.result.channelList
         } else {
             return Promise.reject(response.error.msg)
         }
+    }
+    public async createChannel(cafe:Cafe | number, members:Array<Profile | string> | Profile | string,
+        type = ChatType.OnetoOne) {
+        const cafeid = typeof cafe === "number" ? cafe : cafe.cafeId
+        const memberids:string[] = []
+        if (Array.isArray(members)) {
+            members.forEach((v) => memberids.push(typeof v === "string" ? v : v.userid))
+        } else {
+            memberids.push(typeof members === "string" ? members : members.userid)
+        }
+    }
+    /**
+     * List joinable cafes
+     */
+    public async listCafes(chatType:ChatType) {
+        const request = await this.credit.reqGet(CHATAPI_CAFES.get(chatType))
+        const response = new NcJson(request, (obj) => {
+            const arr = get(obj, "myCafeList", {default:[]}) as ICafewP[]
+            return arr.map((_cafe) => ({
+                cafeId: _cafe.cafeId,
+                cafeName: _cafe.cafeUrl,
+                cafeDesc: _cafe.cafeName,
+                cafeImage: _cafe.cafeThumbnail,
+                onetoOne: _cafe.memberLevel >= _cafe.oneToOneCreateLevel,
+                group: _cafe.memberLevel >= _cafe.groupCreateLevel,
+            }) as CafewChatPerm).filter((v) => chatType === ChatType.OnetoOne ? v.onetoOne : v.group)
+        })
     }
     /**
      * Test channel..
@@ -111,3 +138,21 @@ export default class Ncc extends NcFetch {
         return this.session
     }
 }
+interface CafewChatPerm extends Cafe {
+    onetoOne:boolean;
+    group:boolean;
+}
+interface ICafewP {
+    cafeId:number;
+    cafeName:string;
+    cafeUrl:string;
+    cafeThumbnail:string;
+    memberNickname:string;
+    memberLevel:number;
+    managingCafe:boolean;
+    groupCreateLevel:number;
+    oneToOneCreateLevel:number;
+    blockCafe:boolean;
+    dormantCafe:boolean;
+}
+  
