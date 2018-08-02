@@ -412,6 +412,7 @@ export interface RoomName extends SysMsg {
 export enum ChatType {
     OnetoOne = 1,
     Group = 2,
+    OpenGroup = 4,
 }
 interface IChannelMember {
     memberId:string;

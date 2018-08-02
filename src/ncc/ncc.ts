@@ -5,8 +5,9 @@ import Cache from "../cache"
 import Log from "../log"
 import NCredit from "./credit/ncredit"
 import NCaptcha from "./ncaptcha"
-import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, 
-    CHAT_SOCKET_IO, CHATAPI_CAFE_INVITE, CHATAPI_CAFES, CHATAPI_CHANNELS, COOKIE_SITES } from "./ncconstant"
+import { CAFE_DEFAULT_IMAGE, CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
+    CHAT_HOME_URL, CHAT_SOCKET_IO, CHATAPI_CAFE_INVITE, 
+    CHATAPI_CAFE_INVITE_PERM, CHATAPI_CAFES, CHATAPI_CHANNELS, COOKIE_SITES } from "./ncconstant"
 import { asJSON, getFirst, parseURL } from "./nccutil"
 import NcFetch from "./ncfetch"
 import NcCredent from "./ncredent"
@@ -42,17 +43,31 @@ export default class Ncc extends NcFetch {
      * @param captcha Captcha (generated, in group chat)
      */
     public async createChannel(cafe:Cafe | number, members:Array<Profile | string> | Profile | string,
-        type = ChatType.OnetoOne, captcha:NCaptcha = null) {
+        type = ChatType.OnetoOne, captcha:NCaptcha = null,) {
         const cafeid = typeof cafe === "number" ? cafe : cafe.cafeId
+        cafe = cafeid
         const memberids:string[] = []
         if (Array.isArray(members)) {
             members.forEach((v) => memberids.push(typeof v === "string" ? v : v.userid))
         } else {
             memberids.push(typeof members === "string" ? members : members.userid)
         }
-        if (memberids.length >= 2) {
+        if (memberids.length >= 2 && type === ChatType.OnetoOne) {
             type = ChatType.Group
         }
+        // check perm
+        const privilege = new NcJson(
+            await this.credit.reqGet(CHATAPI_CAFE_INVITE_PERM.get(cafeid, type)), (obj) => {
+                const arr = get(obj, "createChannelPrivilegeList", {default:[]}) as object[]
+                return arr.map((v) => ({
+                    channelType: v["channelType"] as number,
+                    creatable: v["creatable"] as boolean
+                })).filter((v) => v.channelType === type)
+        })
+        if (!privilege.valid || privilege.result.length <= 0 || !privilege.result[0].creatable) {
+            return Promise.reject("No permission.")
+        }
+        /*
         // check invitable
         const cafePerms = await this.listCafes(type)
         if (!cafePerms.valid) {
@@ -62,7 +77,8 @@ export default class Ncc extends NcFetch {
         if (cafeI == null || !(type === ChatType.OnetoOne ? cafeI.onetoOne : cafeI.group)) {
             return Promise.reject("No permission.")
         }
-        if (type === ChatType.Group && captcha == null) {
+        */
+        if (type !== ChatType.OnetoOne && captcha == null) {
             return Promise.reject("Require Captcha")
         }
         const request = await this.credit.reqPost(CHATAPI_CAFE_INVITE.get(cafeid), {}, {
@@ -98,7 +114,7 @@ export default class Ncc extends NcFetch {
                 cafeId: _cafe.cafeId,
                 cafeName: _cafe.cafeUrl,
                 cafeDesc: _cafe.cafeName,
-                cafeImage: _cafe.cafeThumbnail,
+                cafeImage: _cafe.cafeThumbnail.length <= 0 ? CAFE_DEFAULT_IMAGE : _cafe.cafeThumbnail,
                 onetoOne: _cafe.memberLevel >= _cafe.oneToOneCreateLevel,
                 group: _cafe.memberLevel >= _cafe.groupCreateLevel,
             }) as CafewChatPerm).filter((v) => chatType === ChatType.OnetoOne ? v.onetoOne : v.group)

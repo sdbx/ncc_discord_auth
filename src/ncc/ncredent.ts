@@ -53,6 +53,7 @@ export default class NcCredent extends EventEmitter {
         const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id")
         let password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__")
         let result:string | LoginError
+        const first = true
         let captcha = null
         do {
             try {
@@ -68,7 +69,9 @@ export default class NcCredent extends EventEmitter {
             }
             if (result.captcha) {
                 Log.i("Captcha-URL", result.captchaURL)
-                password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__")
+                if (!first) {
+                    password = await Log.read("Password",{hide:true, logResult:false}, password).catch(() => "__")
+                }
                 const captchaRead = await Log.read("Captcha", {hide:false, logResult: true}).catch(() => "")
                 captcha = {
                     key: result.captchaKey,

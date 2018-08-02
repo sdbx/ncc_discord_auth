@@ -38,7 +38,7 @@ async function init() {
             try {
                 await ncc.fetchChannels()
                 await ncc.testChannel(106977317649)
-                const channel = await ncc.createChannel(26686242, "<id>")
+                const channel = await ncc.createChannel(26686242, await Log.read("ID"))
                 await channel.leave()
             } catch (err) {
                 Log.e(err)
