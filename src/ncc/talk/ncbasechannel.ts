@@ -91,6 +91,9 @@ export default class NcBaseChannel implements NcIDBase {
      * 최근 메세지
      */
     public get lastMessage():NcMessage {
+        if (this.baseinfo.latestMessage == null) {
+            return null
+        }
         return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelID)
     }
 }
@@ -115,7 +118,7 @@ export interface INcChannel {
     messagePeriod:number;
     open:boolean;
     visible:boolean;
-    latestMessage:LatestMessage;
+    latestMessage?:LatestMessage;
     owner:Owner;
     originalOwner:boolean;
     unreadCountVisible:boolean;

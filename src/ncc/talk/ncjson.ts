@@ -6,6 +6,18 @@ export default class NcJson<T extends object> {
     public static default(response:object) {
         return new NcJson(response, (obj) => obj)
     }
+    public static fail(errormsg:string) {
+        return new NcJson<undefined>({
+            message: {
+                status: "-1",
+                error: {
+                    code: "-1",
+                    msg: errormsg,
+                    errorResult: "",
+                } as NcError
+            }
+        }, null)
+    }
     public status:string
     public error:NcError
     public result:T

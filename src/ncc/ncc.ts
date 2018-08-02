@@ -4,8 +4,9 @@ import * as io from "socket.io-client"
 import Cache from "../cache"
 import Log from "../log"
 import NCredit from "./credit/ncredit"
+import NCaptcha from "./ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, CHAT_HOME_URL, 
-    CHAT_SOCKET_IO, CHATAPI_CAFES, CHATAPI_CHANNELS, COOKIE_SITES } from "./ncconstant"
+    CHAT_SOCKET_IO, CHATAPI_CAFE_INVITE, CHATAPI_CAFES, CHATAPI_CHANNELS, COOKIE_SITES } from "./ncconstant"
 import { asJSON, getFirst, parseURL } from "./nccutil"
 import NcFetch from "./ncfetch"
 import NcCredent from "./ncredent"
@@ -30,14 +31,18 @@ export default class Ncc extends NcFetch {
             channelList: (get(obj, "channelList") as object[])
                     .map((channel) => new NcBaseChannel(channel)),
         }))
-        if (response.valid) {
-            return response.result.channelList
-        } else {
-            return Promise.reject(response.error.msg)
-        }
+        return response
     }
+    /**
+     * Create channel
+     * @returns Connected channel or Promise.reject
+     * @param cafe Cafe
+     * @param members Array of invite members or single member
+     * @param type Chat Type (Group: requires captcha)
+     * @param captcha Captcha (generated, in group chat)
+     */
     public async createChannel(cafe:Cafe | number, members:Array<Profile | string> | Profile | string,
-        type = ChatType.OnetoOne) {
+        type = ChatType.OnetoOne, captcha:NCaptcha = null) {
         const cafeid = typeof cafe === "number" ? cafe : cafe.cafeId
         const memberids:string[] = []
         if (Array.isArray(members)) {
@@ -45,9 +50,45 @@ export default class Ncc extends NcFetch {
         } else {
             memberids.push(typeof members === "string" ? members : members.userid)
         }
+        if (memberids.length >= 2) {
+            type = ChatType.Group
+        }
+        // check invitable
+        const cafePerms = await this.listCafes(type)
+        if (!cafePerms.valid) {
+            return Promise.reject("Invalid Cafe")
+        }
+        const cafeI = getFirst(cafePerms.result.filter((v) => v.cafeId === cafeid))
+        if (cafeI == null || !(type === ChatType.OnetoOne ? cafeI.onetoOne : cafeI.group)) {
+            return Promise.reject("No permission.")
+        }
+        if (type === ChatType.Group && captcha == null) {
+            return Promise.reject("Require Captcha")
+        }
+        const request = await this.credit.reqPost(CHATAPI_CAFE_INVITE.get(cafeid), {}, {
+            "channelTypeCode": type,
+            "userIdList": memberids,
+            "captchaKey": captcha == null ? null : captcha.key,
+            "captchaValue": captcha == null ? null : captcha.value,
+        })
+        const response = new NcJson(request, (obj) => ({
+            channelID: get(obj, "channelId")
+        }))
+        if (!response.valid) {
+            return Promise.reject(response.error.msg)
+        }
+        const channel = await NcChannel.from(this.credit, response.result.channelID)
+        return channel
+    }
+    public async leaveChannel(channel:NcBaseChannel | number) {
+        if (typeof channel !== "number") {
+            channel = channel.channelID
+        }
+        return NcChannel.quit(this.credit, channel)
     }
     /**
      * List joinable cafes
+     * @param chatType one2one or group!
      */
     public async listCafes(chatType:ChatType) {
         const request = await this.credit.reqGet(CHATAPI_CAFES.get(chatType))
@@ -62,6 +103,7 @@ export default class Ncc extends NcFetch {
                 group: _cafe.memberLevel >= _cafe.groupCreateLevel,
             }) as CafewChatPerm).filter((v) => chatType === ChatType.OnetoOne ? v.onetoOne : v.group)
         })
+        return response
     }
     /**
      * Test channel..

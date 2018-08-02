@@ -229,7 +229,7 @@ export default class NCredit extends EventEmitter {
         return this.req("POST", url, sub, postD, encoding, referer)
     }
     // request raw
-    public async req(sendType:"POST" | "GET", url:string,
+    public async req(sendType:"POST" | "GET" | "DELETE", url:string,
         sub:{[key:string]: string} = {}, postD:{[key:string]: any} = {},
         encoding = "utf-8", referer = CHAT_HOME_URL) {
         // set origin

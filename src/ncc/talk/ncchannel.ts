@@ -4,7 +4,8 @@ import { EventDispatcher, IEventHandler } from "strongly-typed-events"
 import Log from "../../log"
 import NCredit from "../credit/ncredit"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
-    CHAT_CHANNEL_URL, CHAT_HOME_URL, CHATAPI_CHANNEL_SYNC, COOKIE_SITES, NcIDBase } from "../ncconstant"
+    CHAT_CHANNEL_URL, CHAT_HOME_URL, CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_SYNC,
+    COOKIE_SITES, NcIDBase } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
@@ -29,7 +30,17 @@ export default class NcChannel extends NcBaseChannel {
         }
         return instance
     }
-
+    /**
+     * Leave Channel
+     */
+    public static async quit(credit:NCredit, id:number) {
+        const request = await credit.req("DELETE", CHATAPI_CHANNEL_LEAVE.get(id))
+        const instance = new NcJson(request, (obj) => ({msg:obj["msg"]}))
+        if (!instance.valid) {
+            return Promise.reject(instance.error.msg)
+        }
+        return Promise.resolve()
+    }
     /************************** Fields & Constructor *******************************/
     /**
      * Channel Users
@@ -216,6 +227,12 @@ export default class NcChannel extends NcBaseChannel {
      */
     public async syncChannel() {
         return this.update()
+    }
+    /**
+     * Leave Channel (No way to destroy channel :p)
+     */
+    public async leave() {
+        return NcChannel.quit(this.credit, this.channelID)
     }
     /**
      * Connect session.

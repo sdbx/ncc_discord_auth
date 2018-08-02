@@ -35,8 +35,14 @@ async function init() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (ncc.available) {
-            await ncc.fetchChannels()
-            await ncc.testChannel(106977317649)
+            try {
+                await ncc.fetchChannels()
+                await ncc.testChannel(106977317649)
+                const channel = await ncc.createChannel(26686242, "<id>")
+                await channel.leave()
+            } catch (err) {
+                Log.e(err)
+            }
         }
     }
 }
