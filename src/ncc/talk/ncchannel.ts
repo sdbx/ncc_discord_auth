@@ -92,7 +92,7 @@ export default class NcChannel extends NcBaseChannel {
             credit = this.credit
         }
         try {
-            const sync = JSON.parse(await credit.reqGet(CHATAPI_CHANNEL_SYNC.get(id)))
+            const sync = JSON.parse(await credit.reqGet(CHATAPI_CHANNEL_SYNC.get(id)) as string)
             const response = new NcJson(sync, (obj) => ({
                 channelI: {...get(obj, "channel")} as INcChannel,
                 memberList: get(obj, "memberList") as object[],

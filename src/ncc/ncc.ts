@@ -28,7 +28,7 @@ export default class Ncc extends NcFetch {
      * Fetch current channels
      */
     public async fetchChannels() {
-        const content = asJSON(await this.credit.reqGet(CHATAPI_CHANNELS))
+        const content = asJSON(await this.credit.reqGet(CHATAPI_CHANNELS) as string)
         const response = new NcJson(content, (obj) => ({
             channelList: (get(obj, "channelList") as object[])
                     .map((channel) => new NcBaseChannel(channel)),
@@ -41,7 +41,7 @@ export default class Ncc extends NcFetch {
      * @param cafe Cafe
      * @param member Invite member (Profile)
      * @param type Chat Type (Group: requires captcha)
-     * @param captcha Captcha (generated, in group chat)
+     * @param captcha Captcha (generated, **GroupChat**)
      */
     public async createChannel(cafe:Cafe | number,
         member:Array<Profile | string> | Profile | string | OpenChatOption,
@@ -97,8 +97,12 @@ export default class Ncc extends NcFetch {
             }
         }
         const request = await this.credit.reqPost(url.get(cafeid), {}, param)
+        let depthS = "channelId"
+        if (type === ChatType.OpenGroup) {
+            depthS = "channel." + depthS
+        }
         const response = new NcJson(request, (obj) => ({
-            channelID: get(obj, "channelId")
+            channelID: get(obj, depthS)
         }))
         if (!response.valid) {
             return Promise.reject(response.error.msg)
@@ -106,8 +110,21 @@ export default class Ncc extends NcFetch {
         const channel = await NcChannel.from(this.credit, response.result.channelID)
         return channel
     }
-    public async createOpenChannel(cafe:Cafe | number,info:OpenChatOption,captcha:NCaptcha) {
-        return this.createChannel(cafe, info, ChatType.OpenGroup, captcha)
+    /**
+     * Create OpenChannel
+     * @param cafe Cafe id
+     * @param captcha Captcha (open chat uses captcha)
+     * @param name Chat Title
+     * @param description Chat description
+     * @param image Image URL (external is ok.)
+     */
+    public async createOpenChannel(cafe:Cafe | number,captcha:NCaptcha,
+        name:string, description:string = "", image?:string) {
+        return this.createChannel(cafe, {
+            channelName: name,
+            desc: description,
+            image,
+        } as OpenChatOption, ChatType.OpenGroup, captcha)
     }
     public async leaveChannel(channel:NcBaseChannel | number) {
         if (typeof channel !== "number") {

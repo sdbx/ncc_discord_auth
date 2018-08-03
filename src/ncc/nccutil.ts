@@ -1,4 +1,5 @@
 import * as get from "get-value"
+import * as mime from "mime-types"
 import Cafe from "./structure/cafe"
 import Profile from "./structure/profile"
 
@@ -86,6 +87,27 @@ export function parseMember(json:object, cafe:Cafe) {
         nickname: get(json, "nickname"),
         userid: get(json, "memberId"),
     } as Profile
+}
+/**
+ * Form-data maker
+ * @param value string, stream, buffer
+ * @param filename extension or buffer
+ */
+export function withName<T>(value:T, filename:string = null) {
+    if (filename == null) {
+        return value
+    }
+    if (filename.indexOf(".") <= 0) {
+        filename = "unknown" + filename.substr(filename.indexOf(".") + 1)
+    }
+   const contentType = mime.lookup(filename) || "application/octet-stream"
+   return {
+       value,
+       options: {
+           filename,
+           contentType
+       }
+   }
 }
 export class ParamStr {
     public static make(str:string) {

@@ -48,7 +48,7 @@ export default class NCredit extends EventEmitter {
         log("Creating new cookie jar")
         this.cookieJar = new CookieJar()
         const rsaKey = await this.reqGet("https://nid.naver.com/login/ext/keys.nhn")
-            .catch((e) => {Log.e(e); return ""}) // RSA Key
+            .catch((e) => {Log.e(e); return ""}) as string // RSA Key
         try {
             const keyO = encryptKey(rsaKey, this.username, this._password)
         } catch (err) {
@@ -94,7 +94,7 @@ export default class NCredit extends EventEmitter {
         nnbCookie.path = "./"
         nnbCookie.domain = "naver.com"
         nnbCookie.expires = new Date(2050, 11, 30)
-        this.cookieJar.setCookieSync(nnbCookie, "https://naver.com")
+        this.cookieJar.setCookieSync(nnbCookie, "https://naver.com/")
         // copy cookie to cookieJar
         this.saveCookie(COOKIE_SITES, cookie)
         // check cookie valid
@@ -129,7 +129,7 @@ export default class NCredit extends EventEmitter {
         }
     }
     public async fetchUserID() {
-        const home = await this.reqGet(CHAT_HOME_URL)
+        const home = await this.reqGet(CHAT_HOME_URL) as string
         const q1 = home.match(/userId.+/i)[0]
         const userid = q1.substring(q1.indexOf("'") + 1, q1.lastIndexOf("'")).trim()
         Log.d("Username", userid)
@@ -151,7 +151,7 @@ export default class NCredit extends EventEmitter {
      * @returns username or Promise.reject() (fail)
      */
     public async validateLogin() {
-        const content = asJSON(await this.reqGet(CHATAPI_CHANNELS))
+        const content = asJSON(await this.reqGet(CHATAPI_CHANNELS) as string)
         if (content == null) {
             // not found.
             return Promise.reject("404 NOT FOUND")
@@ -191,8 +191,8 @@ export default class NCredit extends EventEmitter {
      * request get
      * @param url Request URL without ?**=**&**=** or with **NOT** encoded.
      * @param sub Parmaters (**=**&**=**) **NOT** encoded.
-     * @param encoding Encoding
      * @param referer Referer
+     * @param encoding Receive Encoding
      */
     public async reqGet(url:string, sub:{[key:string]: string} = {}, referer = CHAT_HOME_URL, encoding = "utf-8") {
         if (url.indexOf("?") >= 0) {
@@ -203,7 +203,7 @@ export default class NCredit extends EventEmitter {
                 ...parse.params,
             }
         }
-        return this.req("GET", url, sub, {}, encoding, referer)
+        return this.req("GET", url, sub, {}, referer, encoding)
     }
     /**
      * request post 
@@ -211,10 +211,10 @@ export default class NCredit extends EventEmitter {
      * @param sub Parmaters (**=**&**=**) **NOT** encoded.
      * @param postD Form Data
      * @param referer Referer
-     * @param encoding Encoding
+     * @param encoding Receive Encoding
      */
     public async reqPost(url:string, sub:{[key:string]: string}, postD:{[key:string]: any} = {},
-        referer = CHAT_HOME_URL, encoding = "utf-8") {
+        referer = CHAT_HOME_URL,  encoding = "utf-8") {
         if (url.indexOf("?") >= 0) {
             const parse = parseURL(url)
             url = parse.url
@@ -223,12 +223,12 @@ export default class NCredit extends EventEmitter {
                 ...parse.params,
             }
         }
-        return this.req("POST", url, sub, postD, encoding, referer)
+        return this.req("POST", url, sub, postD, referer, encoding)
     }
     // request raw
     public async req(sendType:"POST" | "GET" | "DELETE", url:string,
         sub:{[key:string]: string} = {}, postD:{[key:string]: any} = {},
-        encoding = "utf-8", referer = CHAT_HOME_URL) {
+        referer = CHAT_HOME_URL, encoding = "utf-8") {
         // set origin
         const originRegex = /http(s)?:\/\/.+?\//
         let origin
@@ -237,43 +237,48 @@ export default class NCredit extends EventEmitter {
         } else {
             origin = referer
         }
-        // post data encode
-        let post_body = null
+        // check post type
+        let binary = false
         if (sendType === "POST") {
-            let convFn:(v:string) => string
-            if (encoding === "utf-8") {
-                convFn = (v) => encodeURIComponent(v)
-            } else {
-                convFn = (v) => v
+            for (const value of Object.values(postD)) {
+                if (["number", "boolean", "string"].indexOf(typeof value) < 0) {
+                    binary = true
+                    break
+                }
             }
-            post_body = iconv.convert(
-                querystring.stringify(postD, "&", "=", { encodeURIComponent: convFn }), "utf-8")
         }
         const jar = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: sendType,
             url,
             qs: sub,
-            body: post_body,
+            form: sendType === "POST" && !binary ? postD : undefined,
+            formData: binary ? postD : undefined,
             agent: this.httpsAgent,
-            encoding: encoding === "utf-8" ? encoding : null,
+            encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
             strictSSL: true,
             headers: {
                 // "cache-control": "no-cache, no-store, max-age=0",
                 "referer": referer,
                 "origin": origin,
-                "content-type": (sendType === "POST" ? 
-                    `application/x-www-form-urlencoded; charset=${encoding}` : undefined)
             },
             jar,
         }
-        this.saveCookie(COOKIE_SITES, jar)
+        // this.saveCookie(COOKIE_SITES, jar)
         try {
             const buffer:Buffer | string = await request(options).catch((e) => Log.e(e))
             if (typeof buffer === "string") {
+                // utf-8 encoded
                 return Promise.resolve(buffer)
             } else {
-                return iconv.convert(buffer, "utf-8", encoding).toString() as string
+                // binary test?
+                if (encoding != null) {
+                    // to string
+                    return iconv.convert(buffer, "utf-8", encoding).toString() as string
+                } else {
+                    // binary
+                    return buffer
+                }
             }
         } catch (err) {
             Log.e(err)
@@ -303,6 +308,7 @@ export default class NCredit extends EventEmitter {
                     tCookie.path = _cookie.path
                     tCookie.httpOnly = _cookie.httpOnly
                     tCookie.secure = _cookie.secure
+                    tCookie.expires = new Date(2050, 11, 30)
                     this.cookieJar.setCookieSync(tCookie, v)
                 }
             })

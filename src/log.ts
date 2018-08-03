@@ -1,9 +1,12 @@
 import * as _caller from "caller"
-import chalk, { Chalk } from "chalk"
+import _chalk, { Chalk } from "chalk"
 import * as Hook from "console-hook"
 import * as Reverser from "esrever"
 import * as Inquirer from "inquirer"
 import * as path from "path"
+import * as request from "request-promise-native"
+import * as terminalImage from "terminal-image"
+import * as terminalLink from "terminal-link"
 import * as Util from "util"
 
 /* tslint:disable:no-namespace */
@@ -11,7 +14,7 @@ import * as Util from "util"
  * Log module like Android Logcat
  */
 namespace Log {
-    const colorLevel = chalk.supportsColor.level
+    const colorLevel = _chalk.supportsColor.level
     /**
      * The maximum size of prefix
      */
@@ -32,11 +35,9 @@ namespace Log {
     let lastTiming = Date.now()
     export let ui:Inquirer.ui.BottomBar
     // 1: 8color 2: 256color 3: 0xFFFFFF color
-    /*
-    const chalk = new _chark.constructor({
-        level: colorLevel + 1
-    });
-    */
+    const chalk = new _chalk.constructor({
+        level: colorLevel === 1 ? 0 : colorLevel
+    })
     /**
      * Warning
      * @param title Title or Content 
@@ -120,6 +121,65 @@ namespace Log {
     export function json(title:string, obj:object) {
         custom("#d2b7ff", "#af5fff", chalk.bgCyan.cyan, "OBJ", {title, content:JSON.stringify(obj,null,2)})
     }
+    export function url(title:string, _url:string, desc?:string) {
+        const design = style("#eff9b8","#eff9b8",chalk.bgBlack.white)
+        if (desc == null) {
+            desc = decodeURIComponent(_url).replace(/\?.*/ig, "")
+            desc = desc.substring(desc.lastIndexOf("/") + 1)
+        }
+        raw(design.header, design.num, design.content, design.hlight, "URL", {title, content: desc})
+        // parse raw
+        const column = process.stdout.columns
+        const split:string[] = []
+        let chain = _url
+        while (chain.length > 0) {
+            const str = cutstr(chain, Math.min(length(chain), column - 7))
+            split.push(str)
+            chain = chain.replace(str, "")
+        }
+        let out = ""
+        split.forEach((_v, _i) => {
+            out += design.header(` ${_i === 0 ? "   " : "   "} `)
+            out += design.content(` ${terminalLink(_v.padEnd(column - 7 - unicodeLength(_v)), _url)} `)
+            out += "\n"
+        })
+        process.stdout.write(out)
+    }
+    /**
+     * Image trace...????
+     */
+    export async function image(_image:string | Buffer, title:string, desc?:string) {
+        let binary:Buffer
+        if (typeof _image === "string") {
+            if (desc == null) {
+                desc = path.basename(decodeURIComponent(_image.replace(/\?.*/ig, "")))
+            }
+            binary = await request.get(_image, {encoding: null})
+        } else {
+            binary = _image
+        }
+        // flush cache need.
+        await new Promise((res, rej) => {
+            terminalImage.buffer(binary).then((str) => {
+                if (typeof _image === "string") {
+                    Log.url(title, _image, desc)
+                } else {
+                    Log.i(title, desc == null ? "Image" : desc)
+                }
+                process.stdout.write(str, () => {
+                    res()
+                })
+            }).catch(() => {
+                rej()
+            })
+        })
+        const white = chalk.bgHex("#eff9b8").hex("#424242")
+        await new Promise((res, rej) => {
+            process.stdout.write(white("".padEnd(process.stdout.columns)) + "\n", () => res())
+        })
+        // raw(white, white, white, white, "", {title:"", content: "Image end."})
+        return Promise.resolve()
+    }
     /**
      * Custom style trace
      * @param themeH A hex of 0xFFFFFF colors
@@ -199,10 +259,15 @@ namespace Log {
             message = ""
         }
         // [20](prefix) [3](num) [1](|) [40+](content)
-        const sends = message.split("\n").map((str) => {
+        const sends = message.split("\n").map((str, _i) => {
             const out:string[] = []
             while (str.length > 0) {
-                const piece = cutstr(str,contentLimit)
+                let piece
+                if (_i >= 1) {
+                    piece = cutstr(str, contentLimit + prefixLimit + 1)
+                } else {
+                    piece = cutstr(str,contentLimit)
+                }
                 out.push(piece)
                 str = str.replace(piece,"")
             }
@@ -224,9 +289,18 @@ namespace Log {
                 } else if (_i === 0) {
                     numText = (index + 1).toString()
                 }
-                _log(index === 0 ? headerColor : headerSemiColor, useHeader ? prefix.toString() : "",
+                if (index === 0 && _i === 0) {
+                    _log(index === 0 ? headerColor : headerSemiColor, useHeader ? prefix.toString() : "",
                     numberColor, numText,
                     contentColor,_v)
+                } else {
+                    const column = process.stdout.columns
+                    let out = ""
+                    out += headerColor(` ${numText.padStart(numberLimit)} `)
+                    out += contentColor(` ${_v.padEnd(_v.length + (column - length(_v)) - 7)} `)
+                    out += "\n"
+                    process.stdout.write(out)
+                }
             })
         })
         // line for readability

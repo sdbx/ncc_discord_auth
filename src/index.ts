@@ -8,6 +8,7 @@ import Log from "./log"
 import Ncc from "./ncc/ncc"
 import Cafe from "./ncc/structure/cafe"
 import NcChannel from "./ncc/talk/ncchannel"
+import uploadImage from "./ncc/talk/uploadphoto"
 
 let run:Runtime
 async function start() {
@@ -39,10 +40,14 @@ async function init() {
             try {
                 await ncc.fetchChannels()
                 await ncc.testChannel(106977317649)
-                const captcha = await ncc.genCaptchaByConsole()
+                // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line
-                const channel = await ncc.createOpenChannel(26686242, { channelName: "Hello", desc: "World"}, captcha)
+                const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")
+                // tslint:disable-next-line
+                // const channel = await ncc.createOpenChannel(26686242, captcha, "Hello", "World", image.path)
                 // await channel.leave()
+                // await Log.image(image.path, "Uploaded")
+                Log.json("Test",image)
             } catch (err) {
                 Log.e(err)
             }

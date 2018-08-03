@@ -53,7 +53,8 @@ export default class NcCredent extends EventEmitter {
      */
     public async genCaptchaByConsole() {
         const captcha = await NCaptcha.gen(this.credit)
-        Log.i("Captcha URL", captcha.url)
+        // Log.i("Captcha URL", captcha.url)
+        await Log.image(captcha.url, "Captcha")
         const captchaRead = await Log.read("Captcha", { hide: false, logResult: true }).catch(() => "")
         captcha.value = captchaRead
         return captcha
@@ -66,7 +67,7 @@ export default class NcCredent extends EventEmitter {
         const username = await Log.read("Username",{hide:false, logResult:true}).catch(() => "id")
         let password = await Log.read("Password",{hide:true, logResult:false}).catch(() => "__")
         let result:string | LoginError
-        const first = true
+        let first = true
         let captcha = null
         do {
             try {
@@ -81,7 +82,8 @@ export default class NcCredent extends EventEmitter {
                 return Promise.resolve(result)
             }
             if (result.captcha) {
-                Log.i("Captcha-URL", result.captchaURL)
+                await Log.image(result.captchaURL, "Captcha-Login",
+                    "When you can't verify captcha, Please click below link.")
                 if (!first) {
                     password = await Log.read("Password",{hide:true, logResult:false}, password).catch(() => "__")
                 }
@@ -90,6 +92,7 @@ export default class NcCredent extends EventEmitter {
                     key: result.captchaKey,
                     value: captchaRead,
                 }
+                first = false
             } else {
                 return Promise.resolve(null)
             }
