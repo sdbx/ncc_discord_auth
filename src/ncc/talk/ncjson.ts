@@ -2,7 +2,7 @@ import * as get from "get-value"
 /**
  * JSON response from talkAPI
  */
-export default class NcJson<T extends object> {
+export default class NcJson<T> {
     public static default(response:object) {
         return new NcJson(response, (obj) => obj)
     }
@@ -21,7 +21,7 @@ export default class NcJson<T extends object> {
     public status:string
     public error:NcError
     public result:T
-    public constructor(response:object | string, parser:(obj:object) => T) {
+    public constructor(response:object | string, parser:(obj:any) => T) {
         let resObj:object
         if (typeof response === "string") {
             try {

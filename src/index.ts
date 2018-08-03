@@ -48,6 +48,7 @@ async function init() {
                 // await channel.leave()
                 // await Log.image(image.path, "Uploaded")
                 Log.json("Test",image)
+                Log.time()
             } catch (err) {
                 Log.e(err)
             }

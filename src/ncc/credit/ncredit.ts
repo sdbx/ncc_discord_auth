@@ -194,7 +194,8 @@ export default class NCredit extends EventEmitter {
      * @param referer Referer
      * @param encoding Receive Encoding
      */
-    public async reqGet(url:string, sub:{[key:string]: string} = {}, referer = CHAT_HOME_URL, encoding = "utf-8") {
+    public async reqGet(url:string, sub:{[key:string]: string | number | boolean} = {},
+        referer = CHAT_HOME_URL, encoding = "utf-8") {
         if (url.indexOf("?") >= 0) {
             const parse = parseURL(url)
             url = parse.url
@@ -213,7 +214,7 @@ export default class NCredit extends EventEmitter {
      * @param referer Referer
      * @param encoding Receive Encoding
      */
-    public async reqPost(url:string, sub:{[key:string]: string}, postD:{[key:string]: any} = {},
+    public async reqPost(url:string, sub:{ [key:string]: string | number | boolean}, postD:{[key:string]: any} = {},
         referer = CHAT_HOME_URL,  encoding = "utf-8") {
         if (url.indexOf("?") >= 0) {
             const parse = parseURL(url)
@@ -227,7 +228,7 @@ export default class NCredit extends EventEmitter {
     }
     // request raw
     public async req(sendType:"POST" | "GET" | "DELETE", url:string,
-        sub:{[key:string]: string} = {}, postD:{[key:string]: any} = {},
+        sub:{[key:string]: string | number | boolean} = {}, postD:{[key:string]: any} = {},
         referer = CHAT_HOME_URL, encoding = "utf-8") {
         // set origin
         const originRegex = /http(s)?:\/\/.+?\//

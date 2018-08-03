@@ -224,13 +224,13 @@ export interface INcMessage {
     extras:string; // image:{width, url, height, is...} json
 }
 
-interface NcImage {
+export interface NcImage {
     url:string; // nullable
     width:number; // nullable
     height:number; // nullable
     is_original_size?:boolean; // nullable
 }
-interface NcSticker {
+export interface NcSticker {
     stickerId:string; // stickerId
     seq:number; // ??
     packName:string; // packname... where use?
@@ -238,7 +238,7 @@ interface NcSticker {
     height:number; // useless
     imageUrl:string; // umm
 }
-interface NcEmbed {
+export interface NcEmbed {
     title:string; // kkiro.kr - Title of embed
     url:string; // https://kkiro.kr/
     description:string; // Kkiro's personal blog
