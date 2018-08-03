@@ -8,6 +8,7 @@ import * as orgrq from "request"
 import * as request from "request-promise-native"
 import { Cookie, CookieJar, parseDate } from "tough-cookie"
 import Log from "../../log"
+import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, CHATAPI_CHANNELS, COOKIE_SITES } from "../ncconstant"
 import { asJSON, parseURL } from "../nccutil"
 import encryptKey from "./loginencrypt"
@@ -46,7 +47,7 @@ export default class NCredit extends EventEmitter {
         log("Starting logging in")
         log("Creating new cookie jar")
         this.cookieJar = new CookieJar()
-        const rsaKey = await this.reqGet("https://static.nid.naver.com/enclogin/keys.nhn")
+        const rsaKey = await this.reqGet("https://nid.naver.com/login/ext/keys.nhn")
             .catch((e) => {Log.e(e); return ""}) // RSA Key
         try {
             const keyO = encryptKey(rsaKey, this.username, this._password)
@@ -75,12 +76,25 @@ export default class NCredit extends EventEmitter {
             url: "https://nid.naver.com/nidlogin.login",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
-              "Accept": "text/plain"
+              "Accept": "text/plain",
+              "Referer": "https://nid.naver.com/nidlogin.login"
             },
             method: "POST",
             form,
             jar: cookie,
         })
+        /**
+         * Generate NNB cookie
+         * 
+         * Naver captcha **REQUIRES** this cookie
+         */
+        const nnbCookie = new Cookie()
+        nnbCookie.key = "NNB"
+        nnbCookie.value = NCaptcha.randomString(11, true)
+        nnbCookie.path = "./"
+        nnbCookie.domain = "naver.com"
+        nnbCookie.expires = new Date(2050, 11, 30)
+        this.cookieJar.setCookieSync(nnbCookie, "https://naver.com")
         // copy cookie to cookieJar
         this.saveCookie(COOKIE_SITES, cookie)
         // check cookie valid

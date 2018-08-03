@@ -19,18 +19,21 @@ export default class NCaptcha {
         }
         return captcha
     }
-    public url:string
-    public key:string
-    public value:string
-    private constructor() {
-        this.value = ""
-    }
-    public randomString(length) {
-        const rand = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
+    public static randomString(length:number, uppercase = false) {
+        let rand = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
+        if (uppercase) {
+            rand += "abcdefghiklmnopqrstuvwxyz"
+        }
         let str = ""
         for (let i = 0; i < length; i += 1) {
             str += rand.charAt(Math.floor(Math.random() * rand.length))
         }
         return str
+    }
+    public url:string
+    public key:string
+    public value:string
+    private constructor() {
+        this.value = ""
     }
 }
