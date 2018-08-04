@@ -2,7 +2,7 @@ import { EventEmitter } from "events"
 import * as get from "get-value"
 import Session, { Message } from "node-ncc-es6"
 import * as io from "socket.io-client"
-import { EventDispatcher, IEventHandler, SimpleEventDispatcher } from "strongly-typed-events"
+import { EventDispatcher, IEventHandler, ISimpleEventHandler, SimpleEventDispatcher } from "strongly-typed-events"
 import Cache from "../cache"
 import Log from "../log"
 import NCredit from "./credit/ncredit"
@@ -29,6 +29,10 @@ export default class Ncc extends NcFetch {
      * Joined channels
      */
     public joinedChannels:NcJoinedChannel[] = []
+    /**
+     * Session connected channels
+     */
+    public connectedChannels:NcChannel[] = []
     /**
      * Auto update tasker
      */
@@ -264,6 +268,10 @@ export default class Ncc extends NcFetch {
         }
         return openChannels
     }
+    /**
+     * Fetch channels and start auto sync
+     * @param autoUpdate 
+     */
     public async connect(autoUpdate = false) {
         if (!await this.availableAsync()) {
             return Promise.reject("Not logined")
@@ -275,6 +283,43 @@ export default class Ncc extends NcFetch {
         }
         if (autoUpdate) {
             this.syncTask = setTimeout(this.syncChannels.bind(this), intervalNormal)
+            this.onPrivate(this.events.onChatUpdated, (async (list) => {
+                const loop = (async <T extends NcBaseChannel>(arr:T[], remove = false) => {
+                    const ln1 = arr.length
+                    const ln2 = this.connectedChannels.length
+                    for (let i = 0; i < ln1; i += 1) {
+                        const param = arr[i]
+                        let find = -1
+                        for (let k = 0; k < ln2; k += 1) {
+                            if (this.connectedChannels[k].channelID === param.channelID) {
+                                find = k
+                                break
+                            }
+                        }
+                        if (find < 0) {
+                            if (!remove) {
+                                const ch = await NcChannel.from(this.credit, param)
+                                this.connectedChannels.push(ch)
+                                await ch.connect(this.credit)
+                            }
+                        } else {
+                            if (remove) {
+                                this.connectedChannels[find].disconnect()
+                                this.connectedChannels.splice(find, 1)
+                            }
+                        }
+                    }
+                }).bind(this)
+                if (list.added.length >= 1) {
+                    await loop(list.added)
+                }
+                if (list.modified.length >= 1) {
+                    await loop(list.modified)
+                }
+                if (list.removed.length >= 1) {
+                    await loop(list.removed, true)
+                }
+            }).bind(this))
         }
         return Promise.resolve()
     }
@@ -431,7 +476,7 @@ export default class Ncc extends NcFetch {
      * @param dispatcher this.events 
      * @param handler function
      */
-    protected onPrivate<V>(dispatcher:EventDispatcher<NcChannel, V>, handler:IEventHandler<NcChannel, V>) {
+    protected onPrivate<V>(dispatcher:SimpleEventDispatcher<V>, handler:ISimpleEventHandler<V>) {
         dispatcher.asEvent().subscribe(handler)
     }
     private isChannelDesc(param:any):param is ChannelInfo {

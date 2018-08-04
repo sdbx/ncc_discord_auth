@@ -43,7 +43,7 @@ async function init() {
                 await ncc.getOpenChannels(26686242)
                 ncc.connect(true)
                 ncc.on(NccEvents.updateList, (obj:ChannelListEvent) => {
-                    Log.json("Delta", obj)
+                    // Log.json("Delta", obj)
                 })
                 // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line

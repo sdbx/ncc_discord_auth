@@ -139,8 +139,11 @@ namespace Log {
         }
         let out = ""
         split.forEach((_v, _i) => {
+            const content = _v.padEnd(column - 7 - unicodeLength(_v))
             out += design.header(` ${_i === 0 ? "   " : "   "} `)
-            out += design.content(` ${terminalLink(_v.padEnd(column - 7 - unicodeLength(_v)), _url)} `)
+            out += design.content(` ${terminalLink(content, _url)}${
+                length(content) >= column - numberLimit - 3 ? "" : " "
+            }`)
             out += "\n"
         })
         process.stdout.write(out)
@@ -295,9 +298,10 @@ namespace Log {
                     contentColor,_v)
                 } else {
                     const column = process.stdout.columns
+                    const trace = _v.padEnd(_v.length + (column - length(_v)) - 7)
                     let out = ""
                     out += headerColor(` ${numText.padStart(numberLimit)} `)
-                    out += contentColor(` ${_v.padEnd(_v.length + (column - length(_v)) - 7)} `)
+                    out += contentColor(` ${trace}${length(trace) >= column - numberLimit - 3 ? "" : " "}`)
                     out += "\n"
                     process.stdout.write(out)
                 }

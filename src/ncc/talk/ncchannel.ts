@@ -68,9 +68,8 @@ export default class NcChannel {
     /**
      * Is session connected?
      */
-    protected _connected = false
     public get connected() {
-        return this._connected
+        return this.session != null && this.session.connected
     }
     /* ******** Proxies **********/
     /**
@@ -150,9 +149,9 @@ export default class NcChannel {
      */
     protected registerE(s:SocketIOClient.Socket) {
         // connected check
-        s.on("connect", () => this._connected = true)
-        s.on("disconnect", () => this._connected = false);
-        ["error", "connect_error", "reconnect_failed"].forEach((tag) => s.on(tag, () => this._connected = false))
+        // s.on("connect", () => this._connected = true)
+        // s.on("disconnect", () => this._connected = false);
+        // ["error", "connect_error", "reconnect_failed"].forEach((tag) => s.on(tag, () => this._connected = false))
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
             const message = this.serialMsg(eventmsg)
@@ -403,6 +402,19 @@ export default class NcChannel {
             })
         }
         this.session.open()
+    }
+    public disconnect() {
+        if (this.connected) {
+            this.session.disconnect()
+        }
+        if (this.session != null) {
+            this.session.removeAllListeners()
+            this.session = null
+        }
+        for (const e of Object.values(this.events)) {
+            e.clear()
+        }
+        this.credit = null
     }
     
     /**************** Utilities *************************/
