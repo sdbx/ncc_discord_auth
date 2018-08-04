@@ -1,6 +1,8 @@
+import { EventEmitter } from "events"
 import * as get from "get-value"
 import Session, { Message } from "node-ncc-es6"
 import * as io from "socket.io-client"
+import { EventDispatcher, IEventHandler, SimpleEventDispatcher } from "strongly-typed-events"
 import Cache from "../cache"
 import Log from "../log"
 import NCredit from "./credit/ncredit"
@@ -27,10 +29,15 @@ export default class Ncc extends NcFetch {
      * Joined channels
      */
     public joinedChannels:NcJoinedChannel[] = []
+    /**
+     * Auto update tasker
+     */
     protected syncTask:NodeJS.Timer
+    protected events:Events
     protected session:Session
     constructor() {
         super()
+        this.events = new Events(this)
     }
     /**
      * Fetch current channels
@@ -269,21 +276,50 @@ export default class Ncc extends NcFetch {
         if (autoUpdate) {
             this.syncTask = setTimeout(this.syncChannels.bind(this), intervalNormal)
         }
+        return Promise.resolve()
     }
     public async syncChannels() {
         let errored = false
         const original = [...this.joinedChannels]
         try {
-            this.joinedChannels = await this.fetchChannels()
+            const now = await this.fetchChannels()
+            // output
+            const added:NcJoinedChannel[] = []
+            const modified:NcJoinedChannel[] = []
+            const removed:NcJoinedChannel[] = []
+            // previous ids
             const previous = original.map((v) => v.channelID)
-            const now = this.joinedChannels.map((v) => v.channelID)
-            const added = this.joinedChannels.filter((v) => previous.indexOf(v.channelID) < 0)
-            const removed = original.filter((v) => now.indexOf(v.channelID) < 0)
-            if (added.length >= 1) {
-                Log.d("Added.")
+            // id pair
+            for (const channel of now) {
+                const i = previous.indexOf(channel.channelID)
+                if (i < 0) {
+                    // new channel
+                    added.push(channel)
+                    continue
+                }
+                const org = getFirst(original.filter((v) => v.channelID === channel.channelID))
+                if (org != null) {
+                    if (org.lastestMessage.messageId !== channel.lastestMessage.messageId ||
+                        JSON.stringify(org.channelInfo) !== JSON.stringify(channel.channelInfo)) {
+                        modified.push(channel)
+                    }
+                }
+                previous.splice(i, 1)
             }
-            if (removed.length >= 1) {
-                Log.d("Deleted.")
+            for (const channel of original) {
+                const i = previous.indexOf(channel.channelID)
+                if (i >= 0) {
+                    removed.push(channel)
+                }
+            }
+            this.joinedChannels = now
+            if (added.length + modified.length + removed.length >= 1) {
+                Log.d("Updated")
+                this.events.onChatUpdated.dispatchAsync({
+                    added,
+                    modified,
+                    removed,
+                } as ChannelListEvent)
             }
         } catch (err) {
             Log.e(err)
@@ -312,7 +348,7 @@ export default class Ncc extends NcFetch {
                 group: _cafe.memberLevel >= _cafe.groupCreateLevel,
                 staff: _cafe.managingCafe,
                 blocked: false,
-            }) as CafewChatPerm).filter((v) => chatType === ChannelType.OnetoOne ? v.onetoOne : v.group)
+            }) as CafeWithPerm).filter((v) => chatType === ChannelType.OnetoOne ? v.onetoOne : v.group)
         })
         return response
     }
@@ -390,17 +426,52 @@ export default class Ncc extends NcFetch {
     public get chat():Session {
         return this.session
     }
+    /**
+     * Register event
+     * @param dispatcher this.events 
+     * @param handler function
+     */
+    protected onPrivate<V>(dispatcher:EventDispatcher<NcChannel, V>, handler:IEventHandler<NcChannel, V>) {
+        dispatcher.asEvent().subscribe(handler)
+    }
     private isChannelDesc(param:any):param is ChannelInfo {
         return "name" in param
     }
 }
-interface CafewChatPerm extends Cafe {
+/**
+ * Public events
+ */
+export enum NccEvents {
+    updateList = "updateChannelList",
+}
+/**
+ * Private events
+ */
+class Events {
+    public onMessage = new SimpleEventDispatcher<NcMessage>()
+    public onChatUpdated = this.getE<ChannelListEvent>(NccEvents.updateList)
+    private superO:EventEmitter
+    public constructor(p:EventEmitter) {
+        this.superO = p
+    }
+    private getE<T>(name:NccEvents) {
+        const e = new SimpleEventDispatcher<T>()
+        e.asEvent().subscribe((obj:any) => this.superO.emit(name, obj))
+        return e
+    }
+}
+export interface ChannelListEvent {
+    added:NcJoinedChannel[];
+    removed:NcJoinedChannel[];
+    modified:NcJoinedChannel[];
+}
+export interface CafeWithPerm extends Cafe {
     onetoOne:boolean;
     group:boolean;
     staff:boolean;
     blocked:boolean;
 }
-interface CafePermInfo {
+export interface CafePermInfo {
     cafeId:number;
     cafeName:string;
     cafeUrl:string;

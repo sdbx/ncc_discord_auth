@@ -33,7 +33,7 @@ export default interface NcBaseChannel extends NcIDBase {
     /**
      * The id of owner (Detail for owner)
      */
-    ownerid:string;
+    ownerid?:string;
 }
 /**
  * Parse ncc's openChatList response to Typed object
@@ -88,49 +88,4 @@ export enum ChannelType {
     OnetoOne = 1,
     Group = 2,
     OpenGroup = 4,
-}
-export interface INcChannel {
-    name:string;
-    type:number;
-    channelId:number;
-    userStatus:string;
-    newMessageCount:number;
-    thumbnailList?:string[] | null;
-    updatedAt:number;
-    createdAt:number;
-    userCount:number;
-    userPushType:string;
-    userFirstMessageNo:number;
-    userLatestMessageNo:number;
-    categoryId:number;
-    categoryName:string;
-    categoryUrl:string;
-    description:string;
-    defaultChannel:boolean;
-    messagePeriod:number;
-    open:boolean;
-    visible:boolean;
-    latestMessage?:LatestMessage;
-    owner:Owner;
-    originalOwner:boolean;
-    unreadCountVisible:boolean;
-    cafeChatRoomId?:number;
-}
-interface LatestMessage {
-    id:number;
-    body:string;
-    writerId:string;
-    writerName:string;
-    type:number;
-    createdTime:number;
-    extras?:null;
-}
-interface Owner {
-    memberId:string;
-    maskingId:string;
-    nickname:string;
-    memberProfileImageUrl:string;
-    manager:boolean;
-    cafeMember:boolean;
-    status:string;
 }

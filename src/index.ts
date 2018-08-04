@@ -5,7 +5,7 @@ import * as readline from "readline"
 import * as request from "request-promise-native"
 import Runtime from "./discord/runtime"
 import Log from "./log"
-import Ncc from "./ncc/ncc"
+import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
 import Cafe from "./ncc/structure/cafe"
 import NcChannel from "./ncc/talk/ncchannel"
 import uploadImage from "./ncc/talk/uploadphoto"
@@ -42,6 +42,9 @@ async function init() {
                 await ncc.testChannel(106977317649)
                 await ncc.getOpenChannels(26686242)
                 ncc.connect(true)
+                ncc.on(NccEvents.updateList, (obj:ChannelListEvent) => {
+                    Log.json("Delta", obj)
+                })
                 // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line
                 // const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")

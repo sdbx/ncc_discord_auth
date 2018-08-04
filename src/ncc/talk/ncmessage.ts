@@ -118,7 +118,7 @@ export default class NcMessage implements NcIDBase {
             return null
         }
         const extras = this.instance.extras
-        if (extras == null) {
+        if (extras == null || extras.length <= 0) {
             // No embed.
             return null
         }
