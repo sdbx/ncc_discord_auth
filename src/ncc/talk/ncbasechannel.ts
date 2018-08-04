@@ -1,101 +1,93 @@
-﻿import { EventEmitter } from "events"
-import { NcIDBase } from "../ncconstant"
+﻿import { NcIDBase } from "../ncconstant"
 import Cafe from "../structure/cafe"
-import Profile from "../structure/profile"
-import NcMessage from "./ncmessage"
 
-export default class NcBaseChannel implements NcIDBase {
+export default interface NcBaseChannel extends NcIDBase {
     /**
-     * Channel ID
-     * 
-     * 채널 고유 ID
+     * Unique Channel ID
      */
-    public channelID:number
-    protected baseinfo:INcChannel
-    private _cafe:Cafe = null
-    constructor(obj:object) {
-        if (obj != null) {
-            this.baseinfo = {...obj} as INcChannel
-            this.channelID = this.baseinfo.channelId
-        }
-    }
+    channelID:number;
     /**
-     * Unread count
-     * 
-     * 안 읽은 메세지
+     * Chat Info (name, desc, image)
      */
-    public get unreads() {
-        return this.baseinfo.newMessageCount
-    }
+    channelInfo:ChannelInfo;
     /**
-     * User count
-     * 
-     * 유저 **수**
+     * Channel Type
      */
-    public get userCount() {
-        return this.baseinfo.userCount
-    }
+    type:ChannelType;
     /**
-     * Cafe Info
+     * Cafe info
      * 
-     * 네이버 카페 정보
+     * Only cafeID is ensure!!
      */
-    public get cafe() {
-        if (this._cafe == null) {
-            const cafe = {
-                cafeId: this.baseinfo.categoryId,
-                cafeName: this.baseinfo.categoryUrl,
-                cafeDesc: this.baseinfo.categoryName,
-            } as Cafe
-            if (this.baseinfo.thumbnailList.length >= 1) {
-                cafe.cafeImage = this.baseinfo.thumbnailList[0]
-            }
-            this._cafe = cafe
-        }
-        return this._cafe
-    }
+    cafe:Cafe;
     /**
-     * Chat info
+     * When to create this channel
      * 
-     * 채팅방 정보
+     * Javascript Timestamp
      */
-    public get description() {
-        return this.baseinfo.description
-    }
+    createdAt:number;
     /**
-     * Open chat
-     * 
-     * 오픈채팅방 여부
+     * Count of Members
      */
-    public get openChat() {
-        return this.baseinfo.open
-    }
+    userCount:number;
     /**
-     * Owner
-     * 
-     * 채팅방 방장
+     * The id of owner (Detail for owner)
      */
-    public get owner():Profile {
-        const owner = this.baseinfo.owner
-        const cafe = this.cafe
-        return {
-            ...cafe,
-            profileurl: owner.memberProfileImageUrl,
-            nickname: owner.nickname,
-            userid: owner.memberId,
-        } as Profile
-    }
-    /**
-     * Last message
-     * 
-     * 최근 메세지
-     */
-    public get lastMessage():NcMessage {
-        if (this.baseinfo.latestMessage == null) {
-            return null
-        }
-        return new NcMessage(this.baseinfo.latestMessage, this.cafe, this.channelID)
-    }
+    ownerid:string;
+}
+/**
+ * Parse ncc's openChatList response to Typed object
+ * @param json response of openchannel
+ */
+export function parseFromOpen(json:OpenChatInfo) {
+    return {
+        channelID: json.channelId,
+        channelInfo: {
+            name: json.name,
+            description: json.description,
+            thumbnails: json.thumbnailList == null ? [] : json.thumbnailList,
+        },
+        type: json.type,
+        cafe: {
+            cafeId: json.categoryId
+        } as Cafe,
+        createdAt: json.createdAt,
+        userCount: json.userCount,
+        ownerid: json.ownerId == null ? null : json.ownerId,
+    } as NcBaseChannel
+}
+export interface OpenChatInfo {
+    thumbnailList?:string[] | null;
+    name:string;
+    type:number;
+    description:string;
+    channelId:number;
+    createdAt:number;
+    userCount:number;
+    categoryId:number;
+    defaultChannel:boolean;
+    joinStatus:string;
+    latestMessageReceivedTime?:number;
+    cafeChatRoomId?:number;
+    originalOwnerId:string;
+    ownerId?:string;
+}
+
+/**
+ * Channel Info interface
+ */
+export interface ChannelInfo {
+    name:string;
+    description:string;
+    thumbnails:string[];
+}
+/**
+ * Channel Type
+ */
+export enum ChannelType {
+    OnetoOne = 1,
+    Group = 2,
+    OpenGroup = 4,
 }
 export interface INcChannel {
     name:string;

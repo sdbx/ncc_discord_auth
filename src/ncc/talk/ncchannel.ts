@@ -3,18 +3,22 @@ import * as io from "socket.io-client"
 import { EventDispatcher, IEventHandler } from "strongly-typed-events"
 import Log from "../../log"
 import NCredit from "../credit/ncredit"
+import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
-    CHAT_CHANNEL_URL, CHAT_HOME_URL, CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_SYNC,
-    COOKIE_SITES, NcIDBase } from "../ncconstant"
+    CHAT_CHANNEL_URL, CHAT_HOME_URL, CHATAPI_CHANNEL_BAN, CHATAPI_CHANNEL_CHGOWNER,
+    CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE, CHATAPI_CHANNEL_LEAVE,
+    CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_SITES, NcIDBase } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
-import NcBaseChannel, { INcChannel } from "./ncbasechannel"
+import NcAPIStatus, { NcErrorType } from "./ncapistatus"
+import NcBaseChannel, { ChannelInfo, INcChannel } from "./ncbasechannel"
+import NcJoinedChannel, { parseFromJoined } from "./ncjoinedchannel"
 import NcJson from "./ncjson"
 import NcMessage, { MessageType, SystemType } from "./ncmessage"
 
 /* tslint:disable:member-ordering */
-export default class NcChannel extends NcBaseChannel {
+export default class NcChannel {
     /**
      * Parse NcChannel from..
      * @param credit 
@@ -22,6 +26,9 @@ export default class NcChannel extends NcBaseChannel {
      */
     public static async from(credit:NCredit, id:number | NcBaseChannel) {
         id = (typeof id === "number") ? id : id.channelID
+        if (credit.validateLogin().catch(() => null) == null) {
+            return null
+        }
         const instance = new NcChannel()
         try {
             await instance.update(credit, id)
@@ -30,18 +37,14 @@ export default class NcChannel extends NcBaseChannel {
         }
         return instance
     }
-    /**
-     * Leave Channel
-     */
-    public static async quit(credit:NCredit, id:number) {
-        const request = await credit.req("DELETE", CHATAPI_CHANNEL_LEAVE.get(id))
-        const instance = new NcJson(request, (obj) => ({msg:obj["msg"]}))
-        if (!instance.valid) {
-            return Promise.reject(instance.error.msg)
-        }
-        return Promise.resolve()
-    }
     /************************** Fields & Constructor *******************************/
+    /**
+     * All info from naver
+     */
+    protected instance:NcJoinedChannel
+    public get detail() {
+        return {...this.instance}
+    }
     /**
      * Channel Users
      */
@@ -63,17 +66,37 @@ export default class NcChannel extends NcBaseChannel {
      */
     protected credit:NCredit = null
     /**
-     * Connected internal
-     */
-    protected _connected = false
-    /**
      * Is session connected?
      */
+    protected _connected = false
     public get connected() {
         return this._connected
     }
+    /* ******** Proxies **********/
+    /**
+     * Channel ID
+     */
+    public get channelID() {
+        return this.detail.channelID
+    }
+    /**
+     * Cafe Info
+     */
+    public get cafe() {
+        return {
+            ...this.detail.cafe
+        } as Cafe
+    }
+    /**
+     * Channel info
+     */
+    public get info() {
+        return {
+            ...this.detail.channelInfo
+        }
+    }
     private constructor() {
-        super(null)
+
     }
     /**
      * Update this channel's objects with new
@@ -81,20 +104,13 @@ export default class NcChannel extends NcBaseChannel {
      * @param id Init id(private)
      */
     public async update(credit:NCredit = null, id = -1) {
-        if (id < 0) {
-            id = this.channelID
-        } else {
-            this.channelID = id
-        }
-        if (credit != null) {
-            this.credit = credit
-        } else {
-            credit = this.credit
-        }
         try {
+            if (id < 0) {
+                id = this.channelID
+            }
             const sync = JSON.parse(await credit.reqGet(CHATAPI_CHANNEL_SYNC.get(id)) as string)
             const response = new NcJson(sync, (obj) => ({
-                channelI: {...get(obj, "channel")} as INcChannel,
+                channelI: parseFromJoined(get(obj, "channel")),
                 memberList: get(obj, "memberList") as object[],
             }))
             if (!response.valid) {
@@ -102,11 +118,10 @@ export default class NcChannel extends NcBaseChannel {
                 // @todo error.code 3006: Not joined room.
                 return Promise.reject(response.error.msg)
             }
-            this.baseinfo = response.result.channelI
-
+            this.instance = response.result.channelI
             const memberList = response.result.memberList
             this.users = memberList.map((v) => {
-                const serial = {...v} as IChannelMember
+                const serial = v as IChannelMember
                 return {
                     ...parseMember(serial, this.cafe),
                     kickable: serial.kickedable,
@@ -116,7 +131,7 @@ export default class NcChannel extends NcBaseChannel {
             return Promise.resolve()
         } catch (err) {
             Log.e(err)
-            return Promise.reject(err)
+            return Promise.resolve()
         }
     }
 
@@ -221,7 +236,7 @@ export default class NcChannel extends NcBaseChannel {
         })
     }
 
-    /************************** Commands *******************************/
+    /* ************************* Commands ****************************** */
     /**
      * Sync Channel
      */
@@ -229,10 +244,105 @@ export default class NcChannel extends NcBaseChannel {
         return this.update()
     }
     /**
+     * Invite Users.
+     * 
+     * Almost no require captcha.
+     * @param users To invite Users
+     * @param captcha Captcha (optical)
+     */
+    public async invite(users:Array<Profile | string>, captcha:NCaptcha = null) {
+        const ids = users.map((user) => typeof user === "string" ? user : user.userid)
+        const request = await this.credit.reqPost(CHATAPI_CHANNEL_INVITE.get(this.cafe.cafeId, this.channelID), {}, {
+            userIdList: ids,
+            captchaKey: captcha == null ? "" : captcha.key,
+            captchaValue: captcha == null ? "" : captcha.value,
+        })
+        await this.syncChannel()
+        return handleSuccess(request)
+    }
+    /**
+     * Ban user :p
+     * 
+     * Permission: Owner | Staff
+     * @param user userid
+     */
+    public async ban(user:Profile | string) {
+        const id = typeof user === "string" ? user : user.userid
+        const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_BAN.get(this.channelID, id))
+        await this.syncChannel()
+        return handleSuccess(request)
+    }
+    /**
      * Leave Channel (No way to destroy channel :p)
+     * 
+     * Permission: *
      */
     public async leave() {
-        return NcChannel.quit(this.credit, this.channelID)
+        const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_LEAVE.get(this.channelID))
+        return handleSuccess(request)
+    }
+    /**
+     * Set message expires day
+     * 
+     * Permission: Owner | Staff | User?
+     * @param day Day (0: 3~4 / 30: 30 days / 365: 1 year)
+     */
+    public async period(day:0 | 30 | 365) {
+        let code:number
+        switch (day) {
+            case 30: code = 2; break
+            case 365: code = 3; break
+            default: code = 0
+        }
+        const request = await this.credit.req("PUT", CHATAPI_CHANNEL_PERIOD.get(this.channelID), {}, {"period": code})
+        await this.syncChannel()
+        return handleSuccess(request)
+    }
+    /**
+     * Change owner to user
+     * 
+     * Permission: Owner | Staff
+     * @param user 
+     */
+    public async changeOwner(user:Profile | string) {
+        const id = typeof user === "string" ? user : user.userid
+        const request = await this.credit.req("PUT", CHATAPI_CHANNEL_CHGOWNER.get(this.cafe.cafeId, this.channelID, id))
+        await this.syncChannel()
+        return handleSuccess(request)
+    }
+    /**
+     * Change Info
+     * 
+     * Permission: Owner | Staff
+     * @param text Name, Description (input null if you don't want to change)
+     * @param image Image(s), Multiple image.. is experimental
+     */
+    public async changeInfo(text:{name?:string, desc?:string}, ...image:string[]) {
+        const org = this.info
+        if (text.name != null) {
+            org.name = text.name
+        }
+        if (text.desc != null) {
+            org.description = text.desc
+        }
+        if (image.length >= 1) {
+            org.thumbnails = image
+        }
+        const request = await this.credit.req("PUT", CHATAPI_CHANNEL_INFO.get(this.channelID), {}, {
+            "profileImageUrl": org.thumbnails,
+            "name": org.name,
+            "description": org.description,
+        })
+        await this.syncChannel()
+        return handleSuccess(request)
+    }
+    /**
+     * Clear Recent Messages
+     */
+    public async clearMessage() {
+        const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_CLEARMSG.get(this.channelID))
+        await this.syncChannel()
+        return handleSuccess(request)
     }
     /**
      * Connect session.
@@ -351,6 +461,13 @@ export default class NcChannel extends NcBaseChannel {
         return nick == null ? fallback : nick.nickname
     }
 }
+export async function handleSuccess(req:string | Buffer):Promise<NcAPIStatus> {
+    if (typeof req !== "string") {
+        return NcAPIStatus.error(NcErrorType.system, "For coder: Wrong type")
+    }
+    const instance = new NcJson(req, (obj) => ({ msg: obj["msg"] }))
+    return NcAPIStatus.from(instance)
+}
 class Events {
     public onMessage = new EventDispatcher<NcChannel, NcMessage>()
     public onMemberJoin = new EventDispatcher<NcChannel, Join>()
@@ -385,6 +502,10 @@ export interface UserAction extends NcIDBase {
 export interface SysUserAction extends UserAction, SysMsg {
     // ?
 }
+interface SysMsg extends NcIDBase {
+    message:NcMessage;
+    modifier?:Profile;
+}
 export class Join implements NcIDBase {
     public channelID:number
     public newMember:Profile
@@ -397,10 +518,7 @@ export class Join implements NcIDBase {
         this.newMember = getFirst(newMembers.filter((v) => this.oldUsers.indexOf(v.userid) < 0))
     }
 }
-interface SysMsg extends NcIDBase {
-    message:NcMessage;
-    modifier?:Profile;
-}
+
 export interface Master extends SysMsg {
     newMasterNick:string;
     newMaster?:Profile;
@@ -409,12 +527,10 @@ export interface RoomName extends SysMsg {
     before:string;
     after:string;
 }
-export enum ChatType {
-    OnetoOne = 1,
-    Group = 2,
-    OpenGroup = 4,
-}
-interface IChannelMember {
+/**
+ * interface of chat members
+ */
+export interface IChannelMember {
     memberId:string;
     maskingId:string;
     nickname:string;
@@ -430,7 +546,10 @@ interface IChannelMember {
     delegatable:boolean;
     channelManageable:boolean;
 }
-interface IEventMessage {
+/**
+ * Message event
+ */
+export interface IEventMessage {
     serialNumber:string;
     typeCode:number;
     userId:string;
@@ -442,4 +561,3 @@ interface IEventMessage {
     tempId:string;
     readCount:number;
 }
-  

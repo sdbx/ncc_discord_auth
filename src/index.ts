@@ -40,14 +40,16 @@ async function init() {
             try {
                 await ncc.fetchChannels()
                 await ncc.testChannel(106977317649)
+                await ncc.getOpenChannels(26686242)
+                ncc.connect(true)
                 // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line
-                const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")
+                // const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")
                 // tslint:disable-next-line
                 // const channel = await ncc.createOpenChannel(26686242, captcha, "Hello", "World", image.path)
                 // await channel.leave()
                 // await Log.image(image.path, "Uploaded")
-                Log.json("Test",image)
+                // Log.json("Test",image)
                 Log.time()
             } catch (err) {
                 Log.e(err)

@@ -1,17 +1,19 @@
 import * as cheerio from "cheerio"
 import * as encoding from "encoding"
+import * as get from "get-value"
 import * as Entities from "html-entities"
 import { Agent } from "https"
 import * as querystring from "querystring"
 import * as request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
-import { cafePrefix, mCafePrefix, whitelistDig } from "./ncconstant"
+import { cafePrefix, CHAT_HOME_URL, CHATAPI_MEMBER_SEARCH, mCafePrefix, whitelistDig } from "./ncconstant"
 import NcCredent from "./ncredent"
 import Article from "./structure/article"
 import Cafe from "./structure/cafe"
 import Comment from "./structure/comment"
 import Profile from "./structure/profile"
+import NcJson from "./talk/ncjson"
 const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0"
 export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities()
@@ -134,8 +136,13 @@ export default class NcFetch extends NcCredent {
                 return o.text()
                 case 2:
                 return o.find("img").length >= 1 ? o.find("img")[0].attribs["src"] : ""
-                default:
-                return null
+                default: {
+                    const query = o.text().match(/카페멤버\s+:\s+\d+/i)
+                    if (query != null) {
+                        return query[0].match(/\d+/i)[0]
+                    }
+                    return null
+                }
             }
         }).get()
         members = members.filter((_v) => _v != null)
@@ -144,6 +151,7 @@ export default class NcFetch extends NcCredent {
             cafeName: members[1].substr(members[1].lastIndexOf("/") + 1),
             cafeDesc: members[0].trim(),
             cafeImage: members[2].length <= 0 ? null : members[2],
+            cafeUserCount: Number.parseInt(members[3])
         } as Cafe
         this.cacheDetail.set(cafeid, new Cache(cafe, 86400))
         return Promise.resolve(cafe)
@@ -408,7 +416,7 @@ export default class NcFetch extends NcCredent {
      * @param nickname 회원의 별명
      */
     public async getMemberByNick(cafeid:number, nickname:string) {
-        const profiles = await this.queryMemberByNick(cafeid,nickname)
+        const profiles = await this.queryMembersByNick(cafeid,nickname)
         const real = profiles.filter((_v) => _v.nickname === nickname)
         if (real.length === 0) {
             return Promise.reject(`${nickname} 닉의 유저는 없음`)
@@ -418,46 +426,98 @@ export default class NcFetch extends NcCredent {
         return this.getMemberById(cafeid, real[0].userid)
     }
     /**
+     * 특정 네이버 카페의 **모든** 회원 목록을 가져옵니다.
+     * 
+     * **주의**) 매우 오래 걸립니다. *(22만개 13분)*
+     * @param cafeid 네이버 카페 ID
+     * @param limitation 최대 가져올 수
+     */
+    public async getALLMembers(cafeid:number, limitation = 1000000) {
+        // http://cafe.naver.com/static/js/mycafe/javascript/nickNameValidationChk-1516327387000-7861.js
+        const url = CHATAPI_MEMBER_SEARCH.get(cafeid)
+        let memberList:Profile[] = []
+        const perPage = 400
+        const retries = 5
+        const param = {
+            page: 1,
+            perPage,
+        }
+        const cafe = await this.parseNaverDetail(cafeid)
+        if (cafe.cafeUserCount == null) {
+            cafe.cafeUserCount = -1
+        }
+        const echo = 30000
+        const start = Date.now()
+        let date = Date.now()
+        let req:object
+        let tries = 0
+        let looplist:object[]
+        while (true) {
+            req = JSON.parse(await this.credit.reqGet(url, param) as string)
+            if (get(req, "message.status") !== "200") {
+                Log.e(get(req, "message.error.msg"))
+                if (tries > retries) {
+                    memberList = []
+                    break
+                }
+                tries += 1
+                continue
+            }
+            looplist = get(req, "message.result.memberList") as object[]
+            const ln = looplist.length
+            let el
+            for (let i = 0; i < ln; i += 1) {
+                el = looplist[i]
+                memberList.push({
+                    cafeId: cafeid,
+                    userid: el.memberId,
+                    nickname: el.nickname,
+                    profileurl: el.memberProfileImageUrl,
+                })
+            }
+            if (ln < perPage || param.page * perPage >= limitation) {
+                break
+            }
+            if (Date.now() - date >= echo) {
+                const progress = param.page * perPage
+                if (cafe.cafeUserCount > 0) {
+                    Log.d("CafeMember-Fetch", `${progress}/${cafe.cafeUserCount} (${
+                        Math.floor(progress / cafe.cafeUserCount * 100)
+                    }%) (${Math.floor((Date.now() - start) / 1000)}s)`)
+                } else {
+                    Log.d("CafeMember-Fetch", `${progress} (${Math.floor((Date.now() - start) / 1000)}s)`)
+                }
+                date = Date.now()
+            }
+            tries = 0
+            param.page += 1
+        }
+        return memberList
+    }
+    /**
      * 닉네임 검색
      */
-    protected async queryMemberByNick(cafeid:number,nick:string) {
+    protected async queryMembersByNick(cafeid:number,nick:string) {
         // http://cafe.naver.com/static/js/mycafe/javascript/nickNameValidationChk-1516327387000-7861.js
+        const url = CHATAPI_MEMBER_SEARCH.get(cafeid)
         const param = {
-            "_callback": "window.__naver_garbege_callback._$1234_0",
-            "q": nick,
-            "q_enc": "UTF-8",
-            "st": 100,
-            "frm": "test",
-            "r_format": "json",
-            "r_enc": "UTF-8", // I love utf-8
-            "r_unicode": 0, // ?
-            "t_koreng": 1, // ?
-            "cafeId": cafeid,
-            "memberId": this.username,
-            "cmd": 1000010,
+            "page": 1,
+            "perPage":10,
+            "query": nick,
         }
-        const opt = new RequestOption()
-        opt.eucKR = false
-        opt.referer = "https://chat.cafe.naver.com/ChatHome.nhn"
-        const $ = await this.getWeb("https://chat.cafe.naver.com/api/CafeMemberSearchAjax.nhn", param, opt)
         const memberList:Profile[] = []
-        const ids = $("body").text().match(/\{\s+"id"[\S\s]+?\}/igm)
-        if (ids != null) {
-            ids.forEach((json:string) => {
-                try {
-                    const data = JSON.parse(json)
-                    memberList.push({
-                        cafeId: cafeid,
-                        userid: data["id"],
-                        nickname: data["nickname"],
-                        profileurl: data["profileImage"],
-                    } as Profile)
-                } catch (err) {
-                    Log.e(err)
-                }
-            })
+        const req = await this.credit.reqGet(url, param)
+        const query = new NcJson(req, (obj) => obj["memberList"] as TalkMember[])
+        if (!query.valid) {
+            return memberList
         }
-        return Promise.resolve(memberList)
+        query.result.forEach((v) => memberList.push(({
+            cafeId: cafeid,
+            userid: v.memberId,
+            nickname: v.nickname,
+            profileurl: v.memberProfileImageUrl
+        }) as Profile))
+        return memberList
     }
     /**
      * Query string... at ('aa','bb','cc').split(",");
@@ -506,8 +566,24 @@ class RequestOption {
     public postdata?:{[key:string]: string | number }
     public eucKR:boolean = true
     public useAuth:boolean = true
-    public referer:string = `${cafePrefix}/`
+    public referer:string = `${cafePrefix} / `
 }
+interface TalkMember {
+    memberId:string;
+    maskingId:string;
+    nickname:string;
+    memberProfileImageUrl:string;
+    manager:boolean;
+    cafeMember:boolean;
+    inviteeStatus:InviteeStatus;
+    status:string;
+}
+interface InviteeStatus {
+    inviteable:boolean;
+    resultType:string;
+    resultMessage:string;
+}
+
 enum SendType {
     GET = "GET",
     POST = "POST",

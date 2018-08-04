@@ -13,6 +13,8 @@ import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, CHATAPI_CHANNELS, COOKIE_SITES 
 import { asJSON, parseURL } from "../nccutil"
 import encryptKey from "./loginencrypt"
 
+const likepost = ["POST", "PUT"]
+
 export default class NCredit extends EventEmitter {
     public username:string
     protected _password:string
@@ -214,7 +216,7 @@ export default class NCredit extends EventEmitter {
      * @param referer Referer
      * @param encoding Receive Encoding
      */
-    public async reqPost(url:string, sub:{ [key:string]: string | number | boolean}, postD:{[key:string]: any} = {},
+    public async reqPost(url:string, sub:{[key:string]: string | number | boolean} = {}, postD:{[key:string]: any} = {},
         referer = CHAT_HOME_URL,  encoding = "utf-8") {
         if (url.indexOf("?") >= 0) {
             const parse = parseURL(url)
@@ -227,7 +229,7 @@ export default class NCredit extends EventEmitter {
         return this.req("POST", url, sub, postD, referer, encoding)
     }
     // request raw
-    public async req(sendType:"POST" | "GET" | "DELETE", url:string,
+    public async req(sendType:"POST" | "GET" | "DELETE" | "PUT", url:string,
         sub:{[key:string]: string | number | boolean} = {}, postD:{[key:string]: any} = {},
         referer = CHAT_HOME_URL, encoding = "utf-8") {
         // set origin
@@ -239,8 +241,9 @@ export default class NCredit extends EventEmitter {
             origin = referer
         }
         // check post type
+        const likePost = likepost.indexOf(sendType) >= 0
         let binary = false
-        if (sendType === "POST") {
+        if (likePost) {
             for (const value of Object.values(postD)) {
                 if (["number", "boolean", "string"].indexOf(typeof value) < 0) {
                     binary = true
@@ -253,7 +256,7 @@ export default class NCredit extends EventEmitter {
             method: sendType,
             url,
             qs: sub,
-            form: sendType === "POST" && !binary ? postD : undefined,
+            form: likePost && !binary ? postD : undefined,
             formData: binary ? postD : undefined,
             agent: this.httpsAgent,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
