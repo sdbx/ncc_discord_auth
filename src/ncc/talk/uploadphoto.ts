@@ -34,6 +34,9 @@ export default async function uploadImage(credit:NCredit, file:string | Buffer, 
             }
         }
     } else {
+        if (filename == null) {
+            filename = "unknown.png"
+        }
         send = file
     }
     if (filename == null || (send == null)) {

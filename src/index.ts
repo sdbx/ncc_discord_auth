@@ -41,10 +41,11 @@ async function init() {
                 await ncc.fetchChannels()
                 await ncc.testChannel(106977317649)
                 await ncc.getOpenChannels(26686242)
-                ncc.connect(true)
+                await ncc.connect(true)
                 ncc.on(NccEvents.updateList, (obj:ChannelListEvent) => {
                     // Log.json("Delta", obj)
                 })
+                const ch = await ncc.getConnectedChannel(45528313105)
                 // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line
                 // const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")

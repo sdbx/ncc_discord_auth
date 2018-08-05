@@ -30,8 +30,8 @@ export function parseURL(str:string) {
     return out
 }
 export function getFirst<T>(arr:T[], filter:(v:T) => boolean = () => true):T {
-    const size = arr.length
-    if (arr != null && size >= 1) {
+    if (arr != null && arr.length >= 1) {
+        const size = arr.length
         for (let i = 0; i < size; ++i) {
             if (filter(arr[i])) {
                 return arr[i]

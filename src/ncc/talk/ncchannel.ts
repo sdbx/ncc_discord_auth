@@ -5,9 +5,9 @@ import Log from "../../log"
 import NCredit from "../credit/ncredit"
 import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
-    CHAT_CHANNEL_URL, CHAT_HOME_URL, CHATAPI_CHANNEL_BAN, CHATAPI_CHANNEL_CHGOWNER,
-    CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE, CHATAPI_CHANNEL_LEAVE,
-    CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_SITES, NcIDBase } from "../ncconstant"
+    CHAT_CHANNEL_URL, CHAT_HOME_URL, CHAT_URL_CRAWLER, CHATAPI_CHANNEL_BAN,
+    CHATAPI_CHANNEL_CHGOWNER, CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE,
+    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_SITES, NcIDBase } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
@@ -15,7 +15,8 @@ import NcAPIStatus, { NcErrorType } from "./ncapistatus"
 import NcBaseChannel from "./ncbasechannel"
 import NcJoinedChannel, { parseFromJoined } from "./ncjoinedchannel"
 import NcJson from "./ncjson"
-import NcMessage, { MessageType, SystemType } from "./ncmessage"
+import NcMessage, { MessageType, NcEmbed, NcImage, SystemType } from "./ncmessage"
+import uploadImage from "./uploadphoto"
 
 /* tslint:disable:member-ordering */
 export default class NcChannel {
@@ -305,6 +306,122 @@ export default class NcChannel {
         return handleSuccess(request)
     }
     /**
+     * Get Embed from URL (naver's api) - delay >=600ms?
+     * @param url URL
+     */
+    public async getURLEmbed(url:string) {
+        if (!/^http(s)?:\/\//.test(url)) {
+            url = "https://" + url
+        }
+        const request = await this.credit.reqGet(CHAT_URL_CRAWLER, {
+            escape: false,
+            url,
+        }) as string
+        const response = new NcJson(request, (obj:EmbedParsed) => obj)
+        if (!response.valid || !response.result.hasOgTag) {
+            return null
+        }
+        const r = response.result
+        return {
+            ...r.summary
+        } as NcEmbed
+    }
+    /**
+     * Send text to this channel
+     * 
+     * AutoEmbed is soooo slow
+     * @param text Send text
+     * @param autoEmbed Detect link and parse embed?
+     */
+    public async sendText(text:string, autoEmbed = true) {
+        const regex = /(http(s)?:\/\/)[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)/ig
+        const url = getFirst(text.match(regex))
+        if (!autoEmbed && url != null) {
+            return this.sendEmbed(text, await this.getURLEmbed(url))
+        } else {
+            return this.sendEmbed(text, null)
+        }
+    }
+    /**
+     * Send text with custom embed
+     * 
+     * How about XSS-Atack?
+     * @param content Send text (in green chat)
+     * @param embed NcEmbed Object
+     * @param image Dest Image URL / File Path / Image Buffer
+     * @param displayAsVideo Draw with video mark?
+     */
+    public async sendCustomEmbed(content:string, embed:NcEmbed, image:string | Buffer = null, displayAsVideo = false) {
+        let naverImage:NcImage = null
+        if (image != null) {
+            try {
+                const uploaded = await uploadImage(this.credit, image)
+                naverImage = {
+                    width: uploaded.width,
+                    height: uploaded.height,
+                    url: uploaded.url,
+                }
+                embed.image = naverImage
+            } catch {
+                // :)
+                embed.image = {
+                    width: null,
+                    height: null,
+                    url: null,
+                }
+            }
+        }
+        embed.type = displayAsVideo ? "video" : null
+        return this.sendEmbed(content, embed)
+    }
+    /**
+     * Send text with embed
+     * @param text Send Text
+     * @param content NcEmbed Object
+     */
+    public async sendEmbed(text:string, content:NcEmbed) {
+        let extras:string = ""
+        if (content != null) {
+            extras = JSON.stringify({snippet: content})
+        }
+        this.session.emit("send", {
+            extras,
+            message: text,
+            messageTypeCode: 1,
+            sessionKey: this.credit.accessToken,
+        })
+        return Promise.resolve()
+    }
+    /**
+     * Send Image to Chat
+     * @param image Image URL / File URL / Buffer
+     * @param text Optical text (experimental)
+     */
+    public async sendImage(image:string | Buffer, text?:string) {
+        let naverImage:NcImage = null
+        try {
+            const uploaded = await uploadImage(this.credit, image)
+            naverImage = {
+                width: uploaded.width,
+                height: uploaded.height,
+                url: uploaded.url,
+                is_original_size: false,
+            }
+        } catch {
+            // no upload
+        }
+        if (naverImage == null) {
+            return Promise.resolve()
+        }
+        this.session.emit("send", {
+            extras: JSON.stringify({image: naverImage}),
+            message: text == null ? "" : text,
+            messageTypeCode: 11,
+            sessionKey: this.credit.accessToken,
+        })
+        return Promise.resolve()
+    }
+    /**
      * Set message expires day
      * 
      * Permission: Owner | Staff | User?
@@ -427,6 +544,11 @@ export default class NcChannel {
         }
         this.session.open()
     }
+    /**
+     * Disconnect Channel
+     * 
+     * **Credit also be invalid!!**
+     */
     public disconnect() {
         if (this.connected) {
             this.session.disconnect()
@@ -597,4 +719,28 @@ export interface IEventMessage {
     extras:string;
     tempId:string;
     readCount:number;
+}
+/**
+ * Embed resposne
+ */
+interface EmbedParsed {
+    hasOgTag:boolean;
+    url:string;
+    summary:{
+        url:string;
+        domain:string;
+        title:string;
+        description:string;
+        type?:string;
+        image:EmbedImage;
+        allImages?:EmbedImage[];
+    };
+    complete:boolean;
+    busy:boolean;
+    cached:boolean;
+}
+interface EmbedImage {
+    url:string;
+    width:number;
+    height:number;
 }

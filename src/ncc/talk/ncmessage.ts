@@ -240,11 +240,29 @@ export interface NcSticker {
     imageUrl:string; // umm
 }
 export interface NcEmbed {
+    /**
+     * Title of embed
+     */
     title:string; // kkiro.kr - Title of embed
-    url:string; // https://kkiro.kr/
+    /**
+     * Description of embed
+     */
     description:string; // Kkiro's personal blog
+    /**
+     * Display URL
+     */
     domain:string; // kkiro.kr - ?
+    /**
+     * Link's URL (not shown)
+     */
+    url:string; // https://kkiro.kr/
+    /**
+     * "video" or null
+     */
     type:string; // video | null - notfound.
+    /**
+     * Embed Image
+     */
     image:NcImage;
 }
 /*

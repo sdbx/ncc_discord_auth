@@ -45,6 +45,7 @@ export const CHATAPI_BLOCKLIST_CAFE = `${CHAT_API_URL}/blockCafes`
 export const CHATAPI_CAFE_BLOCK = s(`${CHAT_API_URL}/categories/$/block`)
 export const CHATAPI_OPENCHAT_LIST = s(`${CHAT_API_URL}/categories/$/openchannels`)
 export const CHATAPI_MEMBER_SEARCH = s(`${CHAT_API_URL}/categories/$/members`)
+export const CHAT_URL_CRAWLER = `${CHAT_HOME_URL}/crawler`
 
 /* ncc config */
 // ms
