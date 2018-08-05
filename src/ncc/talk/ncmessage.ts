@@ -1,6 +1,7 @@
 import * as get from "get-value"
 import { NcIDBase } from "../ncconstant"
 import Cafe from "../structure/cafe"
+import Profile from "../structure/profile"
 
 export default class NcMessage implements NcIDBase {
     public static typeAsString(t:MessageType) {
@@ -22,13 +23,25 @@ export default class NcMessage implements NcIDBase {
      * 안읽은 숫자
      */
     public readCount:number
+    /**
+     * User Profile
+     * 
+     * null if lastMessage (joinedChannel)
+     */
+    public sendUser:Profile
     private readonly instance:INcMessage
     private _cafe:Cafe
-    constructor(obj:object, cafe:Cafe, channelId:number) {
+    constructor(obj:object, cafe:Cafe, channelId:number, overrideUser:Profile = null) {
         this.instance = {...obj} as INcMessage
         this._cafe = cafe
         this.channelID = channelId
-        this.readCount = 0
+        this.readCount = obj["readCount"] != null ? obj["readCount"] : 0
+
+        if (overrideUser != null) {
+            this.instance.writerId = overrideUser.userid
+            this.instance.writerName = overrideUser.nickname
+            this.sendUser = overrideUser
+        }
     }
     /**
      * Cafe Info
@@ -223,6 +236,7 @@ export interface INcMessage {
     type:number; // 1: text 11:image 10:sticker
     createdTime:number;
     extras:string; // image:{width, url, height, is...} json
+    readCount?:number;
 }
 
 export interface NcImage {

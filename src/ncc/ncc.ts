@@ -380,7 +380,6 @@ export default class Ncc extends NcFetch {
             }
             this.joinedChannels = now
             if (added.length + modified.length + removed.length >= 1) {
-                Log.d("Updated")
                 const eventChUpdate = {
                     added,
                     modified,
@@ -520,9 +519,8 @@ export default class Ncc extends NcFetch {
      */
     protected registerChannelEvents(channel:NcChannel) {
         channel.on(channel.events.onMessage, (ch, msg) => {
-            Log.d(NcMessage.typeAsString(msg.type), JSON.stringify(msg.content, null, 4))
-            if (msg.embed != null) {
-                Log.d("embed", JSON.stringify(msg.embed, null, 4))
+            if (!ch.hideACK) {
+                ch.sendAck(msg.messageId)
             }
         })
         channel.on(channel.events.onKicked, (ch, msg) => {
@@ -621,7 +619,6 @@ export default class Ncc extends NcFetch {
         if (channel != null) {
             await channel.connect(this.credit)
             // register event
-            Log.d("Connect", channel.channelID.toString())
             this.registerChannelEvents(channel)
             this.connectedChannels.push(channel)
         }

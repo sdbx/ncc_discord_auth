@@ -15,7 +15,7 @@ import NcAPIStatus, { NcErrorType } from "./ncapistatus"
 import NcBaseChannel from "./ncbasechannel"
 import NcJoinedChannel, { parseFromJoined } from "./ncjoinedchannel"
 import NcJson from "./ncjson"
-import NcMessage, { MessageType, NcEmbed, NcImage, SystemType } from "./ncmessage"
+import NcMessage, { INcMessage, MessageType, NcEmbed, NcImage, SystemType } from "./ncmessage"
 import uploadImage from "./uploadphoto"
 
 /* tslint:disable:member-ordering */
@@ -57,15 +57,23 @@ export default class NcChannel {
     /**
      * Fetched messages
      */
-    public messages:Map<number, NcMessage> = new Map()
+    public messages:PastMessage[] = []
     /**
      * events
      */
     public events:Events = new Events()
     /**
+     * Prevent to send ACK signal?
+     */
+    public hideACK = false
+    /**
      * Credit for internal use
      */
     protected credit:NCredit = null
+    /**
+     * First message in fetchable
+     */
+    protected firstMsgNo:number
     /**
      * Is session connected?
      */
@@ -156,12 +164,26 @@ export default class NcChannel {
         // s.on("connect", () => this._connected = true)
         // s.on("disconnect", () => this._connected = false);
         // ["error", "connect_error", "reconnect_failed"].forEach((tag) => s.on(tag, () => this._connected = false))
+        // fetch recent message
+        s.on("connect", async () => {
+            if (this.messages.length === 0) {
+                this.session.emit("message_list_recent", {
+                    sessionKey: this.credit.accessToken,
+                }, (code, data) => {
+                    if (code !== "accessDenied" && data["resultCode"] === 0) {
+                        this.firstMsgNo = get(data, "data.firstMessageNo")
+                        this.allocPastMessages(get(data, "data.messageList"))
+                    }
+                })
+            }
+        })
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
             const message = this.serialMsg(eventmsg)
             if (message == null) {
                 return Promise.resolve()
             }
+            this.appendMessages(message)
             this.events.onMessage.dispatchAsync(this, message)
         })
         // member join
@@ -384,6 +406,9 @@ export default class NcChannel {
         if (content != null) {
             extras = JSON.stringify({snippet: content})
         }
+        if (!this.connected) {
+            return Promise.resolve()
+        }
         this.session.emit("send", {
             extras,
             message: text,
@@ -399,6 +424,9 @@ export default class NcChannel {
      */
     public async sendImage(image:string | Buffer, text?:string) {
         let naverImage:NcImage = null
+        if (!this.connected) {
+            return Promise.resolve()
+        }
         try {
             const uploaded = await uploadImage(this.credit, image)
             naverImage = {
@@ -477,12 +505,163 @@ export default class NcChannel {
         return handleSuccess(request)
     }
     /**
+     * Send ACK signal
+     * @param messageid The last watched message ID
+     */
+    public async sendAck(messageid:number) {
+        if (!this.connected) {
+            return
+        }
+        this.session.emit("ack", {
+            messageSerialNumber: messageid,
+            sessionKey: this.credit.accessToken,
+        })
+    }
+    /**
+     * Fetch Past Messages
+     * 
+     * Count: number of message
+     * 
+     * At: from now to ID messages
+     * 
+     * All: all, in server
+     * 
+     * Date: Messages after timestamp
+     * @param mode Mode
+     * @param num Value
+     */
+    public async fetchMessages(mode:"COUNT" | "AT" | "ALL" | "DATE", num:number) {
+        if (!this.connected) {
+            return
+        }
+        const pasts = []
+        const nowFirst = this.messages.length === 0 ? this.detail.lastestMessageNo : this.messages[0].id
+        const dateMode = mode === "DATE"
+        let end:number
+        /*
+        if (mode === "ALL") {
+            this.messages = []
+            pasts.push(...await this.recentMessages(false))
+        }
+        */
+        switch (mode) {
+            case "COUNT" : {end = nowFirst - num + 1} break
+            case "AT" : {end = num} break
+            case "ALL": {end = -1} break
+            case "DATE": {end = -1} break
+        }
+        end = Math.min(Math.max(this.firstMsgNo, end),nowFirst)
+        for (let i = nowFirst - 1; i >= end; i -= 30) {
+            await new Promise((res, rej) => {
+                this.session.emit("message_list_range", {
+                    fromMessageNo: Math.max(end, i - 29),
+                    toMessageNo: i,
+                    sessionKey: this.credit.accessToken,
+                }, (code, data) => {
+                    if (code == null && data.resultCode === 0) {
+                        if (pasts.length === 0) {
+                            pasts.push(...get(data, "data.messageList"))
+                        } else {
+                            pasts.unshift(...get(data, "data.messageList"))
+                        }
+                    }
+                    res()
+                })
+            })
+            if (dateMode && pasts.length >= 1 && pasts[0].createTime <= num) {
+                let k = 0
+                while (true) {
+                    if (k >= pasts.length - 1 || pasts[k].createTime >= num) {
+                        try {
+                            pasts.splice(0, k)
+                        } catch {
+                            // :)
+                        }
+                        break
+                    }
+                    k += 1
+                }
+                break
+            }
+        }
+        return this.allocPastMessages(pasts)
+    }
+    /**
      * Clear Recent Messages
      */
     public async clearMessage() {
         const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_CLEARMSG.get(this.channelID))
         await this.syncChannel()
         return handleSuccess(request)
+    }
+    /**
+     * Push Socket.io's past messages to first
+     * @param messages Socket.io message_list_*** result
+     */
+    protected allocPastMessages(messages:any[]) {
+        if (messages.length <= 0) {
+            return
+        }
+        const ln = messages.length
+        for (let i = 0; i < ln; i += 1) {
+            const msg = messages[i]
+            messages[i] = {
+                id: Number.parseInt(msg.messageNo),
+                body: msg.content,
+                writerId: msg.userId,
+                writerName: null,
+                type: msg.messageTypeCode,
+                createdTime: Number.parseInt(msg.createdTime),
+                extras: msg.extras,
+                channelNo: msg.channelNo,
+                memberCount: msg.memberCount,
+                readCount: msg.readCount,
+                updateTime: msg.updateTime,
+            } as PastMessage
+        }
+        const ncMsgs = messages.map(
+            (v:PastMessage) => new NcMessage(v, this.cafe, this.channelID, this.getUserById(v.writerId)))
+        if (this.messages.length >= 1) {
+            if (this.messages[0].id === messages[ln - 1].id + 1) {
+                // append to start (all)
+                this.messages.unshift(...messages)
+            } else {
+                Log.w("MsgQueue Broken",
+                    `${this.channelID} Channel(${this.info.name}) message array are broken!\n` + 
+                    `${this.messages[0].id} <-> ${messages[ln - 1].id}`)
+                return ncMsgs
+            }
+        } else {
+            this.messages.push(...messages)
+        }
+        this.events.onPastMessage.dispatchAsync(this, ncMsgs)
+        return ncMsgs
+    }
+    /**
+     * Append Now messages to last
+     * @param messages That received Message.
+     */
+    protected async appendMessages(...messages:NcMessage[]) {
+        const ln = messages.length
+        const iLn = this.messages.length
+        Log.d("LastMsg", (this.messages[iLn - 1].id + 1) + "")
+        Log.d("NewMsg", messages[0].messageId + "")
+
+        if (ln >= 1 && (messages[0].messageId === this.messages[iLn - 1].id + 1)) {
+            for (let i = 0; i < ln; i += 1) {
+                const msg = messages[i]["instance"]
+                this.messages.push({
+                    ...msg,
+                    channelNo: messages[i].channelID,
+                    memberCount: this.detail.userCount,
+                    updateTime: msg.createdTime,
+                } as PastMessage)
+            }
+        } else {
+            Log.w("MsgQueue Broken",
+                `${this.channelID} Channel(${this.info.name}) message array are broken!\n` +
+                `${this.messages[iLn - 1].id} <-> ${messages[0].messageId}`)
+        }
     }
     /**
      * Connect session.
@@ -574,20 +753,20 @@ export default class NcChannel {
             _message.extras = null
         }
         const ncMsg = new NcMessage({
-            id: _message.serialNumber,
+            id: Number.parseInt(_message.serialNumber),
             body: _message.contents,
             writerId: _message.userId,
             writerName: this.getNick(_message.userId, "Kicked User"),
             type: _message.typeCode,
-            createdTime: _message.createTime,
+            createdTime: Number.parseInt(_message.createTime),
             extras: _message.extras,
-        }, this.cafe, this.channelID)
+        }, this.cafe, this.channelID, this.getUserById(_message.userId))
         ncMsg.readCount = Math.max(0, _message.readCount)
         return ncMsg
     }
     private serialSysMsg(msg:object) {
         const message = this.serialMsg(msg)
-        const modifier = getFirst(this.users, (v) => v.userid === get(message.sender, "naverId"))
+        const modifier = this.getUserById(get(message.sender, "naverId"))
         let actionDest = null
         try {
             const extras = JSON.parse(get(msg, "message.extras"))
@@ -604,7 +783,7 @@ export default class NcChannel {
     }
     private serialQueryMsg(param:object) {
         const users = get(param, "userIdList", { default: [] }) as string[]
-        const members = users.map((v) => getFirst(this.users, (_v) => _v.userid === v))
+        const members = users.map((v) => this.getUserById(v))
         const msg = {
             channelID: get(param, "channelNo"),
             userIDs: users,
@@ -614,8 +793,11 @@ export default class NcChannel {
         } as UserAction
         return msg
     }
+    private getUserById(userid:string) {
+        return getFirst(this.users, (v) => v.userid === userid)
+    }
     private getNick(id:string, fallback:string = null) {
-        const nick = getFirst(this.users, (v) => v.userid === id)
+        const nick = this.getUserById(id)
         return nick == null ? fallback : nick.nickname
     }
 }
@@ -629,11 +811,29 @@ export async function handleSuccess(req:string | Buffer):Promise<NcAPIStatus> {
 class Events {
     public onMessage = new EventDispatcher<NcChannel, NcMessage>()
     public onMemberJoin = new EventDispatcher<NcChannel, Join>()
+    /**
+     * on Member leave (official: quit)
+     */
     public onMemberQuit = new EventDispatcher<NcChannel, UserAction>()
+    /**
+     * on (other) member kicked
+     */
     public onMemberKick = new EventDispatcher<NcChannel, SysUserAction>()
     public onRoomnameChanged = new EventDispatcher<NcChannel, RoomName>()
+    /**
+     * on Owner changed
+     */
     public onMasterChanged = new EventDispatcher<NcChannel, Master>()
+    /**
+     * on (me) I have been kicked
+     */
     public onKicked = new EventDispatcher<NcChannel, SysMsg>()
+    /**
+     * on Past Messages are parsed.
+     * 
+     * Order: older -> newer (messageNo order.)
+     */
+    public onPastMessage = new EventDispatcher<NcChannel, NcMessage[]>()
 }
 export enum ChannelEvent {
     SYSTEM = "sys",
@@ -743,4 +943,21 @@ interface EmbedImage {
     url:string;
     width:number;
     height:number;
+}
+/*
+export interface INcMessage {
+    id:number;
+    body:string;
+    writerId:string;
+    writerName:string;
+    type:number; // 1: text 11:image 10:sticker
+    createdTime:number;
+    extras:string; // image:{width, url, height, is...} json
+}
+*/
+interface PastMessage extends INcMessage {
+    channelNo:number;
+    memberCount:number;
+    readCount:number;
+    updateTime:number;
 }

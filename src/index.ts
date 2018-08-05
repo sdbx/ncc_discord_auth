@@ -8,6 +8,7 @@ import Log from "./log"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
 import Cafe from "./ncc/structure/cafe"
 import NcChannel from "./ncc/talk/ncchannel"
+import { MessageType, NcImage } from "./ncc/talk/ncmessage"
 import uploadImage from "./ncc/talk/uploadphoto"
 
 let run:Runtime
@@ -24,7 +25,6 @@ async function start() {
 Log.hook()
 // start();
 init()
-
 
 async function init() {
     /*
@@ -46,6 +46,7 @@ async function init() {
                     // Log.json("Delta", obj)
                 })
                 const ch = await ncc.getConnectedChannel(45528313105)
+                const msgs = await ch.fetchMessages("ALL", -1)
                 // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line
                 // const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")
@@ -54,6 +55,17 @@ async function init() {
                 // await channel.leave()
                 // await Log.image(image.path, "Uploaded")
                 // Log.json("Test",image)
+                for (const msg of msgs) {
+                    let text
+                    switch (msg.type) {
+                        case MessageType.text : text = msg.content; break
+                        case MessageType.image : text = (msg.content as NcImage).url; break
+                        case MessageType.sticker : text = "Sticker"; break
+                        case MessageType.system : text = msg.content; break
+                        default: text = "null"
+                    }
+                    Log.d("Chat", text)
+                }
                 Log.time()
             } catch (err) {
                 Log.e(err)
