@@ -107,7 +107,10 @@ export default class NcChannel {
             if (id < 0) {
                 id = this.channelID
             }
-            const sync = JSON.parse(await credit.reqGet(CHATAPI_CHANNEL_SYNC.get(id)) as string)
+            if (credit != null) {
+                this.credit = credit
+            }
+            const sync = JSON.parse(await this.credit.reqGet(CHATAPI_CHANNEL_SYNC.get(id)) as string)
             const response = new NcJson(sync, (obj) => ({
                 channelI: parseFromJoined(get(obj, "channel")),
                 memberList: get(obj, "memberList") as object[],
@@ -177,13 +180,17 @@ export default class NcChannel {
         s.on(ChannelEvent.KICK, async (eventmsg:object) => {
             const action = this.serialQueryMsg(eventmsg)
             const sys = this.serialSysMsg(eventmsg)
-            await this.syncChannel()
+            // await this.syncChannel()
             const msg = {
                 message: sys.msg,
                 ...action,
                 ...sys,
             } as SysUserAction
-            this.events.onMemberKick.dispatchAsync(this, msg)
+            if (get(sys.actionDest,"memberId", {default: ""}) === this.credit.username) {
+                this.events.onKicked.dispatchAsync(this, msg)
+            } else {
+                this.events.onMemberKick.dispatchAsync(this, msg)
+            }
         })
         // system message;;
         s.on(ChannelEvent.SYSTEM, async (eventmsg:object) => {
@@ -196,6 +203,7 @@ export default class NcChannel {
             if (message == null || message.type !== MessageType.system) {
                 return Promise.resolve()
             }
+            this.events.onMessage.dispatchAsync(this, message)
             switch (message.systemType) {
                 // type: room name change
                 case SystemType.changed_Roomname: {
@@ -225,12 +233,19 @@ export default class NcChannel {
                 case SystemType.changed_Master: {
                     this.events.onMasterChanged.dispatchAsync(this, {
                         newMasterNick: serialMsg.actionDest,
-                        newMaster: getFirst(this.users.filter((v) => v.nickname === serialMsg.actionDest)),
+                        newMaster: getFirst(this.users, (v) => v.nickname === serialMsg.actionDest),
                         channelID: this.channelID,
                         message,
                         modifier: serialMsg.modifier,
                     } as Master)
-                }
+                } break
+                case SystemType.kick: {
+                    this.events.onKicked.dispatchAsync(this, {
+                        channelID: this.channelID,
+                        message,
+                        modifier: serialMsg.modifier,
+                    } as SysMsg)
+                } break
             }
         })
     }
@@ -278,6 +293,15 @@ export default class NcChannel {
      */
     public async leave() {
         const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_LEAVE.get(this.channelID))
+        return handleSuccess(request)
+    }
+    /**
+     * Destory Channel (OpenChat- Complely REMOVE)
+     * 
+     * Permission: Owner
+     */
+    public async destroy() {
+        const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_INFO.get(this.channelID))
         return handleSuccess(request)
     }
     /**
@@ -398,7 +422,7 @@ export default class NcChannel {
             }
             this.session.on(naverE, (t) => {
                 Log.i(naverE)
-                Log.e(t)
+                Log.json("Object", t)
             })
         }
         this.session.open()
@@ -441,7 +465,7 @@ export default class NcChannel {
     }
     private serialSysMsg(msg:object) {
         const message = this.serialMsg(msg)
-        const modifier = getFirst(this.users.filter((v) => v.userid === get(message.sender, "naverId")))
+        const modifier = getFirst(this.users, (v) => v.userid === get(message.sender, "naverId"))
         let actionDest = null
         try {
             const extras = JSON.parse(get(msg, "message.extras"))
@@ -458,7 +482,7 @@ export default class NcChannel {
     }
     private serialQueryMsg(param:object) {
         const users = get(param, "userIdList", { default: [] }) as string[]
-        const members = users.map((v) => getFirst(this.users.filter((_v) => _v.userid === v)))
+        const members = users.map((v) => getFirst(this.users, (_v) => _v.userid === v))
         const msg = {
             channelID: get(param, "channelNo"),
             userIDs: users,
@@ -469,7 +493,7 @@ export default class NcChannel {
         return msg
     }
     private getNick(id:string, fallback:string = null) {
-        const nick = getFirst(this.users.filter((v) => v.userid === id))
+        const nick = getFirst(this.users, (v) => v.userid === id)
         return nick == null ? fallback : nick.nickname
     }
 }
@@ -487,6 +511,7 @@ class Events {
     public onMemberKick = new EventDispatcher<NcChannel, SysUserAction>()
     public onRoomnameChanged = new EventDispatcher<NcChannel, RoomName>()
     public onMasterChanged = new EventDispatcher<NcChannel, Master>()
+    public onKicked = new EventDispatcher<NcChannel, SysMsg>()
 }
 export enum ChannelEvent {
     SYSTEM = "sys",
@@ -527,7 +552,7 @@ export class Join implements NcIDBase {
         this.oldUsers.push(...members.map((v) => v.userid))
     }
     public fetch(newMembers:Profile[]) {
-        this.newMember = getFirst(newMembers.filter((v) => this.oldUsers.indexOf(v.userid) < 0))
+        this.newMember = getFirst(newMembers, (v) => this.oldUsers.indexOf(v.userid) < 0)
     }
 }
 

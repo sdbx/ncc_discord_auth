@@ -159,7 +159,13 @@ export default class Ncc extends NcFetch {
         if (typeof channel !== "number") {
             channel = channel.channelID
         }
-        const res = await NcChannel.from(this.credit, channel).then((v) => v.leave())
+        const ch = await this.getConnectedChannel(channel)
+        let res:NcAPIStatus
+        if (ch != null) {
+            res = await ch.leave()
+        } else {
+            res = await NcChannel.from(this.credit, channel).then((v) => v.leave())
+        }
         await this.syncChannels()
         return res
     }
@@ -269,10 +275,54 @@ export default class Ncc extends NcFetch {
         return openChannels
     }
     /**
+     * Get joinedChannel from ID
+     * 
+     * Not connected chat!
+     * @param channelID Channel ID
+     */
+    public async getJoinedChannel(channelID:number) {
+        let tries = 0
+        do {
+            const out = getFirst(this.joinedChannels, (v) => v.channelID === channelID)
+            if (out == null) {
+                if (tries < 1) {
+                    await this.syncChannels()
+                    tries += 1
+                } else {
+                    return null
+                }
+            } else {
+                return out
+            }
+        } while (true)
+    }
+    /**
+     * Get Connected Channel from id
+     * 
+     * Return null if not found / cannot join
+     * @param channel Channel
+     */
+    public async getConnectedChannel(channel:number | NcJoinedChannel) {
+        const channelID = typeof channel === "number" ? channel : channel.channelID
+        const exist = getFirst(this.connectedChannels, (v) => v.channelID === channelID)
+        if (exist != null) {
+            return exist
+        }
+        const iCh = await this.getJoinedChannel(channelID)
+        if (iCh != null) {
+            try {
+                return this.addConnectedChannel(iCh.channelID)
+            } catch {
+                return null
+            }
+        }
+        return null
+    }
+    /**
      * Fetch channels and start auto sync
      * @param autoUpdate 
      */
-    public async connect(autoUpdate = false) {
+    public async connect(autoUpdate = true) {
         if (!await this.availableAsync()) {
             return Promise.reject("Not logined")
         }
@@ -281,49 +331,20 @@ export default class Ncc extends NcFetch {
         } catch {
             return Promise.reject("No response")
         }
+        const ln0 = this.joinedChannels.length
+        for (let i = 0; i < ln0; i += 1) {
+            if (this.shouldConnected(this.joinedChannels[i])) {
+                // connect recent channels (first)
+                await this.addConnectedChannel(this.joinedChannels[i].channelID)
+            }
+        }
+        await this.syncChannels()
         if (autoUpdate) {
             this.syncTask = setTimeout(this.syncChannels.bind(this), intervalNormal)
-            this.onPrivate(this.events.onChatUpdated, (async (list) => {
-                const loop = (async <T extends NcBaseChannel>(arr:T[], remove = false) => {
-                    const ln1 = arr.length
-                    const ln2 = this.connectedChannels.length
-                    for (let i = 0; i < ln1; i += 1) {
-                        const param = arr[i]
-                        let find = -1
-                        for (let k = 0; k < ln2; k += 1) {
-                            if (this.connectedChannels[k].channelID === param.channelID) {
-                                find = k
-                                break
-                            }
-                        }
-                        if (find < 0) {
-                            if (!remove) {
-                                const ch = await NcChannel.from(this.credit, param)
-                                this.connectedChannels.push(ch)
-                                await ch.connect(this.credit)
-                            }
-                        } else {
-                            if (remove) {
-                                this.connectedChannels[find].disconnect()
-                                this.connectedChannels.splice(find, 1)
-                            }
-                        }
-                    }
-                }).bind(this)
-                if (list.added.length >= 1) {
-                    await loop(list.added)
-                }
-                if (list.modified.length >= 1) {
-                    await loop(list.modified)
-                }
-                if (list.removed.length >= 1) {
-                    await loop(list.removed, true)
-                }
-            }).bind(this))
         }
         return Promise.resolve()
     }
-    public async syncChannels() {
+    public async syncChannels(autoConnect = true) {
         let errored = false
         const original = [...this.joinedChannels]
         try {
@@ -342,7 +363,7 @@ export default class Ncc extends NcFetch {
                     added.push(channel)
                     continue
                 }
-                const org = getFirst(original.filter((v) => v.channelID === channel.channelID))
+                const org = getFirst(original, (v) => v.channelID === channel.channelID)
                 if (org != null) {
                     if (org.lastestMessage.messageId !== channel.lastestMessage.messageId ||
                         JSON.stringify(org.channelInfo) !== JSON.stringify(channel.channelInfo)) {
@@ -360,11 +381,25 @@ export default class Ncc extends NcFetch {
             this.joinedChannels = now
             if (added.length + modified.length + removed.length >= 1) {
                 Log.d("Updated")
-                this.events.onChatUpdated.dispatchAsync({
+                const eventChUpdate = {
                     added,
                     modified,
                     removed,
-                } as ChannelListEvent)
+                } as ChannelListEvent
+                // ensure joined new chat~~
+                if (autoConnect) {
+                    const ln = this.connectedChannels.length
+                    for (let i = 0; i < ln; i += 1) {
+                        const chConnected = this.connectedChannels[i]
+                        if (!this.shouldConnected(chConnected.detail)) {
+                            chConnected.disconnect()
+                            this.connectedChannels.splice(i, 1)
+                            i -= 1
+                        }
+                    }
+                    await this.syncConnectedChannels(eventChUpdate)
+                }
+                this.events.onChatUpdated.dispatchAsync(eventChUpdate)
             }
         } catch (err) {
             Log.e(err)
@@ -478,6 +513,139 @@ export default class Ncc extends NcFetch {
      */
     protected onPrivate<V>(dispatcher:SimpleEventDispatcher<V>, handler:ISimpleEventHandler<V>) {
         dispatcher.asEvent().subscribe(handler)
+    }
+    /**
+     * Register channel events
+     * @param channel Channel
+     */
+    protected registerChannelEvents(channel:NcChannel) {
+        channel.on(channel.events.onMessage, (ch, msg) => {
+            Log.d(NcMessage.typeAsString(msg.type), JSON.stringify(msg.content, null, 4))
+            if (msg.embed != null) {
+                Log.d("embed", JSON.stringify(msg.embed, null, 4))
+            }
+        })
+        channel.on(channel.events.onKicked, (ch, msg) => {
+            this.removeConnectedChannel(ch)
+        })
+    }
+    /**
+     * Check channel should be keep connected
+     * @param channel 
+     */
+    protected shouldConnected(channel:NcJoinedChannel) {
+        const lastDate = channel.lastestMessage.messageId == null ? channel.createdAt : channel.lastestMessage.timestamp
+        return Date.now() - lastDate <= 432000000 // 5 days
+    }
+    /**
+     * Sync connected channels from Event
+     * @param list Event
+     */
+    protected async syncConnectedChannels(list:ChannelListEvent) {
+        let loop = async <T extends NcJoinedChannel>(arr:T[], type:"remove" | "add" | "update") => {
+            const ln1 = arr.length
+            const ln2 = this.connectedChannels.length
+            for (let i = 0; i < ln1; i += 1) {
+                const param = arr[i]
+                let find = -1
+                // find connectedChannel exists
+                for (let k = 0; k < ln2; k += 1) {
+                    if (this.connectedChannels[k].channelID === param.channelID) {
+                        find = k
+                        break
+                    }
+                }
+                if (find < 0) {
+                    // Not find, so connect
+                    let ch:NcChannel
+                    if (type === "add") {
+                        ch = await NcChannel.from(this.credit, param)
+                    } else if (type === "update") {
+                        const joinedCh =
+                            getFirst(this.joinedChannels, (v) => v.channelID === param.channelID)
+                        if (joinedCh != null && this.shouldConnected(joinedCh)) {
+                            // join auto
+                            ch = await NcChannel.from(this.credit, joinedCh)
+                        }
+                    }
+                    if (ch != null) {
+                        await this.addConnectedChannel(ch)
+                    }
+                } else {
+                    // Find. So, disconnect
+                    const ch = this.connectedChannels[find]
+                    if (type === "remove") {
+                        try {
+                            this.removeConnectedChannel(ch)
+                        } catch (err) {
+                            Log.e(err)
+                        }
+                    }
+                }
+            }
+        }
+        loop = loop.bind(this)
+        if (list.added.length >= 1) {
+            await loop(list.added, "add")
+        }
+        if (list.modified.length >= 1) {
+            await loop(list.modified, "update")
+        }
+        if (list.removed.length >= 1) {
+            await loop(list.removed, "remove")
+        }
+        return Promise.resolve()
+    }
+    /**
+     * Add Connect channel to array
+     * 
+     * also registers event
+     * @param _ch Channel or id
+     */
+    protected async addConnectedChannel(_ch:number | NcChannel) {
+        let id
+        let channel:NcChannel
+        if (typeof _ch !== "number") {
+            id = _ch.channelID
+            channel = _ch
+        } else {
+            id = _ch
+        }
+        const exist = getFirst(this.connectedChannels, (v) => v.channelID === id)
+        if (exist != null) {
+            return Promise.resolve(exist)
+        }
+        if (channel == null) {
+            channel = await NcChannel.from(this.credit, id)
+        }
+        if (channel != null) {
+            await channel.connect(this.credit)
+            // register event
+            Log.d("Connect", channel.channelID.toString())
+            this.registerChannelEvents(channel)
+            this.connectedChannels.push(channel)
+        }
+        return Promise.resolve(channel)
+    }
+    /**
+     * Remove connected channel in array
+     * @param ch Channel
+     */
+    protected async removeConnectedChannel(ch:NcChannel) {
+        let find = -1
+        const ln = this.connectedChannels.length
+        // find connectedChannel exists
+        for (let k = 0; k < ln; k += 1) {
+            if (this.connectedChannels[k].channelID === ch.channelID) {
+                find = k
+                break
+            }
+        }
+        if (find >= 0) {
+            ch.disconnect()
+            this.connectedChannels.splice(find, 1)
+        }
+        return Promise.resolve()
     }
     private isChannelDesc(param:any):param is ChannelInfo {
         return "name" in param

@@ -30,6 +30,7 @@ export const CHATAPI_CHANNEL_CLEARMSG = s(`${CHAT_API_URL}/channels/$/messages`)
 export const CHATAPI_CHANNEL_INFO = s(`${CHAT_API_URL}/channels/$`)
 export const CHATAPI_CHANNEL_CHGOWNER = s(`${CHAT_API_URL}/categories/$/channels/$/owner/$`)
 export const CHATAPI_CHANNEL_INVITE = s(`${CHAT_API_URL}/categories/$/channels/$/invite`)
+export const CHATAPI_CHANNEL_JOIN = s(`${CHAT_API_URL}/channels/$/join`)
 
 /* global commands */
 export const CHATAPI_CAFES = s(`${CHAT_API_URL}/categories?channelTypeCode=$`)

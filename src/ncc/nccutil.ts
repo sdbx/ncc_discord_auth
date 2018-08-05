@@ -29,12 +29,16 @@ export function parseURL(str:string) {
     }
     return out
 }
-export function getFirst<T>(arr:T[]):T {
-    if (arr != null && arr.length >= 1) {
-        return arr[0]
-    } else {
-        return null
+export function getFirst<T>(arr:T[], filter:(v:T) => boolean = () => true):T {
+    const size = arr.length
+    if (arr != null && size >= 1) {
+        for (let i = 0; i < size; ++i) {
+            if (filter(arr[i])) {
+                return arr[i]
+            }
+        }
     }
+    return null
 }
 export function getFirstMap<T, V>(m:Map<T, V>):V {
     if (m != null && m.size >= 1) {
