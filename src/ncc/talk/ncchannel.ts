@@ -151,9 +151,10 @@ export default class NcChannel {
      * Register event
      * @param dispatcher this.events 
      * @param handler function
+     * @returns unsubscribe function
      */
     public on<V>(dispatcher:EventDispatcher<NcChannel, V>, handler:IEventHandler<NcChannel, V>) {
-        dispatcher.asEvent().subscribe(handler)
+        return dispatcher.asEvent().subscribe(handler)
     }
     /**
      * Internal register
@@ -606,12 +607,12 @@ export default class NcChannel {
         for (let i = 0; i < ln; i += 1) {
             const msg = messages[i]
             messages[i] = {
-                id: Number.parseInt(msg.messageNo),
+                id: msg.messageNo,
                 body: msg.content,
                 writerId: msg.userId,
                 writerName: null,
                 type: msg.messageTypeCode,
-                createdTime: Number.parseInt(msg.createdTime),
+                createdTime: msg.createTime,
                 extras: msg.extras,
                 channelNo: msg.channelNo,
                 memberCount: msg.memberCount,
@@ -644,8 +645,6 @@ export default class NcChannel {
     protected async appendMessages(...messages:NcMessage[]) {
         const ln = messages.length
         const iLn = this.messages.length
-        Log.d("LastMsg", (this.messages[iLn - 1].id + 1) + "")
-        Log.d("NewMsg", messages[0].messageId + "")
 
         if (ln >= 1 && (messages[0].messageId === this.messages[iLn - 1].id + 1)) {
             for (let i = 0; i < ln; i += 1) {

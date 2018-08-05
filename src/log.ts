@@ -2,6 +2,7 @@ import * as _caller from "caller"
 import _chalk, { Chalk } from "chalk"
 import * as Hook from "console-hook"
 import * as Reverser from "esrever"
+import * as fs from "fs-extra"
 import * as Inquirer from "inquirer"
 import * as path from "path"
 import * as request from "request-promise-native"
@@ -146,7 +147,7 @@ namespace Log {
             }`)
             out += "\n"
         })
-        process.stdout.write(out)
+        stdWrite(out)
     }
     /**
      * Image trace...????
@@ -154,10 +155,18 @@ namespace Log {
     export async function image(_image:string | Buffer, title:string, desc?:string) {
         let binary:Buffer
         if (typeof _image === "string") {
-            if (desc == null) {
-                desc = path.basename(decodeURIComponent(_image.replace(/\?.*/ig, "")))
+            if (/^http(s)?:\/\//.test(_image)) {
+                if (desc == null) {
+                    desc = path.basename(decodeURIComponent(_image.replace(/\?.*/ig, "")))
+                }
+                binary = await request.get(_image, { encoding: null })
+            } else {
+                _image = _image.replace(/\\\s/ig, " ")
+                const p = path.resolve(_image)
+                if (await fs.pathExists(p)) {
+                    binary = (await fs.readFile(p, {encoding: null})) as any
+                }
             }
-            binary = await request.get(_image, {encoding: null})
         } else {
             binary = _image
         }
@@ -169,7 +178,7 @@ namespace Log {
                 } else {
                     Log.i(title, desc == null ? "Image" : desc)
                 }
-                process.stdout.write(str, () => {
+                stdWrite(str, () => {
                     res()
                 })
             }).catch(() => {
@@ -178,7 +187,7 @@ namespace Log {
         })
         const white = chalk.bgHex("#eff9b8").hex("#424242")
         await new Promise((res, rej) => {
-            process.stdout.write(white("".padEnd(process.stdout.columns)) + "\n", () => res())
+            stdWrite(white("".padEnd(process.stdout.columns)) + "\n", () => res())
         })
         // raw(white, white, white, white, "", {title:"", content: "Image end."})
         return Promise.resolve()
@@ -303,7 +312,7 @@ namespace Log {
                     out += headerColor(` ${numText.padStart(numberLimit)} `)
                     out += contentColor(` ${trace}${length(trace) >= column - numberLimit - 3 ? "" : " "}`)
                     out += "\n"
-                    process.stdout.write(out)
+                    stdWrite(out)
                 }
             })
         })
@@ -331,6 +340,7 @@ namespace Log {
         ansi("2J")
         ansi("0;0H")
         ansi("?25l")
+        setInterval(() => { }, 1 << 30)
         // ui = new Inquirer.ui.BottomBar();
     }
     /**
@@ -352,6 +362,7 @@ namespace Log {
 
         if (ui == null) {
             ui = new Inquirer.ui.BottomBar()
+            // process.stdout.pipe(ui.log)
         }
         // update
         contentLimit = Math.max(5, process.stdout.columns - prefixLimit - numberLimit - totalBlank)
@@ -480,7 +491,7 @@ namespace Log {
         if (ui != null) {
             ui.log.write(format + "\n")
         } else {
-            process.stdout.write(format + "\n")
+            stdWrite(format + "\n")
         }
     }
     /**
@@ -488,7 +499,7 @@ namespace Log {
      * @param code ansi code
      */
     function ansi(...code:string[]) {
-        process.stdout.write(code.map((_v) => "\x1B[" + _v).join(""))
+        stdWrite(code.map((_v) => "\x1B[" + _v).join(""))
     }
     /**
      * Get caller
@@ -552,6 +563,16 @@ namespace Log {
             }
         }
         return str
+    }
+    export function stdWrite(buffer:string, cb?:() => void) {
+        process.stdout.write(buffer, cb)
+        /*
+        if (Log.ui == null || cb != null) {
+            process.stdout.write(buffer, cb)
+        } else {
+            Log.ui.write(buffer)
+        }
+        */
     }
 }
 
@@ -654,6 +675,7 @@ class IME {
             Log.r(this.title,this.hide ? data.replace(/[\S\s]/ig,"*") : data)
         }
         if (Log.ui != null) {
+            process.stdout.unpipe(Log.ui.log)
             Log.ui.close()
             Log.ui = null
             // ui.updateBottomBar("");
@@ -666,6 +688,6 @@ class IME {
         }
     }
     private ansi(...code:string[]) {
-        process.stdout.write(code.map((_v) => "\x1B[" + _v).join(""))
+        Log.stdWrite(code.map((_v) => "\x1B[" + _v).join(""))
     }
 }

@@ -25,6 +25,7 @@ export default async function uploadImage(credit:NCredit, file:string | Buffer, 
             }
             send = await request.get(file, {encoding: null}).catch((err) => null)
         } else {
+            file = file.replace(/\\\s/ig, " ")
             const p = path.resolve(file)
             if (await fs.pathExists(p)) {
                 if (filename == null) {
