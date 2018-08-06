@@ -67,7 +67,7 @@ namespace Log {
      * Error
      * @param error Error object or string or any..
      */
-    export function e(error:Error | string | object | any) {
+    export function e(error:Error | string | object | any):null {
         let show:string
         let title:string = caller()
         if (error instanceof Error) {
@@ -91,6 +91,7 @@ namespace Log {
             }
         }
         custom("#ff715b", "#ff5f5f", chalk.bgRed.red, "ERR", {title, content:show})
+        return null
     }
     /**
      * Verbose

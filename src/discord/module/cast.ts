@@ -100,25 +100,7 @@ export default class Cast extends Plugin {
                 return Promise.resolve()
             }
             // webhook init
-            let webhook:Discord.Webhook
-            try {
-                const whs = (await channel.fetchWebhooks()).filter((v) => v.id === roomCfg.webhookId)
-                if (whs.has(roomCfg.webhookId)) {
-                    webhook = whs.get(roomCfg.webhookId)
-                } else {
-                    try {
-                        webhook = await channel.createWebhook(`ncc-${room.channelID}`, null, "Connect to ncc")
-                    } catch (err2) {
-                        // 
-                    }
-                }
-            } catch (err) {
-                try {
-                    webhook = await channel.createWebhook(`ncc-${room.channelID}`, null, "Connect to ncc")
-                } catch (err2) {
-                    Log.e(err2)
-                }
-            }
+            const webhook = await this.getWebhook(channel).catch(Log.e)
             if (webhook == null) {
                 await channel.send(this.lang.cast.webhookFail)
                 return Promise.resolve()
@@ -205,32 +187,17 @@ export default class Cast extends Plugin {
             return Promise.resolve()
         }
         const channel = this.client.channels.get(roomCfg.channelID) as Discord.TextChannel
-        let webhook:Discord.Webhook
-        try {
-            const webhooks = (await channel.fetchWebhooks()).filter((w) => w.id === roomCfg.webhookId)
-            if (webhooks.size === 1) {
-                webhook = webhooks.get(roomCfg.webhookId)
-            }
-        } catch (err) {
-            Log.e(err)
-        }
-        if (webhook == null) {
-            Log.w("NccCast", "skip - no webhook")
-            return Promise.resolve()
-        }
         // message.user.image
         let pImage = "https://ssl.pstatic.net/static/m/cafe/mobile/img_thumb_20180426.png"
         let nick = this.lang.cast.fallbackNick
         if (message.type !== MessageType.system) {
             pImage = message.sendUser.profileurl
             nick = message.sendUser.nickname
-            if (webhook.name !== nick || roomCfg.lastProfile !== pImage) {
-                webhook = await webhook.edit(nick, pImage)
-            }
-        } else {
-            if (webhook.name !== nick || roomCfg.lastProfile !== pImage) {
-                webhook = await webhook.edit(nick, pImage)
-            }
+        }
+        const webhook = await this.getWebhook(channel, nick, pImage).catch(Log.e)
+        if (webhook == null) {
+            Log.w("NccCast", "skip - no webhook")
+            return Promise.resolve()
         }
         roomCfg.lastProfile = pImage
         switch (message.type) {

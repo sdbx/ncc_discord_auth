@@ -2,6 +2,11 @@ export default class Cache<T> {
     private data:T
     private offset:number
     private ends:number
+    /**
+     * Create cache
+     * @param target target
+     * @param endOffset offset (**second**)
+     */
     constructor(target:T,endOffset:number) {
         this.data = target
         this.offset = endOffset * 1000

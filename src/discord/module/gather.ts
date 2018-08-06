@@ -41,27 +41,16 @@ export default class Gather extends Plugin {
         }
         const destCh = msg.guild.channels.get(cfg.destChannel) as Discord.TextChannel
         const channel = msg.channel as Discord.TextChannel
-        let webhook:Discord.Webhook
-        try {
-            const webhooks = (await destCh.fetchWebhooks()).filter((w) => w.id === cfg.webhookID)
-            if (webhooks.size === 1) {
-                webhook = webhooks.get(cfg.webhookID)
-            }
-        } catch (err) {
-            Log.e(err)
-        }
-        if (webhook == null) {
-            Log.w("Gather", "skip - no webhook")
-            return Promise.resolve()
-        }
+        
         if (cfg.listenChannels.indexOf(msg.channel.id) < 0) {
             return Promise.resolve()
         }
         // change image
         const name = `${DiscordFormat.getNickname(msg)} (#${(msg.channel as Discord.TextChannel).name})`
-        if (name !== webhook.name || msg.author.avatarURL !== cfg.lastImage) {
-            await webhook.edit(name, msg.author.avatarURL)
-            cfg.lastImage = msg.author.avatarURL
+        const webhook = await this.getWebhook(destCh, name, msg.author.avatarURL).catch(Log.e)
+        if (webhook == null) {
+            Log.w("Gather", "skip - no webhook")
+            return Promise.resolve()
         }
         // cast to dest
         let data:any = {
@@ -127,8 +116,10 @@ export default class Gather extends Plugin {
             const channel = msg.channel as Discord.TextChannel
             if (testGather.match && testGather.has(ParamType.to) && testGather.get(ParamType.to) === "대표") {
                 cfg.destChannel = channel.id
-                const webhook = await channel.createWebhook("gatherHook", null, "All-in-one message")
-                cfg.webhookID = webhook.id
+                const webhook = await this.getWebhook(channel).catch(Log.e)
+                if (webhook != null) {
+                    cfg.webhookID = webhook.id
+                }
                 await channel.send(this.lang.gather.gatherDesc)
             } else {
                 const i = cfg.listenChannels.indexOf(channel.id)

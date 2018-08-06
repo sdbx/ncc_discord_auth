@@ -4,6 +4,7 @@ import * as Hangul from "hangul-js"
 const set = require("set-value")
 import * as fs from "fs-extra"
 import { sprintf } from "sprintf-js"
+import Cache from "../cache"
 import Config from "../config"
 import Log from "../log"
 import Ncc from "../ncc/ncc"
@@ -51,6 +52,14 @@ export default abstract class Plugin {
      * @see runtime.locals
      */
     private subs:Map<string, Config>
+    /**
+     * Webhooks (channel, id)
+     */
+    private webhooks:Map<string, Cache<{
+        webhook:Discord.Webhook,
+        name:string,
+        image:string,
+    }>>
 
     /**
      * on plugin load
@@ -63,6 +72,7 @@ export default abstract class Plugin {
         this.ncc = runtime.ncc
         this.lang = runtime.lang
         this.chains = new Map()
+        this.webhooks = new Map()
         this.global = runtime.mainConfig
         this.subs = runtime.subConfigs
     }
@@ -490,6 +500,44 @@ export default abstract class Plugin {
             data = ""
         }
         return data
+    }
+    protected async getWebhook(channel:Discord.TextChannel, name:string = null, image?:string) {
+        let webhook:Discord.Webhook
+        if (!this.webhooks.has(channel.id) || this.webhooks.get(channel.id).expired) {
+            const webhooks = await channel.fetchWebhooks()
+            for (const [key, hook] of webhooks) {
+                if ((hook.owner as Discord.User).id === this.client.user.id) {
+                    webhook = hook
+                    await webhook.edit(name == null ? webhook.name : name, image === undefined ? webhook.avatar : image)
+                    break
+                }
+            }
+            if (webhook == null) {
+                if (name == null) {
+                    name = "ncc_discord_auth"
+                }
+                webhook = await channel.createWebhook(name, image === undefined ? null : image)
+            }
+            this.webhooks.set(channel.id, new Cache({
+                webhook,
+                name: webhook.name,
+                image: webhook.avatar,
+            }, 3600))
+        } else {
+            const info = this.webhooks.get(channel.id).cache
+            const changeImage = image !== undefined && info.image !== image
+            if ((name != null && info.name !== name) || changeImage) {
+                const n = name != null ? name : info.webhook.name
+                const i = changeImage ? image : undefined
+                await info.webhook.edit(n, i)
+                info.name = n
+                if (i != undefined) {
+                    info.image = i
+                }
+            }
+            webhook = info.webhook
+        }
+        return webhook
     }
     /**
      * Filter editable configs
