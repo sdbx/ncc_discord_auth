@@ -1,4 +1,4 @@
-import Cafe from "./cafe";
+import Cafe from "./cafe"
 
 export default interface Profile extends Cafe {
     profileurl:string,
