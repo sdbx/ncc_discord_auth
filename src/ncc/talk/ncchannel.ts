@@ -189,17 +189,20 @@ export default class NcChannel {
         })
         // member join
         s.on(ChannelEvent.JOIN, async (eventmsg:object) => {
-            const msg = {channelID: eventmsg["channelNo"]}
+            const msg = new NcMessage(eventmsg["message"], this.cafe, this.channelID)
             const join = new Join(this.users)
             await this.syncChannel()
             join.fetch(this.users)
             this.events.onMemberJoin.dispatchAsync(this, join)
+            this.events.onMessage.dispatchAsync(this, msg)
         })
         // member quit
         s.on(ChannelEvent.QUIT, async (eventmsg:object) => {
             const msg = this.serialQueryMsg(eventmsg)
             await this.syncChannel()
             this.events.onMemberQuit.dispatchAsync(this, msg)
+            const ncM = new NcMessage(eventmsg["message"], this.cafe, this.channelID)
+            this.events.onMessage.dispatchAsync(this, ncM)
         })
         s.on(ChannelEvent.KICK, async (eventmsg:object) => {
             const action = this.serialQueryMsg(eventmsg)
@@ -215,6 +218,7 @@ export default class NcChannel {
             } else {
                 this.events.onMemberKick.dispatchAsync(this, msg)
             }
+            this.events.onMessage.dispatchAsync(this, sys.msg)
         })
         // system message;;
         s.on(ChannelEvent.SYSTEM, async (eventmsg:object) => {
@@ -646,7 +650,7 @@ export default class NcChannel {
         const ln = messages.length
         const iLn = this.messages.length
 
-        if (ln >= 1 && (messages[0].messageId === this.messages[iLn - 1].id + 1)) {
+        if (ln >= 1 && (iLn <= 0 || (messages[0].messageId === this.messages[iLn - 1].id + 1))) {
             for (let i = 0; i < ln; i += 1) {
                 const msg = messages[i]["instance"]
                 this.messages.push({

@@ -1,3 +1,4 @@
+import Log from "../../log"
 import NcJson from "./ncjson"
 
 export default class NcAPIStatus {
@@ -34,6 +35,11 @@ export default class NcAPIStatus {
     public success:boolean = false
     public errorType:NcErrorType = NcErrorType.unknown
     public errorMsg:string
+    public handleError() {
+        if (!this.success) {
+            Log.w("Error - NcAPI", this.errorMsg)
+        }
+    }
 }
 export enum NcErrorType {
     captchaFailed = "6002",

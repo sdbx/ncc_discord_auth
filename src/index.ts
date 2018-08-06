@@ -23,9 +23,9 @@ async function start() {
     await run.start()
 }
 Log.hook()
-// start();
+start()
 // init()
-client()
+// client()
 
 async function init() {
     /*

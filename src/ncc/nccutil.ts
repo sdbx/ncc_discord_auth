@@ -1,7 +1,9 @@
 import * as get from "get-value"
 import * as mime from "mime-types"
+import Log from "../log"
 import Cafe from "./structure/cafe"
 import Profile from "./structure/profile"
+import NcAPIStatus from "./talk/ncapistatus"
 
 export function asJSON(str:string):object {
     let obj = null

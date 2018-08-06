@@ -155,6 +155,7 @@ export default class NcCredent extends EventEmitter {
     }
     protected async onLogin(username:string):Promise<void> {
         Log.i("Runtime-ncc",`Logined by ${username}.`)
+        this.emit("login", username)
         return Promise.resolve()
     }
 }

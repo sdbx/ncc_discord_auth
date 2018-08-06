@@ -1,14 +1,17 @@
 import * as Discord from "discord.js"
-import { Message, Room } from "node-ncc-es6"
 import * as request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import Cache from "../../cache"
 import Config from "../../config"
 import Log from "../../log"
+import { NccEvents } from "../../ncc/ncc"
 import Article from "../../ncc/structure/article"
 import Cafe from "../../ncc/structure/cafe"
 import Comment from "../../ncc/structure/comment"
 import Profile from "../../ncc/structure/profile"
+import { ChannelType } from "../../ncc/talk/ncbasechannel"
+import NcChannel from "../../ncc/talk/ncchannel"
+import NcMessage, { NcImage, NcSticker } from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
@@ -37,7 +40,7 @@ export default class Auth extends Plugin {
         this.infoNaver.complex = true
         // ncc-listen
         this.ncc_listen = this.onNccMessage.bind(this)
-        this.ncc.on("message", this.ncc_listen)
+        this.ncc.on(NccEvents.message, this.ncc_listen)
         // bind
         this.client.on("guildMemberAdd", this.onGuildMemberAdd.bind(this))
         this.client.on("guildMemberRemove", this.onGuildMemberRemove.bind(this))
@@ -74,7 +77,7 @@ export default class Auth extends Plugin {
             const have = this.getFirst(this.authQueue.filter((v) => v.guildID === guild.id && v.userID === user.id))
             if (have != null) {
                 if (await this.inviteExpired(have.uInviteCode)) {
-                    await this.ncc.deleteRoom(have.uChatID)
+                    (await this.ncc.leaveChannel(have.uChatID)).handleError()
                 } else {
                     await channel.send(
                         `${this.lang.auth.authing}\nhttps://talk.cafe.naver.com/channels/${have.uChatID}`)
@@ -132,10 +135,14 @@ export default class Auth extends Plugin {
             /**
              * Create room first
              */
-            const room:Room = await this.ncc.chat.createRoom(
-                { id: cafeID.cafeId }, [{ id: member.userid }],
-                {name: "디스코드 인증", isPublic: false}).catch((err) => {Log.e(err); return null})
-            if (room == null) {
+            let room:NcChannel
+            try {
+                room = await this.ncc.createChannel(cafeID, [member], {
+                    name: "디스코드 인증",
+                    description: "",
+                    thumbnails: [],
+                },ChannelType.OnetoOne)
+            } catch (err) {
                 await channel.send(this.lang.auth.roomNotMaked)
                 return Promise.resolve()
             }
@@ -151,7 +158,7 @@ export default class Auth extends Plugin {
             const authInfo = new AuthInfo()
             authInfo.guildID = guild.id
             authInfo.proxyID = proxyC.guild.id
-            authInfo.uChatID = room.id
+            authInfo.uChatID = room.channelID
             authInfo.uInviteCode = invite.code
             authInfo.userID = user.id
             authInfo.naverID = member.userid
@@ -159,7 +166,7 @@ export default class Auth extends Plugin {
             /**
              * Send text to ncc room
              */
-            await this.ncc.chat.sendText(room, sprintf(this.lang.auth.nccmessage,{
+            await room.sendText(sprintf(this.lang.auth.nccmessage,{
                 link: invite.url,
                 user: msg.author.username,
             }))
@@ -167,7 +174,7 @@ export default class Auth extends Plugin {
              * Send rich
              */
             const rich = await this.getRichByNaver(member, DiscordFormat.getNickname(msg), msg.author.avatarURL)
-            const roomURL = `https://talk.cafe.naver.com/channels/${room.id}`
+            const roomURL = `https://talk.cafe.naver.com/channels/${room.channelID}`
             await channel.send(roomURL,rich)
         } else if (testInfo.match) {
             if (!await this.ncc.availableAsync()) {
@@ -242,13 +249,13 @@ export default class Auth extends Plugin {
         }
         return Promise.resolve()
     }
-    protected async break(queue:AuthInfo, roomID?:string | Room, breakInvite = true) {
+    protected async break(queue:AuthInfo, roomID?:number | NcChannel, breakInvite = true) {
         if (roomID == null) {
             roomID = queue.uChatID
         }
-        const room = (typeof roomID === "string") ? await this.ncc.getRoom(roomID) : roomID
+        const room = (typeof roomID === "number") ? await this.ncc.getJoinedChannel(roomID) : roomID.detail
         if (room != null) {
-            await this.ncc.chat.deleteRoom(room)
+            await this.ncc.leaveChannel(room.channelID)
         }
         if (breakInvite) {
             try {
@@ -284,20 +291,19 @@ export default class Auth extends Plugin {
         await cfg.export()
         return Promise.resolve(null)
     }
-    protected async onNccMessage(message:Message) {
-        const roomID = message.room.id
+    protected async onNccMessage(channel:NcChannel, message:NcMessage) {
+        const roomID = message.channelID
         const queue = this.getFirst(this.authQueue.filter((_v) => _v.uChatID === roomID))
-        if (queue == null || queue.naverID !== message.user.id) {
+        if (queue == null || queue.naverID !== message.sendUser.userid) {
             return Promise.resolve()
         }
-        const room = await this.ncc.getRoom(roomID)
         const error = await this.verify(queue)
         if (error != null) {
-            this.ncc.chat.sendText(room, error)
+            await channel.sendText(error)
         } else {
-            this.ncc.chat.sendText(room, this.lang.auth.authed)
+            await channel.sendText(this.lang.auth.authed)
         }
-        await this.break(queue, room)
+        await this.break(queue, channel.channelID)
     }
     protected async haveAuthed(guildID:string, nID:string, uID:string):Promise<boolean> {
         let out = false
@@ -429,7 +435,7 @@ class AuthUser {
     public naverID:string
 }
 class AuthInfo extends AuthUser {
-    public uChatID:string // unique
+    public uChatID:number // unique
     public uInviteCode:string // unique
     public proxyID:string
 }

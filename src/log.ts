@@ -340,7 +340,7 @@ namespace Log {
         ansi("2J")
         ansi("0;0H")
         ansi("?25l")
-        setInterval(() => { }, 1 << 30)
+        // setInterval(() => { }, 1 << 30)
         // ui = new Inquirer.ui.BottomBar();
     }
     /**

@@ -244,18 +244,28 @@ export default class NCredit extends EventEmitter {
         const likePost = likepost.indexOf(sendType) >= 0
         let binary = false
         if (likePost) {
-            for (const value of Object.values(postD)) {
-                if (["number", "boolean", "string"].indexOf(typeof value) < 0) {
-                    binary = true
-                    break
+            const deepCheck = (obj) => {
+                for (const value of Object.values(obj)) {
+                    if (value == null) {
+                        continue
+                    }
+                    if (typeof value === "object") {
+                        return deepCheck(value)
+                    }
+                    if (["number", "boolean", "string"].indexOf(typeof value) < 0) {
+                        return true
+                    }
                 }
+                return false
             }
+            binary = deepCheck(postD)
         }
         const jar = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: sendType,
             url,
             qs: sub,
+            useQuerystring: true,
             form: likePost && !binary ? postD : undefined,
             formData: binary ? postD : undefined,
             agent: this.httpsAgent,

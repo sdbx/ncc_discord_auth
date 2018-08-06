@@ -95,6 +95,10 @@ export default class Runtime extends EventEmitter {
         this.lang = new Lang()
         // save time: now
         this.lastSaved = Date.now()
+        // ncc register event
+        this.ncc.on("login", async () => {
+            this.ncc.connect(true)
+        })
         // ncc test auth by cookie
         try {
             if (await this.ncc.loadCredit() == null) {
@@ -134,7 +138,7 @@ export default class Runtime extends EventEmitter {
             for (const plugin of this.plugins) {
                 await plugin.onDestroy()
             }
-            this.ncc.chat.disconnect()
+            this.ncc.disconnect()
         } catch (err) {
             Log.e(err)
             process.exit(-1)

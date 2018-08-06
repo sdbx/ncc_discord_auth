@@ -1,13 +1,16 @@
 import * as Discord from "discord.js"
 import * as fs from "fs-extra"
 import * as hangul from 'hangul-js'
-import { Message, Room } from "node-ncc-es6"
 import * as request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import * as tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
+import { NccEvents } from "../../ncc/ncc"
 import { cafePrefix } from "../../ncc/ncconstant"
+import NcChannel from "../../ncc/talk/ncchannel"
+import NcJoinedChannel from "../../ncc/talk/ncjoinedchannel"
+import NcMessage, { MessageType, NcImage, NcSticker, SystemType } from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
@@ -32,7 +35,7 @@ export default class Cast extends Plugin {
         // get parameter as complex
         this.setup.complex = true
         // ncc onMessage
-        this.ncc.on("message", this.nccMsg.bind(this))
+        this.ncc.on(NccEvents.message, this.nccMsg.bind(this))
         return Promise.resolve()
     }
     /**
@@ -50,12 +53,12 @@ export default class Cast extends Plugin {
                 await channel.send(this.lang.cast.linkFail)
                 return Promise.resolve()
             }
-            const roomid = link.substring(link.lastIndexOf("/") + 1)
+            const roomid = Number.parseInt(link.substring(link.lastIndexOf("/") + 1))
             if (!await this.ncc.availableAsync()) {
                 await channel.send(this.lang.noNaver)
                 return Promise.resolve()
             }
-            const roomCfg = await this.sub(this.config, roomid)
+            const roomCfg = await this.sub(this.config, roomid.toString())
             const channelCfg = await this.sub(new LinkConfig(), msg.channel.id)
             // already listening?
             if (roomCfg.channelID === channel.id && channelCfg.roomID === roomCfg.roomID &&
@@ -66,15 +69,15 @@ export default class Cast extends Plugin {
                     roomCfg.authedOnly = opts.indexOf("auth") >= 0
                     roomCfg.readOnly = opts.indexOf("ro") >= 0
                     if (opts.indexOf("delete") >= 0) {
-                        await this.subDel(roomid)
+                        await this.subDel(roomid.toString())
                         await this.subDel(msg.channel.id)
                         await channel.send("삭제 완료")
                     }
                 }
                 return Promise.resolve()
             }
-            const rooms = (await this.ncc.chat.getRoomList()).filter((value) => value.id === roomid)
-            let room:Room = null
+            const rooms = (await this.ncc.fetchChannels()).filter((value) => value.channelID === roomid)
+            let room:NcJoinedChannel = null
             try {
                 if (rooms.length === 0) {
                     if (!testSetup.has(ParamType.from)) {
@@ -82,7 +85,10 @@ export default class Cast extends Plugin {
                         return Promise.resolve()
                     }
                     const cafe = await this.ncc.parseNaver(`${cafePrefix}/${testSetup.get(ParamType.from)}`)
-                    room = await this.ncc.chat.joinRoom(cafe.cafeId, roomid)
+                    const r = await this.ncc.joinChannel(roomid)
+                    if (r.success) {
+                        room = await this.ncc.getJoinedChannel(roomid)
+                    }
                 } else {
                     room = rooms[0]
                 }
@@ -101,14 +107,14 @@ export default class Cast extends Plugin {
                     webhook = whs.get(roomCfg.webhookId)
                 } else {
                     try {
-                        webhook = await channel.createWebhook(`ncc-${room.id}`, null, "Connect to ncc")
+                        webhook = await channel.createWebhook(`ncc-${room.channelID}`, null, "Connect to ncc")
                     } catch (err2) {
                         // 
                     }
                 }
             } catch (err) {
                 try {
-                    webhook = await channel.createWebhook(`ncc-${room.id}`, null, "Connect to ncc")
+                    webhook = await channel.createWebhook(`ncc-${room.channelID}`, null, "Connect to ncc")
                 } catch (err2) {
                     Log.e(err2)
                 }
@@ -117,11 +123,11 @@ export default class Cast extends Plugin {
                 await channel.send(this.lang.cast.webhookFail)
                 return Promise.resolve()
             }
-            roomCfg.roomID = room.id
+            roomCfg.roomID = room.channelID
             roomCfg.channelID = channel.id
-            channelCfg.roomID = room.id
+            channelCfg.roomID = room.channelID
             channelCfg.channelID = channel.id
-            roomCfg.cafeID = room.cafe.id
+            roomCfg.cafeID = room.cafe.cafeId
             roomCfg.webhookId = webhook.id
 
             await this.onSave()
@@ -131,7 +137,6 @@ export default class Cast extends Plugin {
         return Promise.resolve()
     }
     public async onMessage(msg:Discord.Message) {
-        await super.onMessage(msg)
         if (msg.channel.type === "dm") {
             return Promise.resolve()
         }
@@ -142,7 +147,7 @@ export default class Cast extends Plugin {
         const channel = msg.channel
 
         const channelCfg = await this.sub(new LinkConfig(), msg.channel.id)
-        const roomCfg = await this.sub(this.config, channelCfg.roomID)
+        const roomCfg = await this.sub(this.config, channelCfg.roomID.toString())
 
         if (roomCfg.channelID !== msg.channel.id || msg.author.bot) {
             // nope
@@ -154,7 +159,7 @@ export default class Cast extends Plugin {
         }
         const authL = await this.sub(new AuthConfig(),guild.id, false)
         const n = await getNaver(authL, guild, msg.author.id)
-        const room = this.ncc.chat.rooms[roomCfg.roomID]
+        const room = await this.ncc.getConnectedChannel(roomCfg.roomID)
         if (room == null || (roomCfg.authedOnly && n == null)) {
             // nope
             await channel.send(this.lang.cast.authonly)
@@ -168,31 +173,32 @@ export default class Cast extends Plugin {
                     url = url.substring(0, url.lastIndexOf("?"))
                 }
                 if (url.endsWith(".png") || url.endsWith(".jpg") || url.endsWith(".gif")) {
-                    await this.ncc.chat.sendText(room,
+                    await room.sendText(
                         `${nick}${hangul.endsWithConsonant(nick) ? "이" : "가"} 이미지를 올렸습니다.`)
                     const temp = await tmp.file({postfix: attach.filename.substr(attach.filename.lastIndexOf("."))})
                     const image = await request.get(attach.url, {encoding:null})
                     await fs.writeFile(temp.path,image)
-                    await this.ncc.chat.sendImage(room, fs.createReadStream(temp.path), null)
+                    await room.sendImage(temp.path)
                 }
             }
         }
         if (msg.content.length >= 1) {
-            await this.ncc.chat.sendText(room, `${nick} : ${msg.content}`)
+            await room.sendText(`${nick} : ${msg.content}`)
         }
     }
-    protected async nccMsg(message:Message) {
-        const room = message.room
-        if (!this.subHas(room.id)) {
+    protected async nccMsg(room:NcChannel, message:NcMessage) {
+        /*
+        if (!this.subHas(room.channelID.toString())) {
             return Promise.resolve()
         }
-        const roomCfg = await this.sub(this.config, room.id)
-        if (room.id !== roomCfg.roomID) {
+        */
+        const roomCfg = await this.sub(this.config, room.channelID.toString())
+        if (room.channelID !== roomCfg.roomID) {
             // skip - wrong chat
             Log.w("NccCast", "skip - wrong chat")
             return Promise.resolve()
         }
-        if (message.user.id === this.ncc.username) {
+        if (message.sendUser.userid === this.ncc.username) {
             return Promise.resolve()
         }
         if (!this.client.channels.has(roomCfg.channelID)) {
@@ -215,42 +221,43 @@ export default class Cast extends Plugin {
         // message.user.image
         let pImage = "https://ssl.pstatic.net/static/m/cafe/mobile/img_thumb_20180426.png"
         let nick = this.lang.cast.fallbackNick
-        if (["text", "image", "sticker"].indexOf(message.type) >= 0) {
-            pImage = message.user.image
-            nick = message.user.nickname
+        if (message.type !== MessageType.system) {
+            pImage = message.sendUser.profileurl
+            nick = message.sendUser.nickname
             if (webhook.name !== nick || roomCfg.lastProfile !== pImage) {
                 webhook = await webhook.edit(nick, pImage)
             }
-        } else if (["join", "leave", "changeName"].indexOf(message.type) >= 0) {
+        } else {
             if (webhook.name !== nick || roomCfg.lastProfile !== pImage) {
                 webhook = await webhook.edit(nick, pImage)
             }
         }
         roomCfg.lastProfile = pImage
         switch (message.type) {
-            case "text": {
-                let msg = message.message
-                const user = message.user.id
+            case MessageType.text: {
+                let msg = message.content as string
+                const user = message.sendUser.userid
                 const optout = roomCfg.optouts.indexOf(user)
                 if (msg.startsWith("!optout")) {
                     if (optout < 0) {
                         roomCfg.optouts.push(user)
-                        await this.ncc.chat.sendText(room, "optout 완료.")
+                        await room.sendText("optout 완료.")
                     }
                 } else if (msg.startsWith("!optin")) {
                     if (optout >= 0) {
                         roomCfg.optouts.splice(optout, 1)
-                        await this.ncc.chat.sendText(room, "optin 완료.")
+                        await room.sendText("optin 완료.")
                     }
                 } else if (optout >= 0) {
                     msg = this.lang.cast.optoutMessage
                 }
                 await webhook.send(msg)
             } break
-            case "sticker":
-            case "image": {
-                const url = message["image"]
-                const optout = roomCfg.optouts.indexOf(message.user.id)
+            case MessageType.sticker:
+            case MessageType.image: {
+                const url = (message.type === MessageType.sticker) ?
+                    (message.content as NcSticker).imageUrl : (message.content as NcImage).url
+                const optout = roomCfg.optouts.indexOf(message.sendUser.userid)
                 let fn = url.substring(url.lastIndexOf("/") + 1)
                 if (fn.indexOf("?") >= 0) {
                     fn = fn.substring(0,fn.lastIndexOf("?"))
@@ -267,37 +274,32 @@ export default class Cast extends Plugin {
                     await webhook.send(rich)
                 }
             } break
-            case "leave":
-            case "join": {
-                const title = `${message.user.nickname}님이 ${
-                    message.type === "join" ? "접속" : "퇴장"}하셨습니다.`
-                const cafeID = message.room.cafe.id
-                const member = await this.ncc.getMemberById(cafeID,message.user.id)
-                const desc = await this.getRichByNaver(member)
-                await webhook.send(title,desc)
-            } break
-            case "changeName": {
-                const roomname:any = message.room.name
-                const hasJongseong = hangul.endsWithConsonant(roomname)
-                await webhook.send(`방 이름이 ${roomname}${hasJongseong ? '으' : ''}로 변경되었습니다`)
+            case MessageType.system: {
+                if ([SystemType.quited, SystemType.kick, SystemType.joined].indexOf(message.systemType) >= 0) {
+                    const member = await this.ncc.getMemberById(message.cafe.cafeId, message.sendUser.userid)
+                    const desc = await this.getRichByNaver(member)
+                    await webhook.send(message.content, desc)
+                } else {
+                    await webhook.send(message.content)
+                }
             } break
         }
     }
 }
 interface Link {
     channelID:string;
-    roomID:string;
+    roomID:number;
 }
 class LinkConfig extends Config implements Link {
     public channelID = "Ch"
-    public roomID = "Fallback"
+    public roomID = -1
     constructor() {
         super("cast")
     }
 }
 class CastConfig extends LinkConfig {
     public channelID = "Ch"
-    public roomID = "Fallback"
+    public roomID = -1
     public webhookId = "webhook"
     public readOnly = false
     public authedOnly = false

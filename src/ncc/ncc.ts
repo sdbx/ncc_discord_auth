@@ -10,8 +10,9 @@ import NCaptcha from "./ncaptcha"
 import { CAFE_DEFAULT_IMAGE, CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
     CHAT_HOME_URL, CHAT_SOCKET_IO, CHATAPI_BLOCKLIST_CAFE, 
     CHATAPI_CAFE_BLOCK, CHATAPI_CAFES, CHATAPI_CHANNEL_CREATE,
-    CHATAPI_CHANNEL_CREATE_PERM, CHATAPI_CHANNEL_OPENCREATE, CHATAPI_CHANNELS,
-    CHATAPI_OPENCHAT_LIST, CHATAPI_USER_BLOCK, COOKIE_SITES, intervalError, intervalNormal } from "./ncconstant"
+    CHATAPI_CHANNEL_CREATE_PERM, CHATAPI_CHANNEL_JOIN, CHATAPI_CHANNEL_OPENCREATE,
+    CHATAPI_CHANNELS, CHATAPI_OPENCHAT_LIST, CHATAPI_USER_BLOCK, COOKIE_SITES,
+    intervalError, intervalNormal } from "./ncconstant"
 import { asJSON, getFirst, parseURL } from "./nccutil"
 import NcFetch from "./ncfetch"
 import NcCredent from "./ncredent"
@@ -38,7 +39,6 @@ export default class Ncc extends NcFetch {
      */
     protected syncTask:NodeJS.Timer
     protected events:Events
-    protected session:Session
     constructor() {
         super()
         this.events = new Events(this)
@@ -67,19 +67,18 @@ export default class Ncc extends NcFetch {
      * @param type Chat Type (Group: requires captcha)
      * @param captcha Captcha (generated, **GroupChat**)
      */
-    public async createChannel(cafe:Cafe | number,
-        member:Array<Profile | string> | Profile | string | ChannelInfo,
+    public async createChannel(cafe:Cafe | number, members:Array<Profile | string>,
+        info:ChannelInfo = {name: "채팅방", description:"채팅방이다.", thumbnails: []},
         type = ChannelType.OnetoOne, captcha:NCaptcha = null) {
         const cafeid = typeof cafe === "number" ? cafe : cafe.cafeId
         cafe = cafeid
         const memberids:string[] = []
-        if (typeof member === "object" && this.isChannelDesc(member) !== (type === ChannelType.OpenGroup)) {
-            return Promise.reject("Invalid parameter.")
-        }
-        if (Array.isArray(member)) {
-            member.forEach((v) => memberids.push(typeof v === "string" ? v : v.userid))
-        } else if (typeof member === "string" || !this.isChannelDesc(member)) {
-            memberids.push(typeof member === "string" ? member : member.userid)
+        if (type === ChannelType.OpenGroup) {
+            if (info == null) {
+                return Promise.reject("Invalid parameter.")
+            }
+        } else {
+            members.forEach((v) => memberids.push(typeof v === "string" ? v : v.userid))
         }
         if (memberids.length >= 2 && type === ChannelType.OnetoOne) {
             type = ChannelType.Group
@@ -105,22 +104,22 @@ export default class Ncc extends NcFetch {
             "captchaValue": captcha == null ? null : captcha.value,
         }
         let param
-        if (type === ChannelType.OpenGroup) {
-            const m = member as ChannelInfo
-            param = {
-                ...captchaParam,
-                "name" : m.name,
-                "description": m.description,
-                "profileImageUrl": m.thumbnails,
-            }
-        } else {
+        if (type !== ChannelType.OpenGroup) {
             param = {
                 ...captchaParam,
                 "channelTypeCode": type,
                 "userIdList": memberids,
             }
+        } else {
+            const m = info as ChannelInfo
+            param = {
+                ...captchaParam,
+                "name": m.name,
+                "description": m.description,
+                "profileImageUrl": m.thumbnails,
+            }
         }
-        const request = await this.credit.reqPost(url.get(cafeid), {}, param)
+        const request = await this.credit.reqPost(url.get(cafeid), {}, param).catch((err) => {Log.e(err); return null})
         let depthS = "channelId"
         if (type === ChannelType.OpenGroup) {
             depthS = "channel." + depthS
@@ -132,7 +131,7 @@ export default class Ncc extends NcFetch {
         if (!response.valid) {
             return Promise.reject(response.error.msg)
         }
-        const channel = await NcChannel.from(this.credit, response.result.channelID)
+        const channel = this.getConnectedChannel(response.result.channelID)
         return channel
     }
     /**
@@ -145,11 +144,23 @@ export default class Ncc extends NcFetch {
      */
     public async createOpenChannel(cafe:Cafe | number,captcha:NCaptcha,
         name:string, description:string = "", image?:string) {
-        return this.createChannel(cafe, {
-            name,
+        return this.createChannel(cafe, [], {
+            name: name == null ? "null" : name,
             description,
             thumbnails: [image],
         } as ChannelInfo, ChannelType.OpenGroup, captcha)
+    }
+    /**
+     * Join channel
+     * @param channelID channel id 
+     */
+    public async joinChannel(channelID:NcBaseChannel | number) {
+        if (typeof channelID !== "number") {
+            channelID = channelID.channelID  // ?
+        }
+        const request = await this.credit.reqPost(CHATAPI_CHANNEL_JOIN.get(channelID))
+        await this.syncChannels()
+        return handleSuccess(request)
     }
     /**
      * Leave channel
@@ -344,6 +355,21 @@ export default class Ncc extends NcFetch {
         }
         return Promise.resolve()
     }
+    /**
+     * Remove autoSync
+     */
+    public async disconnect() {
+        if (this.syncTask != null) {
+            clearTimeout(this.syncTask)
+        }
+        this.connectedChannels.forEach((v) => v.disconnect())
+        this.connectedChannels = []
+        this.joinedChannels = []
+        for (const e of Object.values(this.events)) {
+            e.clear()
+        }
+        this.credit = new NCredit()
+    }
     public async syncChannels(autoConnect = true) {
         let errored = false
         const original = [...this.joinedChannels]
@@ -387,8 +413,7 @@ export default class Ncc extends NcFetch {
                 } as ChannelListEvent
                 // ensure joined new chat~~
                 if (autoConnect) {
-                    const ln = this.connectedChannels.length
-                    for (let i = 0; i < ln; i += 1) {
+                    for (let i = 0; i < this.connectedChannels.length; i += 1) {
                         const chConnected = this.connectedChannels[i]
                         if (!this.shouldConnected(chConnected.detail)) {
                             chConnected.disconnect()
@@ -470,22 +495,6 @@ export default class Ncc extends NcFetch {
             Log.d("Kicked:", "ID: " + user.first.nickname)
         })
     }
-    public async getRoom(roomID:string) {
-        if (await this.availableAsync()) {
-            const rooms = (await this.chat.getRoomList()).filter((_v) => _v.id === roomID)
-            for (const _room of rooms) {
-                return _room
-            }
-        }
-        return null
-    }
-    public async deleteRoom(roomID:string) {
-        const room = await this.getRoom(roomID)
-        if (room != null) {
-            await this.chat.deleteRoom(room)
-        }
-        return Promise.resolve()
-    }
     protected async onLogin(username:string):Promise<void> {
         super.onLogin(username)
         /*
@@ -495,15 +504,6 @@ export default class Ncc extends NcFetch {
         this.chat.on("message",this.onNccMessage.bind(this));
         */
         return Promise.resolve()
-    }
-    protected async onNccMessage(message:Message) {
-        this.emit("message",message)
-    }
-    /**
-     * get session
-     */
-    public get chat():Session {
-        return this.session
     }
     /**
      * Register event
@@ -522,6 +522,7 @@ export default class Ncc extends NcFetch {
             if (!ch.hideACK) {
                 ch.sendAck(msg.messageId)
             }
+            this.events.onMessage.dispatchAsync(ch, msg)
         })
         channel.on(channel.events.onKicked, (ch, msg) => {
             this.removeConnectedChannel(ch)
@@ -644,29 +645,32 @@ export default class Ncc extends NcFetch {
         }
         return Promise.resolve()
     }
-    private isChannelDesc(param:any):param is ChannelInfo {
-        return "name" in param
-    }
 }
 /**
  * Public events
  */
 export enum NccEvents {
     updateList = "updateChannelList",
+    message = "message",
 }
 /**
  * Private events
  */
 class Events {
-    public onMessage = new SimpleEventDispatcher<NcMessage>()
-    public onChatUpdated = this.getE<ChannelListEvent>(NccEvents.updateList)
+    public onMessage = this.getE<NcChannel, NcMessage>(NccEvents.message)
+    public onChatUpdated = this.getSE<ChannelListEvent>(NccEvents.updateList)
     private superO:EventEmitter
     public constructor(p:EventEmitter) {
         this.superO = p
     }
-    private getE<T>(name:NccEvents) {
+    private getSE<T>(name:NccEvents) {
         const e = new SimpleEventDispatcher<T>()
         e.asEvent().subscribe((obj:any) => this.superO.emit(name, obj))
+        return e
+    }
+    private getE<T, V>(name:NccEvents) {
+        const e = new EventDispatcher<T, V>()
+        e.asEvent().subscribe((obj1:T, obj2:V) => this.superO.emit(name, obj1, obj2))
         return e
     }
 }

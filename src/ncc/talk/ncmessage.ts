@@ -223,6 +223,8 @@ export enum MessageType {
 }
 export enum SystemType {
     unknown = -1,
+    joined = 101,
+    quited = 102,
     kicked = 103,
     changed_Roomname = 105,
     kick = 106,
