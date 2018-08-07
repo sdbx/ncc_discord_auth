@@ -415,7 +415,7 @@ export default class Auth extends Plugin {
 export async function getNaver(authlist:AuthConfig,guild:Discord.Guild, userid:string):Promise<string> {
     try {
         if (authlist.users != null) {
-            authlist.users.filter((_v) => _v.naverID === userid).forEach((_v) => {
+            authlist.users.filter((_v) => _v.userID === userid).forEach((_v) => {
                 return Promise.resolve(_v.naverID)
             })
         }
