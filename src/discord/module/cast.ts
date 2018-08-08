@@ -140,7 +140,7 @@ export default class Cast extends Plugin {
             return Promise.resolve()
         }
         const authL = await this.sub(new AuthConfig(),guild.id, false)
-        const n = await getNaver(authL, guild, msg.author.id)
+        const n = getNaver(authL, guild.id, msg.author.id)
         const room = await this.ncc.getConnectedChannel(roomCfg.roomID)
         if (room == null || (roomCfg.authedOnly && n == null)) {
             // nope

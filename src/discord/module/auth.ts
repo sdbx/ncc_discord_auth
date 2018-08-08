@@ -14,7 +14,7 @@ import NcChannel from "../../ncc/talk/ncchannel"
 import NcMessage, { NcImage, NcSticker } from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, getFirst, ParamType, } from "../runutil"
 
 export default class Auth extends Plugin {
     protected defaultConfig = {
@@ -430,17 +430,9 @@ export default class Auth extends Plugin {
         return out
     }
 }
-export async function getNaver(authlist:AuthConfig,guild:Discord.Guild, userid:string):Promise<string> {
-    try {
-        if (authlist.users != null) {
-            authlist.users.filter((_v) => _v.userID === userid).forEach((_v) => {
-                return Promise.resolve(_v.naverID)
-            })
-        }
-    } catch (err3) {
-        Log.e(err3)
-    }
-    return Promise.resolve(null)
+export async function getNaver(authlist:AuthConfig, guildid:string, userid:string):Promise<string> {
+    return getFirst(authlist.users.filter(
+        (_v) => _v.guildID === guildid && _v.userID === userid).map((_v) => _v.naverID))
 }
 enum PType {
     ID = "id/아이디",
