@@ -17,6 +17,9 @@ import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
 
 export default class Auth extends Plugin {
+    protected defaultConfig = {
+        "test": 53,
+    }
     protected config = new AuthConfig()
     protected timeout = 10 * 60 * 1000 // 10 is minutes
     protected authCache:Array<Cache<AuthInfo>> = []
@@ -415,7 +418,7 @@ export default class Auth extends Plugin {
 export async function getNaver(authlist:AuthConfig,guild:Discord.Guild, userid:string):Promise<string> {
     try {
         if (authlist.users != null) {
-            authlist.users.filter((_v) => _v.naverID === userid).forEach((_v) => {
+            authlist.users.filter((_v) => _v.userID === userid).forEach((_v) => {
                 return Promise.resolve(_v.naverID)
             })
         }

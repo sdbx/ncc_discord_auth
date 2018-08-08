@@ -501,14 +501,18 @@ export default abstract class Plugin {
         }
         return data
     }
-    protected async getWebhook(channel:Discord.TextChannel, name:string = null, image?:string) {
+    protected async getWebhook(channel:Discord.TextChannel, name:string = null, image:string = null) {
         let webhook:Discord.Webhook
         if (!this.webhooks.has(channel.id) || this.webhooks.get(channel.id).expired) {
             const webhooks = await channel.fetchWebhooks()
             for (const [key, hook] of webhooks) {
                 if ((hook.owner as Discord.User).id === this.client.user.id) {
-                    webhook = hook
-                    await webhook.edit(name == null ? webhook.name : name, image === undefined ? webhook.avatar : image)
+                    if (name != null || image != null) {
+                        const n = hook.name
+                        webhook = await hook.edit(name == null ? n : name, image)
+                    } else {
+                        webhook = hook
+                    }
                     break
                 }
             }
@@ -516,7 +520,7 @@ export default abstract class Plugin {
                 if (name == null) {
                     name = "ncc_discord_auth"
                 }
-                webhook = await channel.createWebhook(name, image === undefined ? null : image)
+                webhook = await channel.createWebhook(name, image)
             }
             this.webhooks.set(channel.id, new Cache({
                 webhook,
@@ -525,10 +529,10 @@ export default abstract class Plugin {
             }, 3600))
         } else {
             const info = this.webhooks.get(channel.id).cache
-            const changeImage = image !== undefined && info.image !== image
+            const changeImage = image != null && info.image !== image
             if ((name != null && info.name !== name) || changeImage) {
                 const n = name != null ? name : info.webhook.name
-                const i = changeImage ? image : undefined
+                const i = changeImage ? image : null
                 await info.webhook.edit(n, i)
                 info.name = n
                 if (i != undefined) {
