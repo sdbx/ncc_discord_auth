@@ -430,7 +430,7 @@ export default class Auth extends Plugin {
         return out
     }
 }
-export async function getNaver(authlist:AuthConfig, guildid:string, userid:string):Promise<string> {
+export function getNaver(authlist:AuthConfig, guildid:string, userid:string):string {
     return getFirst(authlist.users.filter(
         (_v) => _v.guildID === guildid && _v.userID === userid).map((_v) => _v.naverID))
 }
