@@ -138,13 +138,21 @@ export default class Auth extends Plugin {
             /**
              * Create room first
              */
+            const filterRoom = this.getFirst(this.ncc.joinedChannels.filter((v) => {
+                return v.type === ChannelType.OnetoOne && v.channelInfo.name === member.nickname
+                    && v.cafe.cafeId === member.cafeId
+            }))
             let room:NcChannel
             try {
-                room = await this.ncc.createChannel(cafeID, [member], {
-                    name: "디스코드 인증",
-                    description: "",
-                    thumbnails: [],
-                },ChannelType.OnetoOne)
+                if (filterRoom != null) {
+                    room = await this.ncc.getConnectedChannel(filterRoom.channelID)
+                } else {
+                    room = await this.ncc.createChannel(cafeID, [member], {
+                        name: "디스코드 인증",
+                        description: "",
+                        thumbnails: [],
+                    }, ChannelType.OnetoOne)
+                }
             } catch (err) {
                 await channel.send(this.lang.auth.roomNotMaked)
                 return Promise.resolve()
@@ -169,10 +177,17 @@ export default class Auth extends Plugin {
             /**
              * Send text to ncc room
              */
-            await room.sendText(sprintf(this.lang.auth.nccmessage,{
+            await room.sendCustomEmbed(sprintf(this.lang.auth.nccmessage, {
                 link: invite.url,
                 user: msg.author.username,
-            }))
+            }), {
+                title: msg.guild.name,
+                description: msg.author.tag,
+                domain: this.lang.auth.warningID,
+                url: invite.url,
+                type: null,
+                image: null,
+            }, msg.author.avatarURL, false)
             /**
              * Send rich
              */
@@ -281,7 +296,7 @@ export default class Auth extends Plugin {
         const member = guild.member(queue.userID)
         const toRole = this.getFirstMap(guild.roles.filter((v) => v.name === cfg.destRole))
         if (toRole == null || member == null) {
-            return "Config error."
+            return cfg.destRole + " role not found / Contact admin."
         }
         if (await this.haveAuthed(guild.id, queue.naverID, queue.userID)) {
             return this.lang.auth.already_auth
