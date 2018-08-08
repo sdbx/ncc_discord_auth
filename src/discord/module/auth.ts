@@ -17,6 +17,9 @@ import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
 
 export default class Auth extends Plugin {
+    protected defaultConfig = {
+        "test": 53,
+    }
     protected config = new AuthConfig()
     protected timeout = 10 * 60 * 1000 // 10 is minutes
     protected authCache:Array<Cache<AuthInfo>> = []

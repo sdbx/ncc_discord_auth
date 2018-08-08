@@ -80,7 +80,8 @@ export default class Config {
         }
     }
     public async has(_path = this.saveTo):Promise<boolean> {
-        return fs.ensureFile(this.saveTo).then(() => true).catch(() => false)
+        return fs.pathExists(this.saveTo)
+        // return fs.ensureFile(this.saveTo).then(() => true).catch(() => false)
     }
     /**
      * import config from file
@@ -122,7 +123,7 @@ export default class Config {
         if (write) {
             return await this.export()
         } else {
-            return Promise.reject()
+            return Promise.resolve()
         }
     }
     protected _clone(source:any) {
