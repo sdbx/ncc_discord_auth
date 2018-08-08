@@ -5,13 +5,18 @@ export default class NcAPIStatus {
     public static from<T>(response:NcJson<T>) {
         const err = new NcAPIStatus()
         err.success = response.valid
-        if (!err.success) {
-            for (const value of Object.values(NcErrorType)) {
-                if (response.error.code === value) {
-                    err.errorType = value
+        try {
+            if (!err.success) {
+                for (const value of Object.values(NcErrorType)) {
+                    if (response.error.code === value) {
+                        err.errorType = value
+                    }
                 }
+                err.errorMsg = response.error.msg
             }
-            err.errorMsg = response.error.msg
+        } catch (er) {
+            err.errorMsg = er
+            err.errorType = NcErrorType.unknown
         }
         return err
     }

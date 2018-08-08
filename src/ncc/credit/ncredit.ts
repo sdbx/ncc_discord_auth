@@ -245,9 +245,12 @@ export default class NCredit extends EventEmitter {
         let binary = false
         if (likePost) {
             const deepCheck = (obj) => {
-                for (const value of Object.values(obj)) {
+                for (const value of Object.values<any>(obj)) {
                     if (value == null) {
                         continue
+                    }
+                    if (value instanceof Buffer) {
+                        return true
                     }
                     if (typeof value === "object") {
                         return deepCheck(value)

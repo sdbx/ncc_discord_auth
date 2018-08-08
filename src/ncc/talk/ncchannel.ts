@@ -390,12 +390,13 @@ export default class NcChannel {
                     url: uploaded.url,
                 }
                 embed.image = naverImage
-            } catch {
+            } catch (err) {
                 // :)
+                Log.e(err)
                 embed.image = {
                     width: null,
                     height: null,
-                    url: null,
+                    url: typeof image === "string" ? image : null,
                 }
             }
         }

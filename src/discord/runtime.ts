@@ -110,7 +110,7 @@ export default class Runtime extends EventEmitter {
         // event register
         this.plugins.forEach(((v,i) => {
             this.on("ready",v.ready.bind(v))
-            this.on("message",v.onMessage.bind(v))
+            // this.on("message",v.onMessage.bind(v))
             this.on("save",v.onSave.bind(v))
         }))
         // client register
@@ -187,8 +187,8 @@ export default class Runtime extends EventEmitter {
         const text = msg.content
         const prefix = this.global.prefix
         // onMessage should invoke everytime.
-        this.emit("message",msg)
-        // await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)));
+        // this.emit("message",msg)
+        await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg))).catch(Log.e)
         // chain check
         if (msg.author.id === this.client.user.id) {
             // Self say.
