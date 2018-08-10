@@ -62,12 +62,13 @@ export default class Lang extends Config {
         noAuth: "%(nick)s 유저는 인증이 안되어 있습니다.",
         roomNotMaked: "방을 못 만들어서 실패했습니다.",
         onlyGroup: "그룹 채팅만 사용할 수 있습니다.",
-        proxyFailed: "인증용 채팅방이 존재하지 않습니다.",
+        proxyFailed: "인증용 채팅방(프록시 채널)이 존재하지 않습니다.",
         authing: "이미 인증하는 중이니 네카채를 확인해주세요.",
         nccmessage: `%(user)s 님이 이 아이디로 디스코드 인증을 요청합니다.
         %(link)s
         보낸 요청이 맞다면 채팅을 쳐주거나 링크를 클릭해 주세요.
         봇은 잘못 인증한 것에 대한 책임을 지지 않습니다. :)`,
+        warningID: "자신의 디코 아이디인지 확인해주세요.",
         authed: "인증 완료!",
         already_auth: "이미 인증 완료된 아이디입니다.",
         expiredAuth: "이미 유효 기간이 지났습니다.",

@@ -173,7 +173,8 @@ export default class NcChannel {
                 }, (code, data) => {
                     if (code !== "accessDenied" && data["resultCode"] === 0) {
                         this.firstMsgNo = get(data, "data.firstMessageNo")
-                        this.allocPastMessages(get(data, "data.messageList"))
+                        const testArr = get(data, "data.messageList")
+                        this.allocPastMessages(testArr == null ? [] : testArr)
                     }
                 })
             }
@@ -389,12 +390,13 @@ export default class NcChannel {
                     url: uploaded.url,
                 }
                 embed.image = naverImage
-            } catch {
+            } catch (err) {
                 // :)
+                Log.e(err)
                 embed.image = {
                     width: null,
                     height: null,
-                    url: null,
+                    url: typeof image === "string" ? image : null,
                 }
             }
         }
@@ -604,7 +606,7 @@ export default class NcChannel {
      * @param messages Socket.io message_list_*** result
      */
     protected allocPastMessages(messages:any[]) {
-        if (messages.length <= 0) {
+        if (messages == null || messages.length <= 0) {
             return
         }
         const ln = messages.length

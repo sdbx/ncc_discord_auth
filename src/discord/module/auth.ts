@@ -14,9 +14,12 @@ import NcChannel from "../../ncc/talk/ncchannel"
 import NcMessage, { NcImage, NcSticker } from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, getFirst, ParamType, } from "../runutil"
 
 export default class Auth extends Plugin {
+    protected defaultConfig = {
+        "test": 53,
+    }
     protected config = new AuthConfig()
     protected timeout = 10 * 60 * 1000 // 10 is minutes
     protected authCache:Array<Cache<AuthInfo>> = []
@@ -135,13 +138,21 @@ export default class Auth extends Plugin {
             /**
              * Create room first
              */
+            const filterRoom = this.getFirst(this.ncc.joinedChannels.filter((v) => {
+                return v.type === ChannelType.OnetoOne && v.channelInfo.name === member.nickname
+                    && v.cafe.cafeId === member.cafeId
+            }))
             let room:NcChannel
             try {
-                room = await this.ncc.createChannel(cafeID, [member], {
-                    name: "디스코드 인증",
-                    description: "",
-                    thumbnails: [],
-                },ChannelType.OnetoOne)
+                if (filterRoom != null) {
+                    room = await this.ncc.getConnectedChannel(filterRoom.channelID)
+                } else {
+                    room = await this.ncc.createChannel(cafeID, [member], {
+                        name: "디스코드 인증",
+                        description: "",
+                        thumbnails: [],
+                    }, ChannelType.OnetoOne)
+                }
             } catch (err) {
                 await channel.send(this.lang.auth.roomNotMaked)
                 return Promise.resolve()
@@ -166,10 +177,17 @@ export default class Auth extends Plugin {
             /**
              * Send text to ncc room
              */
-            await room.sendText(sprintf(this.lang.auth.nccmessage,{
+            await room.sendCustomEmbed(sprintf(this.lang.auth.nccmessage, {
                 link: invite.url,
                 user: msg.author.username,
-            }))
+            }), {
+                title: msg.guild.name,
+                description: msg.author.tag,
+                domain: this.lang.auth.warningID,
+                url: invite.url,
+                type: null,
+                image: null,
+            }, msg.author.avatarURL, false)
             /**
              * Send rich
              */
@@ -278,7 +296,7 @@ export default class Auth extends Plugin {
         const member = guild.member(queue.userID)
         const toRole = this.getFirstMap(guild.roles.filter((v) => v.name === cfg.destRole))
         if (toRole == null || member == null) {
-            return "Config error."
+            return cfg.destRole + " role not found / Contact admin."
         }
         if (await this.haveAuthed(guild.id, queue.naverID, queue.userID)) {
             return this.lang.auth.already_auth
@@ -412,17 +430,9 @@ export default class Auth extends Plugin {
         return out
     }
 }
-export async function getNaver(authlist:AuthConfig,guild:Discord.Guild, userid:string):Promise<string> {
-    try {
-        if (authlist.users != null) {
-            authlist.users.filter((_v) => _v.userID === userid).forEach((_v) => {
-                return Promise.resolve(_v.naverID)
-            })
-        }
-    } catch (err3) {
-        Log.e(err3)
-    }
-    return Promise.resolve(null)
+export function getNaver(authlist:AuthConfig, guildid:string, userid:string):string {
+    return getFirst(authlist.users.filter(
+        (_v) => _v.guildID === guildid && _v.userID === userid).map((_v) => _v.naverID))
 }
 enum PType {
     ID = "id/아이디",
