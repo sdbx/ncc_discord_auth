@@ -23,8 +23,8 @@ async function start() {
     await run.start()
 }
 Log.hook()
-start()
-// init()
+// start()
+init()
 // client()
 
 async function init() {
@@ -46,8 +46,8 @@ async function init() {
                 ncc.on(NccEvents.updateList, (obj:ChannelListEvent) => {
                     // Log.json("Delta", obj)
                 })
-                const ch = await ncc.getConnectedChannel(45528313105)
-                const msgs = await ch.fetchMessages("ALL", -1)
+                // const ch = await ncc.getConnectedChannel(45528313105)
+                // const msgs = await ch.fetchMessages("ALL", -1)
                 // const captcha = await ncc.genCaptchaByConsole()
                 // tslint:disable-next-line
                 // const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")
@@ -56,6 +56,7 @@ async function init() {
                 // await channel.leave()
                 // await Log.image(image.path, "Uploaded")
                 // Log.json("Test",image)
+                /*
                 for (const msg of msgs) {
                     let text
                     switch (msg.type) {
@@ -67,7 +68,10 @@ async function init() {
                     }
                     Log.d("Chat", text)
                 }
+                */
                 Log.time()
+                // tslint:disable-next-line
+                await ncc.changeProfile(26686242, "벨략", null)
             } catch (err) {
                 Log.e(err)
             }

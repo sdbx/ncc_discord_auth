@@ -9,7 +9,7 @@ import * as request from "request-promise-native"
 import { Cookie, CookieJar, parseDate } from "tough-cookie"
 import Log from "../../log"
 import NCaptcha from "../ncaptcha"
-import { CHAT_API_URL, CHAT_APIS, CHAT_HOME_URL, CHATAPI_CHANNELS, COOKIE_SITES } from "../ncconstant"
+import { CHAT_HOME_URL, CHATAPI_PHOTO_SESSION_KEY, COOKIE_SITES } from "../ncconstant"
 import { asJSON, parseURL } from "../nccutil"
 import encryptKey from "./loginencrypt"
 
@@ -153,7 +153,7 @@ export default class NCredit extends EventEmitter {
      * @returns username or Promise.reject() (fail)
      */
     public async validateLogin() {
-        const content = asJSON(await this.reqGet(CHATAPI_CHANNELS) as string)
+        const content = asJSON(await this.reqGet(CHATAPI_PHOTO_SESSION_KEY) as string)
         if (content == null) {
             // not found.
             return Promise.reject("404 NOT FOUND")

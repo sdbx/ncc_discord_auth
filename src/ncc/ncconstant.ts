@@ -14,6 +14,9 @@ export enum CHAT_APIS {
 export const COOKIE_SITES = ["https://nid.naver.com", "https://naver.com", CHAT_HOME_URL, cafePrefix]
 export const NID_CAPTCHA = `https://nid.naver.com/login/image/captcha`
 export const INSECURE_CAPTCHA = `http://captcha.naver.com`
+export const CAFE_LOGIN_CHECK = `${cafePrefix}/LoginCheck.nhn?m=check`
+export const CAFE_PROFILE_UPDATE = `${cafePrefix}/CafeMemberInfoUpdate.nhn`
+export const CAFE_NICKNAME_CHECK = `${cafePrefix}/CafeMemberNicknameCheckAjax.nhn`
 
 export const CHAT_BACKEND_URL = "https://talkwss.cafe.naver.com"
 export const CHAT_SOCKET_IO = `${CHAT_BACKEND_URL}/socket.io/`
@@ -49,7 +52,7 @@ export const CHAT_URL_CRAWLER = `${CHAT_HOME_URL}/crawler`
 
 /* ncc config */
 // ms
-export const intervalNormal = 10000
+export const intervalNormal = 60000
 export const intervalError = 10000
 
 export interface NcIDBase {

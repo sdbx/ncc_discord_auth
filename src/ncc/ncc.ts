@@ -370,6 +370,10 @@ export default class Ncc extends NcFetch {
         }
         this.credit = new NCredit()
     }
+    /**
+     * Sync Channels and fetch auto
+     * @param autoConnect should auto connect to chat
+     */
     public async syncChannels(autoConnect = true) {
         let errored = false
         const original = [...this.joinedChannels]

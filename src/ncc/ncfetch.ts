@@ -7,7 +7,8 @@ import * as querystring from "querystring"
 import * as request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
-import { cafePrefix, CHAT_HOME_URL, CHATAPI_MEMBER_SEARCH, mCafePrefix, whitelistDig } from "./ncconstant"
+import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE,
+    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, whitelistDig } from "./ncconstant"
 import NcCredent from "./ncredent"
 import Article from "./structure/article"
 import Cafe from "./structure/cafe"
@@ -47,8 +48,7 @@ export default class NcFetch extends NcCredent {
          */
         let post_body = null
         if (option.type === SendType.POST) {
-            post_body = encoding.convert(
-                querystring.stringify(option.postdata, "&", "=", { encodeURIComponent: (v) => v }), "utf-8")
+            post_body = querystring.stringify(option.postdata, "&", "=", { encodeURIComponent: (v) => v })
         }
         const encode = option.eucKR ? "euc-kr" : "utf-8"
         /**
@@ -495,6 +495,59 @@ export default class NcFetch extends NcCredent {
         return memberList
     }
     /**
+     * WIP
+     * @param cafeid 
+     * @param nickname 
+     * @param image 
+     */
+    public async changeProfile(cafeid:number | Cafe, nickname?:string, image?:string) {
+        if (typeof cafeid !== "number") {
+            cafeid = cafeid.cafeId
+        }
+        const uname = this.credit.username
+        if (nickname == null || image == null) {
+            const original = await this.getMemberById(cafeid, uname)
+            if (nickname == null) {
+                nickname = original.nickname
+            }
+            if (image == null) {
+                image = original.profileurl
+            }
+        }
+        const referer = `${cafePrefix}/CafeMemberInfo.nhn?clubid=${cafeid.toString()}&memberid=${uname}`
+        // utf-8
+        const usable_res = await this.credit.reqPost(CAFE_NICKNAME_CHECK, {}, {
+            clubid: cafeid,
+            memberid: uname,
+            nickname,
+        }, referer) as string
+        try {
+            const usable:boolean = get(JSON.parse(usable_res), "isUsable", {default: false})
+            if (!usable) {
+                return Promise.resolve(null)
+            }
+        } catch {
+            return Promise.resolve(null)
+        }
+        const options = new RequestOption()
+        options.eucKR = true
+        options.type = SendType.POST
+        options.useAuth = true
+        options.referer = referer
+        image = image.replace("https://cafethumb.pstatic.net" , "")
+        options.postdata = {
+            "clubid": cafeid,
+            "memberid": this.credit.username,
+            "personalInfoCollectAgree":false,
+            "cafeProfileImageUrl": encodeURIComponent(image),
+            "nickname": this.encodeURI_KR(nickname),
+            "profileImageType": 1,
+        }
+        const $ = await this.getWeb(CAFE_PROFILE_UPDATE, {}, options)
+        const t = $("body script").html().match(/'.*'/ig)
+        return Promise.resolve(t[0])
+    }
+    /**
      * 닉네임 검색
      */
     protected async queryMembersByNick(cafeid:number,nick:string) {
@@ -563,10 +616,10 @@ export default class NcFetch extends NcCredent {
 }
 class RequestOption {
     public type:SendType = SendType.GET
-    public postdata?:{[key:string]: string | number }
+    public postdata?:{[key:string]: string | number | boolean}
     public eucKR:boolean = true
     public useAuth:boolean = true
-    public referer:string = `${cafePrefix} / `
+    public referer:string = `${cafePrefix}/`
 }
 interface TalkMember {
     memberId:string;
