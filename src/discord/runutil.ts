@@ -466,6 +466,74 @@ export class DiscordFormat {
             return msg.author.username
         }
     }
+    public static normalize(msg:string, guild:Discord.Guild) {
+        let chain = msg
+        // 1. Bold
+        chain = this.replaceTo(chain, /\*\*.+?\*\*/g, (str) => str.substring(2, str.length - 2))
+        // 2. Italic
+        chain = this.replaceTo(chain, /\*.+?\*/g, (str) => str.substring(1, str.length - 1))
+        // 3. Underline
+        chain = this.replaceTo(chain, /__.+?__/g, (str) => str.substring(2, str.length - 2))
+        // 4. NamuWiki
+        chain = this.replaceTo(chain, /~~.+?~~/g, (str) => str.substring(2, str.length - 2))
+        // 5. codeBlocks
+        chain = chain.replace(/```.*?```/, "").replace(/`.*?`/ig, "")
+        // 6. mention
+        chain = this.replaceTo(chain, /<@!\d+>/g, (str) => {
+            const id = str.match(/\d+/i)[0]
+            if (guild == null || !guild.available) {
+                return ""
+            }
+            const member = getFirstMap(guild.members.filter((v) => v.id === id))
+            if (member != null) {
+                return "@" + (member.nickname == null ? member.user.username : member.nickname)
+            } else {
+                return ""
+            }
+        })
+        // 7. everyone and here
+        chain = chain.replace(/@(everyone|here)/g, "")
+        // 8. channel
+        chain = this.replaceTo(chain, /<#\d+>/g, (str) => {
+            const id = str.match(/\d+/i)[0]
+            if (guild == null || !guild.available) {
+                return ""
+            }
+            const channel = getFirstMap(guild.channels.filter((v) => v.id === id))
+            if (channel != null) {
+                return "#" + channel.name
+            } else {
+                return ""
+            }
+        })
+        // 9. role
+        chain = this.replaceTo(chain, /<@&\d+>/g, (str) => {
+            const id = str.match(/\d+/i)[0]
+            if (guild == null || !guild.available) {
+                return ""
+            }
+            const role = getFirstMap(guild.roles.filter((v) => v.id === id))
+            if (role != null) {
+                return "@" + role.name
+            } else {
+                return ""
+            }
+        })
+        // 10. emote
+        chain = this.replaceTo(chain, /<a?:\S+:\d+>/g, (str) => "")
+        return chain
+    }
+    private static replaceTo(data:string, regex:RegExp, after:(str:string) => string) {
+        const matches = data.match(regex)
+        if (matches == null || matches.length <= 0) {
+            return data
+        }
+        let chain = data
+        for (const matchStr of matches) {
+            chain = chain.replace(matchStr, after(matchStr))            
+        }
+        return chain
+    }
 
     private _italic = false
     private _bold = false

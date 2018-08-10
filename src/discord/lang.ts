@@ -73,6 +73,10 @@ export default class Lang extends Config {
         already_auth: "이미 인증 완료된 아이디입니다.",
         expiredAuth: "이미 유효 기간이 지났습니다.",
     }
+    public color = {
+        colorSuccess: "색상이 적용됐습니다.",
+        wrongColor: "올바르지 않은 색상입니다! 6자리의 Hex값을 입력해주세요."
+    }
     /*
      * Module: artinoti
      */

@@ -10,6 +10,7 @@ import Lang from "./lang"
 import ArtiNoti from "./module/artinoti"
 import Auth from "./module/auth"
 import Cast from "./module/cast"
+import Color from "./module/color"
 import EventNotifier from "./module/event"
 import Gather from "./module/gather"
 import Login from "./module/login"
@@ -75,7 +76,8 @@ export default class Runtime extends EventEmitter {
         const moduleDir = path.resolve("./module")
         Log.d(moduleDir)
         this.plugins.push(
-            new Ping(), new Login(), new Auth(),new ArtiNoti(),  new Cast(), new Gather(), new EventNotifier())
+            new Ping(), new Login(), new Auth(),new ArtiNoti(),
+            new Cast(), new Gather(), new EventNotifier(), new Color())
     }
     /**
      * **Async**

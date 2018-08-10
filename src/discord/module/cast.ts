@@ -165,7 +165,7 @@ export default class Cast extends Plugin {
             }
         }
         if (msg.content.length >= 1) {
-            await room.sendText(`${nick} : ${msg.content}`)
+            await room.sendText(`${nick} : ${DiscordFormat.normalize(msg.content, msg.guild)}`)
         }
     }
     protected async nccMsg(room:NcChannel, message:NcMessage) {
@@ -218,7 +218,7 @@ export default class Cast extends Plugin {
                 } else if (optout >= 0) {
                     msg = this.lang.cast.optoutMessage
                 }
-                await webhook.send(msg)
+                await webhook.send(DiscordFormat.normalize(msg, channel.guild))
             } break
             case MessageType.sticker:
             case MessageType.image: {
@@ -245,9 +245,11 @@ export default class Cast extends Plugin {
                 if ([SystemType.quited, SystemType.kick, SystemType.joined].indexOf(message.systemType) >= 0) {
                     const member = await this.ncc.getMemberById(message.cafe.cafeId, message.sendUser.userid)
                     const desc = await this.getRichByNaver(member)
-                    await webhook.send(message.content, desc)
+                    await webhook.send(
+                        DiscordFormat.normalize(message.content as string, channel.guild), desc)
                 } else {
-                    await webhook.send(message.content)
+                    await webhook.send(
+                        DiscordFormat.normalize(message.content as string, channel.guild))
                 }
             } break
         }
