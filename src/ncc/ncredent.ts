@@ -71,7 +71,7 @@ export default class NcCredent extends EventEmitter {
         let captcha = null
         do {
             try {
-                result = await this.requestCredent(username,password, captcha)
+                result = await this.login(username,password, captcha)
             } catch (err) {
                 result = err
             }
@@ -102,17 +102,22 @@ export default class NcCredent extends EventEmitter {
      * get credentials from userid and password
      * @returns naver username or null(error)
      * @param username naver id
-     * @param password naver passwork(unencrypt)
+     * @param password naver passwork(unencrypt) - null if username is OTP
      */
-    public async requestCredent(username:string,password:string,
+    public async login(username:string,password:string,
             captcha?:{key:string,value:string}):Promise<string> {
-        this.credit.set(username, password)
         let errorCode:LoginError = null
-        await this.credit.login(captcha).catch((err:LoginError) => errorCode = err)
+        let uname:string = null
+        if (password == null) {
+            uname = await this.credit.loginOTP(username)
+        } else {
+            this.credit.set(username, password)
+            uname = await this.credit.login(captcha).catch((err:LoginError) => { errorCode = err; return null})
+        }
         if (errorCode != null) {
             return Promise.reject(errorCode)
         }
-        const name = await this.validateLogin()
+        const name = uname == null ? null : await this.validateLogin()
         // this.credit.password = "__";
         if (name != null) {
             this.credit.username = name
@@ -123,6 +128,17 @@ export default class NcCredent extends EventEmitter {
             this._name.revoke()
         }
         return Promise.resolve(name)
+    }
+    /**
+     * get credentials from Naver OTP code
+     * 
+     * OTP gen: Naver Cafe APP
+     * @param otpcode 8-digit
+     * @returns naver username or null(error)
+     */
+    public async loginOTP(otpcode:number | string) {
+        const code = typeof otpcode === "number" ? otpcode.toString().padStart(8) : otpcode
+        return this.login(code, null)
     }
     /**
      * load credit from cookie

@@ -23,8 +23,8 @@ async function start() {
     await run.start()
 }
 Log.hook()
-start()
-// init()
+// start()
+init()
 // client()
 
 async function init() {
@@ -33,13 +33,15 @@ async function init() {
     await run.start();
     */
     const ncc = new Ncc()
-    const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole())
+    const otpcode = await Log.read("OTP")
+    const loaded = await ncc.loginOTP(otpcode)
+    // const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole())
     if (loaded != null) {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (ncc.available) {
             try {
-                Log.d("OTP", (await ncc["credit"].getOTP()).token.toString())
+                Log.d("OTP", (await ncc["credit"].genOTP()).token.toString())
             } catch (err) {
                 Log.e(err)
             }

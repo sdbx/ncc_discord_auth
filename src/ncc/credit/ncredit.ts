@@ -46,7 +46,7 @@ export default class NCredit extends EventEmitter {
      * Validate Naver logined.
      * Recommand Caching value
      * @param captcha Naver captcha parameter(check other class for detail)
-     * @returns captcha if false
+     * @returns captcha if false (Promise.reject)
      */
     public async login(captcha:{key:string, value:string} = null) {
         log("Starting logging in")
@@ -65,7 +65,7 @@ export default class NCredit extends EventEmitter {
             encnm: keyName,
             svctype: 0,
             "enc_url": "http0X0.0000000000001P-10220.0000000.000000www.naver.com",
-            url: "www.naver.com",
+            url: "https://www.naver.com",
             "smart_level": 1,
             encpw: key
         }
@@ -88,27 +88,16 @@ export default class NCredit extends EventEmitter {
             form,
             jar: cookie,
         })
-        /**
-         * Generate NNB cookie
-         * 
-         * Naver captcha **REQUIRES** this cookie
-         */
-        const nnbCookie = new Cookie()
-        nnbCookie.key = "NNB"
-        nnbCookie.value = NCaptcha.randomString(11, true)
-        nnbCookie.path = "./"
-        nnbCookie.domain = "naver.com"
-        nnbCookie.expires = new Date(2050, 11, 30)
-        this.cookieJar.setCookieSync(nnbCookie, "https://naver.com/")
+        this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
         // copy cookie to cookieJar
         this.saveCookie(COOKIE_SITES, cookie)
         // check cookie valid
         const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
             log("Successfully logged in")
-            await this.fetchUserID()
+            const userid = await this.fetchUserID()
             this.emit("login")
-            return Promise.resolve()
+            return Promise.resolve(userid)
         } else {
             log("Failed to log in")
             // Parse captcha image if it exists
@@ -131,6 +120,50 @@ export default class NCredit extends EventEmitter {
                 }
             }
             return Promise.reject(errorCode)
+        }
+    }
+    /**
+     * Login via Naver OTP code
+     * @param otpcode otpcode
+     * @returns userid if success / null if fail (resolve)
+     */
+    public async loginOTP(otpcode:number | string) {
+        const code = typeof otpcode === "number" ? otpcode.toString().padStart(8) : otpcode
+        const form = {
+            enctp: 2,
+            svctype: 0,
+            viewtype: 0,
+            locale: "ko_KR",
+            smart_LEVEL: 1,
+            url: "https://www.naver.com",
+            mode: "number",
+            key: code,
+        }
+        const cookie = this.reqCookie
+        const body:string = await request({
+            url: "https://nid.naver.com/nidlogin.login",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "text/plain",
+                "Referer": "https://nid.naver.com/nidlogin.login"
+            },
+            method: "POST",
+            form,
+            jar: cookie,
+        })
+        this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
+        // copy cookie to cookieJar
+        this.saveCookie(COOKIE_SITES, cookie)
+        // check cookie valid
+        const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
+        if (cookieText.indexOf("NID_AUT") !== -1) {
+            log("Successfully logged in")
+            const uid = await this.fetchUserID()
+            this.emit("login")
+            return uid
+        } else {
+            log("Fail. Check and retry code.")
+            return null
         }
     }
     /**
@@ -174,8 +207,12 @@ export default class NCredit extends EventEmitter {
     }
     /**
      * Gen OTP
+     * 
+     * token: 8-diget token number
+     * expires: When expire otp
+     * naverID: ?
      */
-    public async getOTP() {
+    public async genOTP() {
         const oauthURL = "https://nid.naver.com/naver.oauth"
         const timestamp = Math.floor(Date.now() / 1000)
         const basicParam = {
@@ -372,6 +409,20 @@ export default class NCredit extends EventEmitter {
         } catch {
             log("Cookie parse:fail")
         }
+    }
+    /**
+     * Generate NNB cookie
+     * 
+     * Naver captcha **REQUIRES** this cookie
+     */
+    private get nnbCookie() {
+        const nnbCookie = new Cookie()
+        nnbCookie.key = "NNB"
+        nnbCookie.value = NCaptcha.randomString(11, true)
+        nnbCookie.path = "./"
+        nnbCookie.domain = "naver.com"
+        nnbCookie.expires = new Date(2050, 11, 30)
+        return nnbCookie
     }
     private saveCookie(sites:string[], cookie:orgrq.CookieJar) {
         try {

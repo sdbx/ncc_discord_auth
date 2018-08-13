@@ -114,7 +114,7 @@ export default class Login extends Plugin {
                     value: content,
                 }
             }
-            const result:LoginError = await this.ncc.requestCredent(typing.id,typing.pw,captchaValue)
+            const result:LoginError = await this.ncc.login(typing.id,typing.pw,captchaValue)
                 .then((username) => null).catch((err) => err)
             if (result == null) {
                 await message.reply(lang.naverOn + "\n" + lang.passwordDelete)
