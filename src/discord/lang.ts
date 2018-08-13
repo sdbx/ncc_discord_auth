@@ -30,6 +30,8 @@ export default class Lang extends Config {
         successAdmin: "%(user)s님은 이제 관리자입니다.",
         failAdmin_invalidToken: "토큰이 안맞습니다.",
         failAdmin_noToken: "token이 없습니다.",
+        wrongOTPCodeType: "OTP코드의 형식이 맞지 않습니다. 8자리 숫자여야 합니다.",
+        wrongOTPCode: "OTP코드가 맞지 않습니다. 다시 해주세요.",
     }
     /*
      * module: events

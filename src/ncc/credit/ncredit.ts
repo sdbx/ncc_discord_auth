@@ -54,12 +54,14 @@ export default class NCredit extends EventEmitter {
         this.cookieJar = new CookieJar()
         const rsaKey = await this.reqGet("https://nid.naver.com/login/ext/keys.nhn")
             .catch((e) => {Log.e(e); return ""}) as string // RSA Key
+        let keyO
         try {
-            const keyO = encryptKey(rsaKey, this.username, this._password)
+            keyO = encryptKey(rsaKey, this.username, this._password)
         } catch (err) {
             Log.e(err)
+            return null
         }
-        const {key, keyName} = encryptKey(rsaKey, this.username, this._password)
+        const { key, keyName } = keyO
         const form = {
             enctp: 1,
             encnm: keyName,
