@@ -295,7 +295,9 @@ export default class Runtime extends EventEmitter {
                 for (let i = 0; i < Math.ceil(helps.length / 20); i += 1) {
                     const richMsg = this.defaultRich
                     richMsg.setTitle(this.lang.helpTitle)
-                    richMsg.setAuthor(DiscordFormat.getNickname(msg), msg.author.avatarURL)
+                    if (msg.type !== "dm" && msg.guild.available) {
+                        richMsg.setAuthor(DiscordFormat.getNickname(msg.member), msg.author.avatarURL)
+                    }
                     for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
                         const help = helps[i * 20 + k]
                         richMsg.addField(status.isSimple ? help.simpleTitle : help.title, help.description)

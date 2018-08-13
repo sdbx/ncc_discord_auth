@@ -70,7 +70,7 @@ export default class Auth extends Plugin {
                 await channel.send(this.lang.noNaver)
                 return Promise.resolve()
             }
-            if (channel.type === "dm") {
+            if (channel.type === "dm" || !guild.available) {
                 await channel.send(this.lang.auth.onlyGroup)
                 return Promise.resolve()
             }
@@ -191,7 +191,7 @@ export default class Auth extends Plugin {
             /**
              * Send rich
              */
-            const rich = await this.getRichByNaver(member, DiscordFormat.getNickname(msg), msg.author.avatarURL)
+            const rich = await this.getRichByNaver(member, DiscordFormat.getNickname(msg.member), msg.author.avatarURL)
             const roomURL = `https://talk.cafe.naver.com/channels/${room.channelID}`
             await channel.send(roomURL,rich)
         } else if (testInfo.match) {

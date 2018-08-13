@@ -46,7 +46,7 @@ export default class Gather extends Plugin {
             return Promise.resolve()
         }
         // change image
-        const name = `${DiscordFormat.getNickname(msg)} (#${(msg.channel as Discord.TextChannel).name})`
+        const name = `${DiscordFormat.getNickname(msg.member)} (#${(msg.channel as Discord.TextChannel).name})`
         const webhook = await this.getWebhook(destCh, name, msg.author.avatarURL).catch(Log.e)
         if (webhook == null) {
             Log.w("Gather", "skip - no webhook")

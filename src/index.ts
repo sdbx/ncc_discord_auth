@@ -39,39 +39,7 @@ async function init() {
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (ncc.available) {
             try {
-                await ncc.fetchChannels()
-                await ncc.testChannel(106977317649)
-                await ncc.getOpenChannels(26686242)
-                await ncc.connect(true)
-                ncc.on(NccEvents.updateList, (obj:ChannelListEvent) => {
-                    // Log.json("Delta", obj)
-                })
-                // const ch = await ncc.getConnectedChannel(45528313105)
-                // const msgs = await ch.fetchMessages("ALL", -1)
-                // const captcha = await ncc.genCaptchaByConsole()
-                // tslint:disable-next-line
-                // const image = await uploadImage(ncc["credit"], "https://media.discordapp.net/attachments/152746825806381056/474758951171522560/unknown.png", "test.png")
-                // tslint:disable-next-line
-                // const channel = await ncc.createOpenChannel(26686242, captcha, "Hello", "World", image.path)
-                // await channel.leave()
-                // await Log.image(image.path, "Uploaded")
-                // Log.json("Test",image)
-                /*
-                for (const msg of msgs) {
-                    let text
-                    switch (msg.type) {
-                        case MessageType.text : text = msg.content; break
-                        case MessageType.image : text = (msg.content as NcImage).url; break
-                        case MessageType.sticker : text = "Sticker"; break
-                        case MessageType.system : text = msg.content; break
-                        default: text = "null"
-                    }
-                    Log.d("Chat", text)
-                }
-                */
-                Log.time()
-                // tslint:disable-next-line
-                await ncc.changeProfile(26686242, "벨략", null)
+                Log.d("OTP", (await ncc["credit"].getOTP()).token.toString())
             } catch (err) {
                 Log.e(err)
             }

@@ -458,13 +458,11 @@ export class DiscordFormat {
     public static emoji(emojiName:string, emojiId:string, animated = false) {
         return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`
     }
-    public static getNickname(msg:Discord.Message) {
-        if (msg.channel.type !== "dm" && msg.guild.member(msg.author) != null) {
-            const guildnick = msg.guild.member(msg.author).nickname
-            return guildnick != null ? guildnick : msg.author.username
-        } else {
-            return msg.author.username
+    public static getNickname(member:Discord.GuildMember) {
+        if (member == null) {
+            return null
         }
+        return member.nickname != null ? member.nickname : member.user.username
     }
     public static normalize(msg:string, guild:Discord.Guild) {
         let chain = msg

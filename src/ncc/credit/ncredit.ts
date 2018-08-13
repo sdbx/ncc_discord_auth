@@ -1,4 +1,5 @@
 import * as caller from "caller"
+import * as crypto from "crypto"
 import * as iconv from "encoding"
 import { EventEmitter } from "events"
 import * as get from "get-value"
@@ -14,6 +15,8 @@ import { asJSON, parseURL } from "../nccutil"
 import encryptKey from "./loginencrypt"
 
 const likepost = ["POST", "PUT"]
+const consumerKey = "kqbJYsj035JR"
+const signKey = "4EE81426ewcSpNzbjul1"
 
 export default class NCredit extends EventEmitter {
     public username:string
@@ -130,6 +133,9 @@ export default class NCredit extends EventEmitter {
             return Promise.reject(errorCode)
         }
     }
+    /**
+     * Get userid even if logined by cookie
+     */
     public async fetchUserID() {
         const home = await this.reqGet(CHAT_HOME_URL) as string
         const q1 = home.match(/userId.+/i)[0]
@@ -165,6 +171,54 @@ export default class NCredit extends EventEmitter {
             return Promise.reject("1002 NEED LOGIN")
         }
         return errorCode === "200" ? Promise.resolve(this.username) : Promise.reject(`${errorCode} UNKNOWN`)
+    }
+    /**
+     * Gen OTP
+     */
+    public async getOTP() {
+        const oauthURL = "https://nid.naver.com/naver.oauth"
+        const timestamp = Math.floor(Date.now() / 1000)
+        const basicParam = {
+            mode: "req_req_token",
+            oauth_callback: "https://nid.naver.com/com.nhn.login_global/inweb/finish",
+            oauth_consumer_key: consumerKey,
+            oauth_nonce: NCaptcha.randomString(20, false).replace(/0/g, "1"),
+            oauth_signature_method: "HMAC_SHA1",
+            oauth_timestamp: timestamp,
+            use: "number",
+        }
+        const paramQuery = querystring.stringify(basicParam, "&", "=")
+        const signValue = `GET&${
+            encodeURIComponent("https://nid.naver.com/naver.oauth")
+        }&${encodeURIComponent(paramQuery)}`
+        const crypter = crypto.createHmac("sha1", encodeURIComponent(signKey) + "&")
+        crypter.write(Buffer.from(signValue, "utf8"))
+        crypter.end()
+        const signature = (crypter.read() as Buffer).toString("base64")
+        const sendParam = {
+            ...basicParam,
+            oauth_signature: signature,
+        }
+        const str = await this.reqGet(oauthURL, sendParam) as string
+        let json:object
+        try {
+            if (str == null) {
+                return null
+            }
+            json = JSON.parse(str)
+            if (json["stat"] !== "SUCCESS") {
+                return null
+            }
+        } catch (err) {
+            Log.e(err)
+            return null
+        }
+        return {
+            token: (json["number"] as string).padStart(8, "0"),
+            expires: new Date(
+                (Number.parseInt(json["timestamp"], 10) + Number.parseInt(json["expires_in"], 10)) * 1000),
+            naverID: json["id"]
+        }
     }
     /**
      * set Password.
@@ -302,9 +356,16 @@ export default class NCredit extends EventEmitter {
             return Promise.resolve(null as string)
         }
     }
+    /**
+     * Export cookie to string
+     */
     public get export() {
         return JSON.stringify(this.cookieJar.serializeSync(), null, "\t")
     }
+    /**
+     * Import from cookieJar JSON
+     * @param cookieStr 
+     */
     public import(cookieStr:string) {
         try {
             this.cookieJar = CookieJar.deserializeSync(cookieStr)

@@ -76,9 +76,10 @@ export default class Cast extends Plugin {
                 }
                 return Promise.resolve()
             }
-            const rooms = (await this.ncc.fetchChannels()).filter((value) => value.channelID === roomid)
+            let rooms:NcJoinedChannel[]
             let room:NcJoinedChannel = null
             try {
+                rooms = (await this.ncc.fetchChannels()).filter((value) => value.channelID === roomid)
                 if (rooms.length === 0) {
                     if (!testSetup.has(ParamType.from)) {
                         await channel.send(this.lang.cast.needNaver)
@@ -147,7 +148,7 @@ export default class Cast extends Plugin {
             await channel.send(this.lang.cast.authonly)
             return Promise.resolve()
         }
-        const nick = `${DiscordFormat.getNickname(msg)}(${n != null ? n : "미인증"})`
+        const nick = `${DiscordFormat.getNickname(msg.member)}(${n != null ? n : "미인증"})`
         if (msg.attachments.size > 0) {
             for (const [key,attach] of msg.attachments) {
                 let url:string = attach.url
