@@ -2,6 +2,7 @@ import * as Discord from "discord.js"
 import Log from "../log"
 import { MainCfg } from "./runtime"
 
+export const blankChar = "\u{17B5}"
 const safeCmd = /(".+?")|('.+?')/i
 export enum ParamType {
     thing = "이/가",
@@ -464,6 +465,16 @@ export class DiscordFormat {
         }
         return member.nickname != null ? member.nickname : member.user.username
     }
+    public static getAvatarImage(u:Discord.User) {
+        return u.avatarURL == null ? u.defaultAvatarURL : u.avatarURL
+    }
+    public static getUserProfile(member:Discord.GuildMember):[string, string] {
+        if (member == null) {
+            return null
+        }
+        const u = member.user
+        return [this.getNickname(member), this.getAvatarImage(member.user)]
+    }
     public static normalize(msg:string, guild:Discord.Guild) {
         let chain = msg
         // 1. Bold
@@ -755,5 +766,7 @@ export function getRichTemplate(global:MainCfg, client:Discord.Client) {
             rich.setThumbnail(user.avatarURL)
         }
     }
+    // rich.setFooter(client.user.username, client.user.avatarURL)
+    rich.setTimestamp(new Date(Date.now()))
     return rich
 }

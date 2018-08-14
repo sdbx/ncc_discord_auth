@@ -40,12 +40,14 @@ export default class Color extends Plugin {
         const time = this.lastMessaged.get(key)
         if (time == null) {
             this.lastMessaged.set(key, now)
-            return
+            return 
         }
         if (Date.now() - time >= 10000) {
-            const role = msg.guild.roles.find("name", sub.colorRolePrefix + "Random")
-            if (role != null) {
-                await role.setColor(Math.random() * 0xFFFFFF)
+            const colorRoles = msg.guild.roles.filter((v) => v.name.startsWith(sub.colorRolePrefix))
+            const randRoles = colorRoles.filter((v) => v.name.startsWith(sub.colorRolePrefix + "Random"))
+            for (const [k, rRole] of randRoles) {
+                const color = colorRoles.array()[Math.floor(colorRoles.size * Math.random())].color
+                await rRole.setColor(color)
             }
             this.lastMessaged.set(key, now)
         }
@@ -94,7 +96,8 @@ export default class Color extends Plugin {
                 */
                 rich.setTitle(this.lang.color.colorSuccess)
                 rich.setColor(color)
-                rich.setAuthor(DiscordFormat.getNickname(member), msg.author.avatarURL)
+                const profile = DiscordFormat.getUserProfile(member)
+                rich.setAuthor(profile[0], profile[1])
                 rich.setURL(mdnPicker)
                 rich.addField("Red", r, true)
                 rich.addField("Green", g, true)

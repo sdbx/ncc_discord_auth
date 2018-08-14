@@ -110,8 +110,8 @@ export default class ArtiNoti extends Plugin {
                                 authlist.users.filter((_v) => _v.naverID === user.userid).forEach((_v) => {
                                     const m = guild.member(_v.userID)
                                     if (m != null) {
-                                        rich.setFooter(m.nickname === null ? m.user.username : m.nickname,
-                                            m.user.avatarURL)
+                                        const profile = DiscordFormat.getUserProfile(m)
+                                        rich.setFooter(profile[0], profile[1])
                                     }
                                 })
                             }

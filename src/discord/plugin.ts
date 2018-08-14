@@ -11,7 +11,7 @@ import Ncc from "../ncc/ncc"
 import Profile from "../ncc/structure/profile"
 import Lang from "./lang"
 import { MainCfg } from "./runtime"
-import { ChainData, CmdParam, CommandHelp, getFirst, getFirstMap, getRichTemplate } from "./runutil"
+import { blankChar, ChainData, CmdParam, CommandHelp, getFirst, getFirstMap, getRichTemplate } from "./runutil"
 /**
  * The base of bot command executor
  * @class 플러그인
@@ -503,6 +503,13 @@ export default abstract class Plugin {
     }
     protected async getWebhook(channel:Discord.TextChannel, name:string = null, image:string = null) {
         let webhook:Discord.Webhook
+        if (name != null) {
+            if (name.length <= 1) {
+                name = name + blankChar
+            } else if (name.length > 32) {
+                name = name.substring(0,32)
+            }
+        }
         if (!this.webhooks.has(channel.id) || this.webhooks.get(channel.id).expired) {
             const webhooks = await channel.fetchWebhooks()
             for (const [key, hook] of webhooks) {

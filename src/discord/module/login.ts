@@ -66,6 +66,19 @@ export default class Login extends Plugin {
             }
             return Promise.resolve()
         }
+        const _status = this.status.check(this.global,command,state)
+        if (_status.match) {
+            const send = this.defaultRich
+            const nState =
+                await this.ncc.availableAsync() ? lang.naverOn : lang.naverOff
+            send.addField("네이버 로그인", nState)
+            send.addField("봇 관리자 여부", this.toLangString(this.global.authUsers.indexOf(msg.author.id) >= 0))
+            send.author = {
+                name: msg.author.username,
+                icon_url: DiscordFormat.getAvatarImage(msg.author),
+            }
+            await msg.channel.send(send)
+        }
         return Promise.resolve()
     }
 }

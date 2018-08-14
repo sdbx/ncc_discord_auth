@@ -28,7 +28,7 @@ export default class Cast extends Plugin {
         // super: load config
         super.ready()
         // CommandHelp: suffix, description
-        this.setup = new CommandHelp("중계", this.lang.cast.castDesc, true, {reqAdmin: true})
+        this.setup = new CommandHelp("중계,집결", this.lang.cast.castDesc, true, {reqAdmin: true})
         this.setup.addField(ParamType.from, "네이버 카페", false)
         this.setup.addField(ParamType.dest, this.lang.cast.castParam, true)
         this.setup.addField(ParamType.to, "auth|ro|delete", false)

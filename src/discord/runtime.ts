@@ -296,7 +296,8 @@ export default class Runtime extends EventEmitter {
                     const richMsg = this.defaultRich
                     richMsg.setTitle(this.lang.helpTitle)
                     if (msg.type !== "dm" && msg.guild != null) {
-                        richMsg.setAuthor(DiscordFormat.getNickname(msg.member), msg.author.avatarURL)
+                        const profile = DiscordFormat.getUserProfile(msg.member)
+                        richMsg.setAuthor(profile[0], profile[1])
                     }
                     for (let k = 0; k < Math.min(helps.length - 20 * i, 20); k += 1) {
                         const help = helps[i * 20 + k]

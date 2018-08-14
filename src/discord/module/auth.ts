@@ -177,9 +177,10 @@ export default class Auth extends Plugin {
             /**
              * Send text to ncc room
              */
+            const profile = DiscordFormat.getUserProfile(msg.member)
             await room.sendCustomEmbed(sprintf(this.lang.auth.nccmessage, {
                 link: invite.url,
-                user: msg.author.username,
+                user: profile[0],
             }), {
                 title: msg.guild.name,
                 description: msg.author.tag,
@@ -187,11 +188,11 @@ export default class Auth extends Plugin {
                 url: invite.url,
                 type: null,
                 image: null,
-            }, msg.author.avatarURL, false)
+            }, profile[1], false)
             /**
              * Send rich
              */
-            const rich = await this.getRichByNaver(member, DiscordFormat.getNickname(msg.member), msg.author.avatarURL)
+            const rich = await this.getRichByNaver(member, ...DiscordFormat.getUserProfile(msg.member))
             const roomURL = `https://talk.cafe.naver.com/channels/${room.channelID}`
             await channel.send(roomURL,rich)
         } else if (testInfo.match) {
@@ -260,7 +261,7 @@ export default class Auth extends Plugin {
                     rich = await this.getRichByNaver(naver)
                 } else {
                     rich = await this.getRichByNaver(naver,
-                        idUser.nickname == null ? idUser.user.username : idUser.nickname, idUser.user.avatarURL)
+                        ...DiscordFormat.getUserProfile(idUser))
                 }
                 await channel.send(rich)
             }

@@ -21,7 +21,7 @@ export default class Gather extends Plugin {
         super.ready()
         // CommandHelp: suffix, description
         this.gather = new CommandHelp("집결", this.lang.gather.gatherDesc, true, {reqAdmin: true})
-        this.gather.addField(ParamType.to, "대표?", false)
+        this.gather.addField(ParamType.to, "대표", false)
         this.remove = new CommandHelp("집결 해제", this.lang.gather.removeDesc, true, {reqAdmin: true})
         // this.remove.addField(ParamType.to, "방ID", true);
         // get parameter as complex
@@ -47,7 +47,7 @@ export default class Gather extends Plugin {
         }
         // change image
         const name = `${DiscordFormat.getNickname(msg.member)} (#${(msg.channel as Discord.TextChannel).name})`
-        const webhook = await this.getWebhook(destCh, name, msg.author.avatarURL).catch(Log.e)
+        const webhook = await this.getWebhook(destCh, name, DiscordFormat.getAvatarImage(msg.author)).catch(Log.e)
         if (webhook == null) {
             Log.w("Gather", "skip - no webhook")
             return Promise.resolve()
