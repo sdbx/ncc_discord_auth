@@ -24,7 +24,7 @@ export default class Color extends Plugin {
         // super: load config
         super.ready()
         // CommandHelp: suffix, description
-        this.colorize = new CommandHelp("염색,색 입혀", this.lang.sample.hello)
+        this.colorize = new CommandHelp("염색,색 입혀", this.lang.color.colorDesc)
         this.colorize.addField(ParamType.to, "<6Digit Hex> or default or 기본", true)
         // get parameter as complex
         this.colorize.complex = true

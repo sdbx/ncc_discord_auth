@@ -77,7 +77,14 @@ export default class Lang extends Config {
     }
     public color = {
         colorSuccess: "색상이 적용됐습니다.",
-        wrongColor: "올바르지 않은 색상입니다! 6자리의 Hex값을 입력해주세요."
+        wrongColor: "올바르지 않은 색상입니다! 6자리의 Hex값을 입력해주세요.",
+        colorDesc: "알록달록하게 닉네임을 물들입니다.",
+    }
+    public purge = {
+        noPerm: "봇에 권한이 없습니다.",
+        deleting: "삭제중 (%(success)d/%(total)d)",
+        success: "삭제 완료.",
+        noPermAll: "다른 사람의 메세지를 삭제할 권한이 없습니다.",
     }
     /*
      * Module: artinoti

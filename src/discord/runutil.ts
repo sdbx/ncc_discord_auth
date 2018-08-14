@@ -4,6 +4,7 @@ import { MainCfg } from "./runtime"
 
 export const blankChar = "\u{17B5}"
 const safeCmd = /(".+?")|('.+?')/i
+const seperator = /(\/|\||,)/g
 export enum ParamType {
     thing = "이/가",
     dest = "을/를/좀",
@@ -54,7 +55,7 @@ export class CommandHelp {
     // public singleWord:boolean; // receive only single word?
     public constructor(commands:string, desc:string,complex:boolean = false,
         options?:{ reqAdmin?:boolean, dmOnly?:boolean, example?:Map<string, string>}) {
-        this.cmds = commands.split(",")
+        this.cmds = commands.split(seperator)
         this._description = desc
         this.example = this.safeGet(this.example, new Map())
         this.params = []
@@ -179,7 +180,7 @@ export class CommandHelp {
             const parse = (field:Param, str:string) => {
                 let rCode = null
                 for (const _code of field.code) {
-                    for (const __code of _code.split("/")) {
+                    for (const __code of _code.split(seperator)) {
                         if (str.startsWith(__code + ":")) {
                             str = str.substr(str.indexOf(":") + 1)
                             str = this.decode(str, encoded.key)
@@ -202,7 +203,7 @@ export class CommandHelp {
                 const block = parse(require, split[i])
                 if (this.complex || require.code.length <= 1 || block.subType != null) {
                     if (block.subType == null && require.code.length === 1) {
-                        block.subType = require.code[0].split("/")[0]
+                        block.subType = require.code[0].split(seperator)[0]
                     }
                     output.requires.set(require.type, block)   
                 }
@@ -215,7 +216,7 @@ export class CommandHelp {
                 const block = parse(optical, split[i])
                 if (this.complex || optical.code.length <= 1 || block.subType != null) {
                     if (block.subType == null && optical.code.length === 1) {
-                        block.subType = optical.code[0].split("/")[0]
+                        block.subType = optical.code[0].split(seperator)[0]
                     }
                     output.opticals.set(optical.type, block)   
                 }
@@ -263,10 +264,10 @@ export class CommandHelp {
         const queryBlocks:FieldBlock[] = []
         for (const field of fields) {
             // generate field block
-            const destCommands = field.type.split("/")
+            const destCommands = field.type.split(seperator)
             const mergeCommands = []
             if (field.code.length >= 1) {
-                mergeCommands.push(...field.code.map((v) => this.getPreferText(v.split("/"), true)))
+                mergeCommands.push(...field.code.map((v) => this.getPreferText(v.split(seperator), true)))
             }
             if (field.code.length < 2) {
                 mergeCommands.push(...destCommands)
@@ -282,7 +283,7 @@ export class CommandHelp {
                 let ends = ""
                 if (filter != null) {
                     const codeObj = getFirst(field.code
-                        .map((v, i) => ({ obj: this.endsWith(filter.str, v.split("/")), index:i}))
+                        .map((v, i) => ({ obj: this.endsWith(filter.str, v.split(seperator)), index:i}))
                         .filter((v) => v.obj != null))
                     if (codeObj != null) {
                         codeID = field.code[codeObj.index]
@@ -347,7 +348,7 @@ export class CommandHelp {
     protected getFieldHelp(value:Param, korMode:boolean) {
         const guideCode = value.code.length >= 2
         const cmds = value.code.map(
-            (_v) => this.getPreferText(_v.split("/").map((__v) => __v.trim()), korMode))
+            (_v) => this.getPreferText(_v.split(seperator).map((__v) => __v.trim()), korMode))
         const splitter = this.safeGet(value.desc, "").length <= 0 ? "" : " : "
         let echo = ""
         echo += value.require ? "<" : "["
@@ -397,7 +398,7 @@ export class CommandHelp {
     }
     private getParamType(suffix:string) {
         for (const [key, value] of Object.entries(ParamType)) {
-            for (const v of value.split("/")) {
+            for (const v of value.split(seperator)) {
                 if (suffix.endsWith(v)) {
                     return {
                         type: value as ParamType,

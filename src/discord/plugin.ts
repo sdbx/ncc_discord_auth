@@ -86,8 +86,9 @@ export default abstract class Plugin {
         }
         return Promise.resolve()
     }
-    // abstract
+    // 
     /**
+     * abstract
      * @todo on Command receive
      * @param msg message!
      * @param command command(suffix)
@@ -108,11 +109,11 @@ export default abstract class Plugin {
         return out
     }
     /**
+     * Asynchronized work & fire after onCommand.
+     * 
      * @todo on message received
      * 
-     * **DO NOT SEND MESSAGE when BOT has spoken** unless filtering.
-     * 
-     * on message received(except command)
+     * **DO NOT SEND MESSAGE when BOT has spoken** unless filtering. (Cause Infinite loop)
      * @param msg 
      */
     public async onMessage(msg:Discord.Message):Promise<void> {

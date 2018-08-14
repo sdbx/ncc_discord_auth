@@ -15,6 +15,7 @@ import EventNotifier from "./module/event"
 import Gather from "./module/gather"
 import Login from "./module/login"
 import Ping from "./module/ping"
+import Purge from "./module/purge"
 import Plugin from "./plugin"
 import { CmdParam, CommandHelp, DiscordFormat, getRichTemplate, ParamType } from "./runutil"
 
@@ -77,7 +78,8 @@ export default class Runtime extends EventEmitter {
         Log.d(moduleDir)
         this.plugins.push(
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
-            new Cast(), new Gather(), new EventNotifier(), new Color())
+            new Cast(), new Gather(), new EventNotifier(), new Color(),
+            new Purge())
     }
     /**
      * **Async**
@@ -190,10 +192,10 @@ export default class Runtime extends EventEmitter {
         const prefix = this.global.prefix
         // onMessage should invoke everytime.
         // this.emit("message",msg)
-        await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg))).catch(Log.e)
+        
         // chain check
-        if (msg.author.id === this.client.user.id) {
-            // Self say.
+        if (msg.author.bot) {
+            // Bot!
             return Promise.resolve()
         }
         for (const plugin of this.plugins) {
@@ -209,32 +211,32 @@ export default class Runtime extends EventEmitter {
                 this.lastSaved = Date.now()
                 this.emit("save")
             }
-            return Promise.resolve()
-        }
-        /*
-        Let Commandhelp parse them.
-        */
-        const status:CmdParam = {
-            isAdmin: this.global.isAdmin(msg.author.id),
-            isDM: msg.channel.type === "dm",
-            isSimple: !prefix.test(text) && text.startsWith(this.global.simplePrefix),
-        }
-        /*
-          * hard coding!
-        */
-        try {
-            if (await this.hardCodingCmd(msg, text, status)) {
-                return
+        } else {
+            /*
+              Let Commandhelp parse them.
+            */
+            const status:CmdParam = {
+                isAdmin: this.global.isAdmin(msg.author.id),
+                isDM: msg.channel.type === "dm",
+                isSimple: !prefix.test(text) && text.startsWith(this.global.simplePrefix),
             }
-        } catch (err) {
-            Log.e(err)
-            return
+            try {
+                /*
+                  * hard coding!
+                */
+                if (!await this.hardCodingCmd(msg, text, status)) {
+                    await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)))
+                }
+            } catch (err) {
+                Log.e(err)
+            }
         }
         try {
-            await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)))
+            Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)))
         } catch (err) {
             Log.e(err)
         }
+        return Promise.resolve()
     }
     /**
      * Handle command(hard-coding) on top-level
