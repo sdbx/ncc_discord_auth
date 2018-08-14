@@ -1,6 +1,7 @@
 import * as colorConvert from "color-convert"
 import * as Discord from "discord.js"
 import { sprintf } from "sprintf-js"
+import Cache from "../../cache"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
@@ -15,7 +16,7 @@ export default class Color extends Plugin {
     protected colorRegex = /^[0-9A-Fa-f]{6}$/i
     // declare command.
     private colorize:CommandHelp
-    private clearColor:CommandHelp
+    private lastMessaged:Map<string, number> = new Map()
     /**
      * Initialize command
      */
@@ -28,6 +29,26 @@ export default class Color extends Plugin {
         // get parameter as complex
         this.colorize.complex = true
         return Promise.resolve()
+    }
+    public async onMessage(msg:Discord.Message) {
+        const now = Date.now()
+        if (msg.guild == null) {
+            return
+        }
+        const sub = await this.sub(this.config, msg.guild.id)
+        const key = msg.guild.id + "$" + msg.author.id
+        const time = this.lastMessaged.get(key)
+        if (time == null) {
+            this.lastMessaged.set(key, now)
+            return
+        }
+        if (Date.now() - time >= 10000) {
+            const role = msg.guild.roles.find("name", sub.colorRolePrefix + "Random")
+            if (role != null) {
+                await role.setColor(Math.random() * 0xFFFFFF)
+            }
+            this.lastMessaged.set(key, now)
+        }
     }
     /**
      * on Command Received.

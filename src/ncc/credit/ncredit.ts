@@ -283,6 +283,11 @@ export default class NCredit extends EventEmitter {
         }
         return cookie
     }
+    /**
+     * get Naver-auth token for parameter
+     * 
+     * NID_AUT & NID_SES
+     */
     public get accessToken():string {
         const cookies = this.cookieJar.getCookiesSync("https://naver.com/")
         const skey = cookies.filter((value) => value.key === "NID_AUT" || value.key === "NID_SES")
@@ -328,7 +333,15 @@ export default class NCredit extends EventEmitter {
         }
         return this.req("POST", url, sub, postD, referer, encoding)
     }
-    // request raw
+    /**
+     * request (REST API)
+     * @param sendType REST API type
+     * @param url Request URL without ?**=**&**=** or with **NOT** encoded.
+     * @param sub Parmaters (**=**&**=**) **NOT** encoded.
+     * @param postD Form Data
+     * @param referer Referer
+     * @param encoding Receive Encoding
+     */
     public async req(sendType:"POST" | "GET" | "DELETE" | "PUT", url:string,
         sub:{[key:string]: string | number | boolean} = {}, postD:{[key:string]: any} = {},
         referer = CHAT_HOME_URL, encoding = "utf-8") {

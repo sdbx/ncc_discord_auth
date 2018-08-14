@@ -150,8 +150,11 @@ namespace Log {
         let out = ""
         split.forEach((_v, _i) => {
             const content = _v.padEnd(column - 7 - unicodeLength(_v))
+            const realContent = content.trimRight()
             out += design.header(`${split.length < 2 ? "".padEnd(4) : (_i + 2).toString().padStart(4)} `)
-            out += design.content(` ${terminalLink(content, _url)}${
+            out += design.content(` ${terminalLink(realContent, _url)}${
+                "".padStart(content.length - realContent.length)
+            }${
                 length(content) >= column - numberLimit - 3 ? "" : " "
             }`)
             out += "\n"
