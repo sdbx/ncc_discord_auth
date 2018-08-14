@@ -5,6 +5,7 @@ import * as Reverser from "esrever"
 import * as fs from "fs-extra"
 import * as Inquirer from "inquirer"
 import * as path from "path"
+import * as stdRead from "read"
 import * as request from "request-promise-native"
 import * as terminalImage from "terminal-image"
 import * as terminalLink from "terminal-link"
@@ -32,6 +33,10 @@ namespace Log {
      * Repeat prefix each {guidePtrn} time
      */
     const guidePtrn = 10 // show gray text size
+    /**
+     * Enabled?
+     */
+    export let enable = false
     let contentLimit = -1
     let lastTiming = Date.now()
     export let ui:Inquirer.ui.BottomBar
@@ -124,6 +129,9 @@ namespace Log {
         custom("#d2b7ff", "#af5fff", chalk.bgCyan.cyan, "OBJ", {title, content:JSON.stringify(obj,null,2)})
     }
     export function url(title:string, _url:string, desc?:string) {
+        if (!Log.enable) {
+            return
+        }
         const design = style("#eff9b8","#eff9b8",chalk.bgBlack.white)
         if (desc == null) {
             desc = decodeURIComponent(_url).replace(/\?.*/ig, "")
@@ -142,7 +150,7 @@ namespace Log {
         let out = ""
         split.forEach((_v, _i) => {
             const content = _v.padEnd(column - 7 - unicodeLength(_v))
-            out += design.header(` ${_i === 0 ? "   " : "   "} `)
+            out += design.header(`${split.length < 2 ? "".padEnd(4) : (_i + 2).toString().padStart(4)} `)
             out += design.content(` ${terminalLink(content, _url)}${
                 length(content) >= column - numberLimit - 3 ? "" : " "
             }`)
@@ -154,6 +162,9 @@ namespace Log {
      * Image trace...????
      */
     export async function image(_image:string | Buffer, title:string, desc?:string) {
+        if (!Log.enable) {
+            return
+        }
         let binary:Buffer
         if (typeof _image === "string") {
             if (/^http(s)?:\/\//.test(_image)) {
@@ -261,6 +272,9 @@ namespace Log {
      */
     export function raw(headerColor:Chalk, numberColor:Chalk, contentColor:Chalk,
         headerSemiColor:Chalk, defaultH:string, content:{title:string, content?:string}) {
+        if (!Log.enable) {
+            return
+        }
         const prefix = content.content == null ? caller() : content.title
         let message = content.content == null ? content.title : content.content
         // set content width
@@ -291,7 +305,8 @@ namespace Log {
             // only one message
             useNum = false
         }
-        let lines = 0 // all lines
+        // tslint:disable-next-line
+        let lines = 0; // all lines
         sends.forEach((value,index) => {
             value.forEach((_v,_i) => {
                 lines += 1
@@ -310,7 +325,7 @@ namespace Log {
                     const column = process.stdout.columns
                     const trace = _v.padEnd(_v.length + (column - length(_v)) - 7)
                     let out = ""
-                    out += headerColor(` ${numText.padStart(numberLimit)} `)
+                    out += headerColor(`${numText.padStart(numberLimit + 1)} `)
                     out += contentColor(` ${trace}${length(trace) >= column - numberLimit - 3 ? "" : " "}`)
                     out += "\n"
                     stdWrite(out)
@@ -338,6 +353,7 @@ namespace Log {
                 Log.e(args[0])
             }
         })
+        this.enable = true
         ansi("2J")
         ansi("0;0H")
         ansi("?25l")
@@ -360,7 +376,20 @@ namespace Log {
      */
     export async function read(title:string, option = {hide:false, logResult:true},
             content?:string, need = true):Promise<string> {
-
+        if (!Log.enable) {
+            console.log(title)
+            return new Promise<string>((res, rej) => {
+                stdRead({
+                    silent: option.hide,
+                }, (err, result, isDefault) => {
+                    if (err != null) {
+                        rej(err)
+                    } else {
+                        res(result)
+                    }
+                })
+            })
+        }
         if (ui == null) {
             ui = new Inquirer.ui.BottomBar()
             // process.stdout.pipe(ui.log)
@@ -666,6 +695,9 @@ class IME {
         Log.read(this.title, {hide:this.hide, logResult:this.logR}, this.data.join(""), false)
     }
     public finish(success:boolean, data:string) {
+        if (!Log.enable) {
+            return
+        }
         if (Log.ui != null) {
             Log.ui.updateBottomBar("")
         }

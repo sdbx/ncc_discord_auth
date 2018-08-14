@@ -22,7 +22,8 @@ async function start() {
     })
     await run.start()
 }
-Log.hook()
+// Log.hook()
+Log.enable = true
 start()
 // init()
 // client()

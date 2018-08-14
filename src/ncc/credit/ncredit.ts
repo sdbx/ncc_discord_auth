@@ -8,6 +8,7 @@ import * as querystring from "querystring"
 import * as orgrq from "request"
 import * as request from "request-promise-native"
 import { Cookie, CookieJar, parseDate } from "tough-cookie"
+import Cache from "../../cache"
 import Log from "../../log"
 import NCaptcha from "../ncaptcha"
 import { CHAT_HOME_URL, CHATAPI_PHOTO_SESSION_KEY, COOKIE_SITES } from "../ncconstant"
@@ -22,13 +23,19 @@ export default class NCredit extends EventEmitter {
     public username:string
     protected _password:string
     protected cookieJar:CookieJar = new CookieJar()
-    private httpsAgent = new Agent({
-        keepAlive: true
-    })
+    private httpsAgent:Cache<Agent>
     constructor(username?:string, password?:string) {
         super()
         this.username = username
         this._password = password
+        this.httpsAgent = new Cache((old) => {
+            if (old != null) {
+                old.destroy()
+            }
+            return new Agent({
+                keepAlive: true
+            })
+        }, 60)
     }
     public clear() {
         this.cookieJar = new CookieJar()
@@ -333,6 +340,13 @@ export default class NCredit extends EventEmitter {
         } else {
             origin = referer
         }
+        let _url = querystring.stringify(sub, "&", "=")
+        _url = url + ((_url.length > 0) ? "?" + _url : "")
+        let from = caller()
+        if (from != null) {
+            from = from.substr(from.lastIndexOf("/") + 1)
+        }
+        Log.url("Fetch URL", _url, from)
         // check post type
         const likePost = likepost.indexOf(sendType) >= 0
         let binary = false
@@ -356,6 +370,10 @@ export default class NCredit extends EventEmitter {
             }
             binary = deepCheck(postD)
         }
+        // refresh httpsAgent
+        if (this.httpsAgent.expired) {
+            this.httpsAgent.doRefresh()
+        }
         const jar = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: sendType,
@@ -364,7 +382,7 @@ export default class NCredit extends EventEmitter {
             useQuerystring: true,
             form: likePost && !binary ? postD : undefined,
             formData: binary ? postD : undefined,
-            agent: this.httpsAgent,
+            agent: this.httpsAgent.value,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
             strictSSL: true,
             headers: {
@@ -376,7 +394,7 @@ export default class NCredit extends EventEmitter {
         }
         // this.saveCookie(COOKIE_SITES, jar)
         try {
-            const buffer:Buffer | string = await request(options).catch((e) => Log.e(e))
+            const buffer:Buffer | string = await request(options)
             if (typeof buffer === "string") {
                 // utf-8 encoded
                 return Promise.resolve(buffer)
@@ -391,6 +409,7 @@ export default class NCredit extends EventEmitter {
                 }
             }
         } catch (err) {
+            this.httpsAgent.doRefresh()
             Log.e(err)
             return Promise.resolve(null as string)
         }

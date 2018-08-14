@@ -69,6 +69,9 @@ export default class ArtiNoti extends Plugin {
             try {
                 const cafe = await this.ncc.parseNaver(cfg.cafeURL)
                 let articles = await this.ncc.getRecentArticles(cafe.cafeId, true)
+                if (articles.length <= 0) {
+                    continue
+                }
                 let lastID = -1
                 if (this.articleCache.has(guild.id)) {
                     lastID = this.articleCache.get(guild.id)

@@ -1,3 +1,4 @@
+import * as caller from "caller"
 import * as cheerio from "cheerio"
 import * as encoding from "encoding"
 import * as get from "get-value"
@@ -20,11 +21,17 @@ export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities()
     private cacheDetail = new Map<number, Cache<Cafe>>()
     private cacheCafeID = new Map<string, Cache<number>>()
-    private httpsAgent = new Agent({
-        keepAlive: true
-    })
+    private httpsAgent:Cache<Agent>
     constructor() {
         super()
+        this.httpsAgent = new Cache((old) => {
+            if (old != null) {
+                old.destroy()
+            }
+            return new Agent({
+                keepAlive: true
+            })
+        }, 60)
     }
     /**
      * Get Cheerio(jquery) object from url
@@ -52,6 +59,12 @@ export default class NcFetch extends NcCredent {
         }
         const encode = option.eucKR ? "euc-kr" : "utf-8"
         /**
+         * Check keep-session need refresh
+         */
+        if (this.httpsAgent.expired) {
+            this.httpsAgent.doRefresh()
+        }
+        /**
          * Make referer and options.
          */
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
@@ -59,7 +72,7 @@ export default class NcFetch extends NcCredent {
             url: requrl,
             qs: param,
             body: post_body,
-            agent: this.httpsAgent,
+            agent: this.httpsAgent.value,
             encoding: option.eucKR ? null : "utf-8",
             strictSSL: true,
             headers: {
@@ -72,10 +85,18 @@ export default class NcFetch extends NcCredent {
         }
         // log url
         const query = querystring.stringify(options.qs, "&", "=")
-        Log.i("Fetch URL", requrl + "?" + query)
-        Log.time()
-        const buffer:Buffer | string = await request(options)
-        
+        let from = caller()
+        if (from != null) {
+            from = from.substr(from.lastIndexOf("/") + 1)
+        }
+        Log.url("Fetch URL", requrl + ((query.length > 0) ? "?" + query : ""), from)
+        let buffer:Buffer | string
+        try {
+            buffer = await request(options)
+        } catch (err) {
+            this.httpsAgent.doRefresh()
+            return Promise.reject(err)
+        }
         let body:string
         /**
          * Naver cafe uses euc-kr f***.
@@ -87,7 +108,6 @@ export default class NcFetch extends NcCredent {
         }
         
         const cio = cheerio.load(body)
-        Log.time("Req")
         return Promise.resolve(cio)
     }
     /**
@@ -171,7 +191,10 @@ export default class NcFetch extends NcCredent {
         }
         const opt = new RequestOption()
         opt.useAuth = privateCafe
-        const $ = await this.getWeb(articlesURL, params, opt)
+        const $ = await this.getWeb(articlesURL, params, opt).catch(Log.e)
+        if ($ == null) {
+            return []
+        }
         const articleList:Article[] = $('[name="ArticleList"] > table > tbody > tr:nth-child(2n+1)')
             .map((i, el) => { // console.log($(el).children('td:nth-child(3)').html());
                 const clickscript:string = $(el).children("td:nth-child(3)").find(".m-tcol-c").attr("onclick")
@@ -211,9 +234,9 @@ export default class NcFetch extends NcCredent {
         }
         const opt = new RequestOption()
         opt.eucKR = false
-        const $ = await this.getWeb(commentURL, params, opt)
+        const $ = await this.getWeb(commentURL, params, opt).catch(Log.e)
         if ($ == null) {
-            return Promise.reject("Error")
+            return []
         }
 
         if ($("title").text().indexOf("로그인") >= 0) {

@@ -1,6 +1,5 @@
 import * as colorConvert from "color-convert"
 import * as Discord from "discord.js"
-import * as sharp from "sharp"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
@@ -65,11 +64,14 @@ export default class Color extends Plugin {
                 rich.setColor(color)
                 const [r,g,b] = colorConvert.hex.rgb(color)
                 const [h,s,v] = colorConvert.hex.hsv(color)
+                /*
                 const image = Buffer.from(`<svg>
                 <rect width="128" height="128" style="fill:rgb(${r},${g},${b})"></rect>
                 </svg>`)
                 rich.attachFile(new Discord.Attachment(await sharp(image).toBuffer(), "color.png"))
                 rich.setThumbnail("attachment://color.png")
+                */
+                rich.setTitle(this.lang.color.colorSuccess)
                 rich.setColor(color)
                 rich.setAuthor(DiscordFormat.getNickname(member), msg.author.avatarURL)
                 rich.setURL(mdnPicker)
@@ -95,7 +97,6 @@ export default class Color extends Plugin {
                 if (definedRole != null) {
                     await setRole(definedRole)
                     await msg.channel.send(
-                        this.lang.color.colorSuccess,
                         await getRich(definedRole.color.toString(16).padStart(6, "0")))
                     return Promise.resolve()
                 }
@@ -110,7 +111,7 @@ export default class Color extends Plugin {
                 })
                 if (colorRole != null) {
                     await setRole(colorRole)
-                    await msg.channel.send(this.lang.color.colorSuccess, await getRich(colorCode))
+                    await msg.channel.send(await getRich(colorCode))
                 }
                 return Promise.resolve()
             } catch (err) {

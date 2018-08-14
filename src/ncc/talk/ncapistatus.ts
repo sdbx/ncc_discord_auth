@@ -7,12 +7,17 @@ export default class NcAPIStatus {
         err.success = response.valid
         try {
             if (!err.success) {
-                for (const value of Object.values(NcErrorType)) {
-                    if (response.error.code === value) {
-                        err.errorType = value
+                if (response.error == null) {
+                    err.errorMsg = "unknown"
+                    err.errorType = NcErrorType.unknown
+                } else {
+                    for (const value of Object.values(NcErrorType)) {
+                        if (response.error.code === value) {
+                            err.errorType = value
+                        }
                     }
+                    err.errorMsg = response.error.msg
                 }
-                err.errorMsg = response.error.msg
             }
         } catch (er) {
             err.errorMsg = er

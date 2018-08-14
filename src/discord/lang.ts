@@ -83,7 +83,7 @@ export default class Lang extends Config {
      * Module: artinoti
      */
     public noti = {
-        toggleDesc: "이 채널에서 알림 수신을 끄거나 킵니다.",
+        toggleDesc: "네이버 카페의 새 게시글을 이 채널로 알려줍니다.",
     }
     /*
      * Module: cast
