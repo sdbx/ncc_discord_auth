@@ -4,7 +4,7 @@ import { MainCfg } from "./runtime"
 
 export const blankChar = "\u{17B5}"
 const safeCmd = /(".+?")|('.+?')/i
-const seperator = /(\/|\||,)/g
+const seperator = "/"
 export enum ParamType {
     thing = "이/가",
     dest = "을/를/좀",

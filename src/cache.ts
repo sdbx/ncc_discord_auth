@@ -8,14 +8,14 @@ export default class Cache<T> {
      * @param target target
      * @param endOffset offset (**second**)
      */
-    constructor(target:T | ((old:T) => T),endOffset:number) {
+    constructor(target:T | ((old:T) => T),endOffset:number, day = Date.now()) {
         this.offset = endOffset * 1000
         if (typeof target === "function") {
             this.refresh = target
             this.doRefresh()
         } else {
             this.data = target
-            this.ends = Date.now() + this.offset
+            this.ends = day + this.offset
         }
     }
     public get value():T {

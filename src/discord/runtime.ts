@@ -246,10 +246,10 @@ export default class Runtime extends EventEmitter {
      */
     private async hardCodingCmd(msg:Discord.Message, cmd:string, status:CmdParam):Promise<boolean> {
         let result = false
-        const helpCmd = new CommandHelp("도움,도와,도움말",this.lang.helpDesc,true)
+        const helpCmd = new CommandHelp("도움/도와/도움말",this.lang.helpDesc,true)
         const helpCode = "명령어/name"
         helpCmd.addField(ParamType.dest, "궁금한", false, {code: [helpCode]})
-        const setCmd = new CommandHelp("설정,보여",this.lang.sudoNeed, false, { reqAdmin:true })
+        const setCmd = new CommandHelp("설정/보여",this.lang.sudoNeed, false, { reqAdmin:true })
         setCmd.addField(ParamType.dest, "목적", true)
         setCmd.addField(ParamType.to, "설정값", false)
         const adminCmd = new CommandHelp("token", "토큰 인증", false, { dmOnly:true })

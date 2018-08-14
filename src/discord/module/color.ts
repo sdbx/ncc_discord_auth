@@ -24,7 +24,7 @@ export default class Color extends Plugin {
         // super: load config
         super.ready()
         // CommandHelp: suffix, description
-        this.colorize = new CommandHelp("염색,색 입혀", this.lang.color.colorDesc)
+        this.colorize = new CommandHelp("염색/색 입혀", this.lang.color.colorDesc)
         this.colorize.addField(ParamType.to, "<6Digit Hex> or default or 기본", true)
         // get parameter as complex
         this.colorize.complex = true
@@ -41,6 +41,9 @@ export default class Color extends Plugin {
         if (time == null) {
             this.lastMessaged.set(key, now)
             return 
+        }
+        if (!msg.guild.members.find((v) => v.id === this.client.user.id).hasPermission("MANAGE_ROLES")) {
+            return
         }
         if (Date.now() - time >= 10000) {
             const colorRoles = msg.guild.roles.map((v) => {
