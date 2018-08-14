@@ -43,14 +43,31 @@ export default class Color extends Plugin {
             return 
         }
         if (Date.now() - time >= 10000) {
-            const colorRoles = msg.guild.roles.filter((v) => v.name.startsWith(sub.colorRolePrefix))
-            const randRoles = colorRoles.filter((v) => v.name.startsWith(sub.colorRolePrefix + "Random"))
-            for (const [k, rRole] of randRoles) {
-                const color = colorRoles.array()[Math.floor(colorRoles.size * Math.random())].color
-                await rRole.setColor(color)
+            const colorRoles = msg.guild.roles.map((v) => {
+                const cl = v.name.startsWith(sub.colorRolePrefix)
+                const rand = v.name.startsWith(sub.colorRolePrefix + "Random")
+                if (!cl) {
+                    return null
+                }
+                return {
+                    color: cl && !rand,
+                    rand,
+                    value:v
+                }
+            }).filter((v) => v != null)
+            const randRoles = colorRoles.filter((v) => v.rand)
+            for (const rRole of randRoles) {
+                let color:number
+                if (Math.random() * 100 >= sub.pureRand) { 
+                    color = colorRoles[Math.floor(colorRoles.length * Math.random())].value.color
+                } else {
+                    color = Math.floor(Math.random() * 0x1000000)
+                }
+                await rRole.value.setColor(color, "Random Color")
             }
             this.lastMessaged.set(key, now)
         }
+        return Promise.resolve()
     }
     /**
      * on Command Received.
@@ -112,7 +129,7 @@ export default class Color extends Plugin {
                 if (colorCode === "000000") {
                     colorCode = "010101"
                 }
-                if (colorCode === "default" || colorCode === "기본") {
+                if (colorCode.toLowerCase() === "default" || colorCode === "기본") {
                     await this.cleanRole(prefix, member)
                     await this.clearUnusedColors(prefix, msg.guild)
                     return Promise.resolve()
@@ -122,6 +139,17 @@ export default class Color extends Plugin {
                     await setRole(definedRole)
                     await msg.channel.send(
                         await getRich(definedRole.color.toString(16).padStart(6, "0")))
+                    return Promise.resolve()
+                }
+                if (colorCode.toLowerCase() === "random" || colorCode === "랜덤") {
+                    const role = await msg.guild.createRole({
+                        name: prefix + "Random",
+                        permissions:[],
+                        mentionable: true,
+                        color: 0x000000,
+                    })
+                    await setRole(role)
+                    await msg.channel.send("알록달록")
                     return Promise.resolve()
                 }
                 if (!validColor) {
@@ -165,6 +193,7 @@ export default class Color extends Plugin {
 }
 class ColorConfig extends Config {
     public colorRolePrefix = "Color_"
+    public pureRand = 30
     constructor() {
         super("color")
     }
