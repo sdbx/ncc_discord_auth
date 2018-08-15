@@ -17,6 +17,7 @@ export default class Purge extends Plugin {
     protected config = new PurgeConfig()
     private purge:CommandHelp
     private listCache:Map<string, Cache<Array<[string, string]>>> = new Map()
+    private working:string[] = []
     private caching = false
     private filterRegex = new RegExp(`(${filterSimple.join("|")})`, "ig")
     /**
@@ -150,6 +151,10 @@ export default class Purge extends Plugin {
                     return Promise.resolve()
                 }
             }
+            if (this.working.indexOf(msg.author.id) >= 0) {
+                await msg.channel.send(this.lang.purge.working)
+                return Promise.resolve()
+            }
             // check cache
             const check = await this.checkCache(msg.channel, msg.id, msg.author.id)
             if (check != null) {
@@ -157,6 +162,8 @@ export default class Purge extends Plugin {
                 // await msg.channel.send(check)
                 return Promise.resolve()
             }
+            // add queue
+            this.working.push(msg.author.id)
             // add
             const deleteIDs:string[] = []
             const recents = this.listCache.get(msg.channel.id).cache
@@ -173,15 +180,27 @@ export default class Purge extends Plugin {
                     break
                 }
             }
-            const startMsg = await msg.channel.send(
-                sprintf(this.lang.purge.deleting, {total: deleteIDs.length})) as Discord.Message
+            let startMsg:Discord.Message
+            if (deleteIDs.length >= 50) {
+                startMsg = await msg.channel.send(
+                    sprintf(this.lang.purge.deleting, { total: deleteIDs.length })) as Discord.Message
+            }
+            deleteIDs.unshift(msg.id)
             // remove
             while (deleteIDs.length > 0) {
                 const del = deleteIDs.splice(0, Math.min(deleteIDs.length, 100))
                 await msg.channel.bulkDelete(del)
             }
-            await startMsg.delete()
-            await msg.delete()
+            // queue end
+            for (let i = 0; i < this.working.length; i += 1) {
+                if (this.working[i] === msg.author.id) {
+                    this.working.splice(i, 1)
+                    break
+                }
+            }
+            if (startMsg != null) {
+                await startMsg.delete()
+            }
         }
         return Promise.resolve()
     }

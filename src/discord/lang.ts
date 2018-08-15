@@ -90,6 +90,7 @@ export default class Lang extends Config {
         purgeDesc: "싸악 삭제하기.",
         deletedMsg: "메세지를 삭제했습니다.",
         editedMsg: "메세지를 수정했습니다.",
+        working: "진행중입니다.",
     }
     /*
      * Module: artinoti
