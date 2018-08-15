@@ -27,6 +27,8 @@ const presetCfgs:{[key:string]: string[]} = {
     "네이버 카페" : ["auth<%g>.commentURL", "artialert<%g>.cafeURL", "cast<%g>.cafeURL"],
     "프록시 채널" : ["auth<%g>.proxyChannel"],
     "인증 그룹" : ["auth<%g>.destRole"],
+    "비속어 필터": ["purger<%g>.filterExplicit"],
+    "메세지 백업 채널": ["purger<%g>.backupChannel"],
 }
 /**
  * The home of bot

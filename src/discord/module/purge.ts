@@ -5,26 +5,101 @@ import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamAccept, ParamType, } from "../runutil"
+import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
+    getRichTemplate, ParamAccept, ParamType, } from "../runutil"
+import { cloneMessage } from "./gather"
 
 const bulkLimit = 100
+// tslint:disable-next-line
+const filterSimple = ['씨발', '시발', '씨ㅂ', '씨바', 'ㅆ발', 'ㅆ바', '시바', '시ㅂ', 'ㅅ바', 'ㅅ발', 'ㅅㅂ', '개새끼', '새끼', '썅', 'ㅅㄲ', '凸', '병신', 'ㅂㅅ', 'ㅄ', '병ㅅ', '병시', 'ㅂ신', '빙신', '지랄', 'ㅈㄹ', '지ㄹ', 'ㅈ랄', '개소리', '슈바', '슈발', '슈ㅂ', '조까', '좆까', '개소리', 'ㅆㅂ', '니애미', '닥쳐', 'ㄷㅊ', '닥ㅊ', 'ㄷ쳐', '느금마', '니애비', '씨부랄', '시부랄', '좆']
 export default class Purge extends Plugin {
     // declare command.
+    protected config = new PurgeConfig()
     private purge:CommandHelp
     private listCache:Map<string, Cache<Array<[string, string]>>> = new Map()
     private caching = false
+    private filterRegex = new RegExp(`(${filterSimple.join("|")})`, "ig")
     /**
      * Initialize command
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.purge = new CommandHelp("purge/삭제", this.lang.purge.purgeDesc)
         this.purge.addField(ParamType.dest, "삭제할 갯수 | ALL", true, {code: ["num/개"]})
         // get parameter as complex
         this.purge.complex = true
+        // listen delete event
+        const getBackupChannel = async (guild:Discord.Guild) => {
+            const sub = await this.sub(this.config, guild.id)
+            const backupS = guild.channels.find((v) => v.id === sub.backupChannel)
+            if (backupS != null && backupS instanceof Discord.TextChannel) {
+                return backupS
+            }
+            return null
+        }
+        this.client.on("messageDelete", async (msg) => {
+            const backupS = await getBackupChannel(msg.guild)
+            if (backupS != null && msg.channel.id !== backupS.id && !msg.author.bot) {
+                const names = DiscordFormat.getUserProfile(msg.member)
+                const hook = await this.getWebhook(backupS, 
+                    `${names[0]} (#${(msg.channel as Discord.TextChannel).name}, 삭제됨)`, names[1]).catch(Log.e)
+                if (hook == null) {
+                    return
+                }
+                await cloneMessage(hook, msg)
+            }
+        })
+        this.client.on("messageDeleteBulk", async (msg) => {
+            const first = this.getFirstMap(msg)
+            const backupS = await getBackupChannel(first.guild)
+            if (backupS != null && first.channel.id !== backupS.id) {
+                try {
+                    await backupS.send(`${this.lang.purge.deletedMsg}\`\`\`\n${msg.filter((v) => v.content.length >= 1)
+                        .map((v) => DiscordFormat.getUserProfile(v.member)[0] + " : " + v.content)
+                        .join("\n")}\`\`\``)
+                } catch (err) {
+                    Log.e(err)
+                }
+            }
+        })
+        this.client.on("messageUpdate", async (oldM,newM) => {
+            const backupS = await getBackupChannel(newM.guild)
+            if (backupS != null && newM.channel.id !== backupS.id && !newM.author.bot) {
+                const oldContent = oldM.content
+                const newContent = newM.content
+                const names = DiscordFormat.getUserProfile(newM.member)
+                const hook = await this.getWebhook(backupS,
+                    `${names[0]} (#${(newM.channel as Discord.TextChannel).name}, 수정됨)`, names[1]).catch(Log.e)
+                if (hook == null) {
+                    return
+                }
+                const rich = getRichTemplate(this.global, this.client)
+                rich.setTitle(this.lang.purge.editedMsg)
+                rich.addField("수정 전", oldContent)
+                rich.addField("수정 후", newContent)
+                rich.setTimestamp(new Date(oldM.createdTimestamp))
+                await hook.send(newM.url, rich)
+            }
+        })
         return Promise.resolve()
+    }
+    public async onMessage(msg:Discord.Message) {
+        if (!(msg.channel instanceof Discord.TextChannel) || msg.channel.type === "dm") {
+            return
+        }
+        const sub = await this.sub(this.config, msg.guild.id)
+        if (sub.filterExplicit && !(msg.channel as Discord.TextChannel).nsfw &&
+            msg.content.replace(/[ -~]/ig, "").match(this.filterRegex) != null) {
+            if (msg.channel instanceof Discord.GuildChannel) {
+                const perms = msg.channel.permissionsFor(msg.guild.members.find((v) => v.id === this.client.user.id))
+                if (perms.has("MANAGE_MESSAGES")) {
+                    await msg.delete()
+                }
+            }
+        }
+        return
     }
     /**
      * on Command Received.
@@ -32,7 +107,7 @@ export default class Purge extends Plugin {
     public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
         const testPurge = this.purge.check(this.global, command, state)
-        if (testPurge.match) {
+        if (testPurge.match && !msg.author.bot) {
             const numStr = testPurge.get(ParamType.dest)
             let all = false // All message (author: me)
             let deleteALL = false // All Author's message (length: defined)
@@ -84,9 +159,14 @@ export default class Purge extends Plugin {
             }
             // add
             const deleteIDs:string[] = []
-            const recents = this.listCache.get(msg.channel.id)
-            for (const [userid, msgid] of recents.cache) {
+            const recents = this.listCache.get(msg.channel.id).cache
+            let recentL = recents.length
+            for (let i = 0; i < recentL; i += 1) {
+                const [userid, msgid] = recents[i]
                 if (deleteALL || userid.toString() === msg.author.id) {
+                    recentL -= 1
+                    recents.splice(i, 1)
+                    i -= 1
                     deleteIDs.push(msgid.toString())
                 }
                 if (!all && deleteIDs.length >= deleteCount) {
@@ -97,7 +177,8 @@ export default class Purge extends Plugin {
                 sprintf(this.lang.purge.deleting, {total: deleteIDs.length})) as Discord.Message
             // remove
             while (deleteIDs.length > 0) {
-                await msg.channel.bulkDelete(deleteIDs.splice(0, Math.min(deleteIDs.length, 100)), true)
+                const del = deleteIDs.splice(0, Math.min(deleteIDs.length, 100))
+                await msg.channel.bulkDelete(del, false)
             }
             startMsg.delete()
         }
@@ -176,5 +257,12 @@ export default class Purge extends Plugin {
         }
         Log.d("Cached Mesasges", messages.length + "")
         return messages
+    }
+}
+class PurgeConfig extends Config {
+    public filterExplicit = false
+    public backupChannel = "5353"
+    constructor() {
+        super("purger")
     }
 }

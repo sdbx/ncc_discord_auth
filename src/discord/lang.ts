@@ -88,6 +88,8 @@ export default class Lang extends Config {
         fetchStart: "메세지 목록을 받아오고 있습니다. 기다려주세요.",
         fetchEnd: "메세지 목록 동기화가 완료됐습니다. 다시 입력해주세요.",
         purgeDesc: "싸악 삭제하기.",
+        deletedMsg: "메세지를 삭제했습니다.",
+        editedMsg: "메세지를 수정했습니다.",
     }
     /*
      * Module: artinoti

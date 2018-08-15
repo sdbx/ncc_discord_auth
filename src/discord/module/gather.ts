@@ -53,55 +53,7 @@ export default class Gather extends Plugin {
             return Promise.resolve()
         }
         // cast to dest
-        let data:any = {
-            files: [],
-        }
-        const content = msg.content
-        for (const [key, attach] of msg.attachments) {
-            data.files.push({attachment: attach.url, name: attach.filename})
-        }
-        for (const embed of msg.embeds) {
-            const richEmbed = new Discord.RichEmbed()
-            if (embed.author != null) {
-                const author = embed.author
-                richEmbed.setAuthor(author.name,author.iconURL,author.url)
-            }
-            if (embed.color != null) {
-                richEmbed.setColor(embed.color)
-            }
-            if (embed.description != null) {
-                richEmbed.setDescription(embed.description)
-            }
-            for (const field of embed.fields) {
-                richEmbed.addField(field.name,field.value,field.inline)
-            }
-            if (embed.footer != null) {
-                richEmbed.setFooter(embed.footer.text,embed.footer.iconURL)
-            }
-            if (embed.thumbnail != null) {
-                richEmbed.setThumbnail(embed.thumbnail.url)
-            }
-            if (embed.title != null) {
-                richEmbed.setTitle(embed.title)
-            }
-            if (embed.url != null) {
-                richEmbed.setURL(embed.url)
-            }
-            if (embed.image != null) {
-                richEmbed.setImage(embed.image.url)
-            }
-            if (embed.timestamp != null) {
-                richEmbed.setTimestamp(new Date(embed.timestamp))
-            }
-            data = richEmbed
-            break
-            // data.files.push({ attachment: attach.url, name: attach.filename });
-        }
-        if (content.length === 0) {
-            await webhook.send(data)
-        } else {
-            await webhook.send(content, data)
-        }
+        await cloneMessage(webhook, msg)
         return Promise.resolve()
     }
     /**
@@ -135,6 +87,60 @@ export default class Gather extends Plugin {
         }
         return Promise.resolve()
     }
+}
+export async function cloneMessage(webhook:Discord.Webhook, msg:Discord.Message) {
+    let data:any = {
+        files: [],
+    }
+    const content = msg.content
+    for (const [key, attach] of msg.attachments) {
+        data.files.push({ attachment: attach.url, name: attach.filename })
+    }
+    for (const embed of msg.embeds) {
+        const richEmbed = new Discord.RichEmbed()
+        if (embed.author != null) {
+            const author = embed.author
+            richEmbed.setAuthor(author.name, author.iconURL, author.url)
+        }
+        if (embed.color != null) {
+            richEmbed.setColor(embed.color)
+        }
+        if (embed.description != null) {
+            richEmbed.setDescription(embed.description)
+        }
+        for (const field of embed.fields) {
+            richEmbed.addField(field.name, field.value, field.inline)
+        }
+        if (embed.footer != null) {
+            richEmbed.setFooter(embed.footer.text, embed.footer.iconURL)
+        }
+        if (embed.thumbnail != null) {
+            richEmbed.setThumbnail(embed.thumbnail.url)
+        }
+        if (embed.title != null) {
+            richEmbed.setTitle(embed.title)
+        }
+        if (embed.url != null) {
+            richEmbed.setURL(embed.url)
+        }
+        if (embed.image != null) {
+            richEmbed.setImage(embed.image.url)
+        }
+        if (embed.timestamp != null) {
+            richEmbed.setTimestamp(new Date(embed.timestamp))
+        } else {
+            richEmbed.setTimestamp(new Date(msg.createdTimestamp))
+        }
+        data = richEmbed
+        break
+        // data.files.push({ attachment: attach.url, name: attach.filename });
+    }
+    if (content.length === 0) {
+        await webhook.send(data)
+    } else {
+        await webhook.send(content, data)
+    }
+    return
 }
 class GatherConfig extends Config {
     public listenChannels = []

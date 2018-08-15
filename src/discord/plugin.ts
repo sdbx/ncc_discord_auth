@@ -409,7 +409,7 @@ export default abstract class Plugin {
         }
         const newI:T = new (parent["constructor"] as any)(subName, parent.name) as T
         newI.initialize(subName, parent.name)
-        await newI.import(false).catch(Log.e)
+        await newI.import(true).catch(Log.e)
         if (sync) {
             this.subs.set(key, newI)
         }
@@ -510,6 +510,9 @@ export default abstract class Plugin {
             } else if (name.length > 32) {
                 name = name.substring(0,32)
             }
+        }
+        if (!channel.permissionsFor(this.client.user).hasPermission("MANAGE_WEBHOOKS")) {
+            return Promise.reject("No Permission")
         }
         if (!this.webhooks.has(channel.id) || this.webhooks.get(channel.id).expired) {
             const webhooks = await channel.fetchWebhooks()
