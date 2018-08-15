@@ -140,18 +140,18 @@ export default class Purge extends Plugin {
                 await msg.delete()
                 return Promise.resolve()
             } else if (deleteCount < 0) {
-                if (msg.member.hasPermission("MANAGE_MESSAGES")) {
+                if (msg.member.permissions.has("MANAGE_MESSAGES")) {
                     deleteALL = true
                     num = Math.abs(num)
                     deleteCount = Math.abs(deleteCount)
                 } else {
                     await msg.channel.send(this.lang.purge.noPermAll)
+                    await msg.delete()
                     return Promise.resolve()
                 }
             }
-            await msg.delete()
             // check cache
-            const check = await this.checkCache(msg.channel, msg.id)
+            const check = await this.checkCache(msg.channel, msg.id, msg.author.id)
             if (check != null) {
                 Log.d("Caching", check)
                 // await msg.channel.send(check)
@@ -178,13 +178,14 @@ export default class Purge extends Plugin {
             // remove
             while (deleteIDs.length > 0) {
                 const del = deleteIDs.splice(0, Math.min(deleteIDs.length, 100))
-                await msg.channel.bulkDelete(del, false)
+                await msg.channel.bulkDelete(del)
             }
-            startMsg.delete()
+            await startMsg.delete()
+            await msg.delete()
         }
         return Promise.resolve()
     }
-    private async checkCache(channel:Discord.TextChannel, lastID:string) {
+    private async checkCache(channel:Discord.TextChannel, lastID:string, userid:string = null) {
         // check cache
         const key = channel.id
         if (!this.caching) {
@@ -195,8 +196,9 @@ export default class Purge extends Plugin {
                     this.listCache.set(key, new Cache(v, 1209600))
                     this.caching = false
                     msg.delete()
-                    channel.send(this.lang.purge.fetchEnd).then((m:Discord.Message) => {
-                        m.delete(5000)
+                    channel.send(DiscordFormat.mentionUser(userid) + " " + this.lang.purge.fetchEnd)
+                    .then((m:Discord.Message) => {
+                        m.delete(3000)
                     })
                 })
                 return "Cache request."
