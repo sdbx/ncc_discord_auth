@@ -328,17 +328,51 @@ export default class NcFetch extends NcCredent {
             .filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
                 if (whitelist.indexOf(value.tagName) >= 0) {
                     let type = "embed"
-                    let data = value.attribs["src"]
+                    let data:any = value.attribs["src"]
                     if (value.tagName === "img") {
+                        let width:number = -1
+                        let height:number = -1
+                        let style = value.attribs["style"]
+                        if (style != null) {
+                            style = style.replace(/\s+/ig, "")
+                            const _w = style.match(/width:\d+px/i)
+                            if (_w != null) {
+                                width = Number.parseInt(_w[0].match(/\d+/)[0])
+                            }
+                            const _h = style.match(/height:\d+px/i)
+                            if (_h != null) {
+                                height = Number.parseInt(_h[0].match(/\d+/)[0])
+                            }
+                        } else {
+                            const _w = value.attribs["width"]
+                            const _h = value.attribs["height"]
+                            if (_w != null && _w.indexOf("%") < 0) {
+                                width = Number.parseInt(_w.trim())
+                            }
+                            if (_h != null && _h.indexOf("%") < 0) {
+                                height = Number.parseInt(_h.trim())
+                            }
+                        }
+                        if (Number.isNaN(width)) {
+                            width = -1
+                        }
+                        if (Number.isNaN(height)) {
+                            height = -1
+                        }
                         type = "image"
-                    }else if (value.tagName === "br") {
+                        data = {
+                            src: value.attribs["src"],
+                            width,
+                            height,
+                        }
+                    } else if (value.tagName === "br") {
                         type = "newline"
                         data = "br"
                     }
                     if (data == null) {
                         data = ""
                     }
-                    return {type,data}
+                    return {type,data:data.src, info:data}
                 } else {
                     return {type:"text",data:value.data}
                 }
@@ -352,6 +386,7 @@ export default class NcFetch extends NcCredent {
         const images = contents.filter((value) => value.type === "image")
         let image = null
         if (images.length >= 1) {
+            images.sort((a, b) => Math.abs(b.info.width * b.info.width) - Math.abs(a.info.width * a.info.width))
             image = images[0].data
         }
         // name
