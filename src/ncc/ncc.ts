@@ -357,8 +357,10 @@ export default class Ncc extends NcFetch {
     }
     /**
      * Remove autoSync
+     * 
+     * This is not removing AUTH! (see `ncc.logout()`)
      */
-    public async disconnect() {
+    public disconnect() {
         if (this.syncTask != null) {
             clearTimeout(this.syncTask)
         }
@@ -366,9 +368,11 @@ export default class Ncc extends NcFetch {
         this.connectedChannels = []
         this.joinedChannels = []
         for (const e of Object.values(this.events)) {
-            e.clear()
+            if (typeof e["clear"] === "function") {
+                e.clear()
+            }
         }
-        this.credit = new NCredit()
+        // this.credit = new NCredit()
     }
     /**
      * Sync Channels and fetch auto
@@ -500,14 +504,17 @@ export default class Ncc extends NcFetch {
         })
     }
     protected async onLogin(username:string):Promise<void> {
-        super.onLogin(username)
         /*
         this.session = new Session(this.credit);
         await this.session.connect();
         await this.chat.getRoomList();
         this.chat.on("message",this.onNccMessage.bind(this));
         */
-        return Promise.resolve()
+        return super.onLogin(username)
+    }
+    protected async onLogout():Promise<void> {
+        this.disconnect()
+        return super.onLogout()
     }
     /**
      * Register event

@@ -1,5 +1,6 @@
 import * as Discord from "discord.js"
 import { sprintf } from "sprintf-js"
+import { file } from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
@@ -111,7 +112,11 @@ export function cloneMessage(msg:Discord.Message) {
             richEmbed.setDescription(embed.description)
         }
         for (const field of embed.fields) {
-            richEmbed.addField(field.name, field.value, field.inline)
+            if (field.name.length >= 1 && field.value.length >= 1) {
+                richEmbed.addField(field.name, field.value, field.inline)
+            } else {
+                richEmbed.addBlankField(field.inline)
+            }
         }
         if (embed.footer != null) {
             richEmbed.setFooter(embed.footer.text, embed.footer.iconURL)

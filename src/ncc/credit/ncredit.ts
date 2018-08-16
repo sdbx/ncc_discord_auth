@@ -161,6 +161,7 @@ export default class NCredit extends EventEmitter {
             jar: cookie,
         })
         this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
+        this.cookieJar.setCookieSync(this.entcpCookie, "https://nid.naver.com/") // not need but..
         // copy cookie to cookieJar
         this.saveCookie(COOKIE_SITES, cookie)
         // check cookie valid
@@ -180,7 +181,11 @@ export default class NCredit extends EventEmitter {
      */
     public async fetchUserID() {
         const home = await this.reqGet(CHAT_HOME_URL) as string
-        const q1 = home.match(/userId.+/i)[0]
+        const q = home.match(/userId.+/i)
+        if (q == null) {
+            return Promise.reject("Not Logined!")
+        }
+        const q1 = q[0]
         const userid = q1.substring(q1.indexOf("'") + 1, q1.lastIndexOf("'")).trim()
         Log.d("Username", userid)
         this.username = userid
@@ -217,8 +222,10 @@ export default class NCredit extends EventEmitter {
     /**
      * Gen OTP
      * 
-     * token: 8-diget token number
+     * token: 8-diget token **number**
+     * 
      * expires: When expire otp
+     * 
      * naverID: ?
      */
     public async genOTP() {
@@ -260,7 +267,7 @@ export default class NCredit extends EventEmitter {
             return null
         }
         return {
-            token: (json["number"] as string).padStart(8, "0"),
+            token: Number.parseInt(json["number"] as string),
             expires: new Date(
                 (Number.parseInt(json["timestamp"], 10) + Number.parseInt(json["expires_in"], 10)) * 1000),
             naverID: json["id"]
@@ -387,7 +394,7 @@ export default class NCredit extends EventEmitter {
         if (this.httpsAgent.expired) {
             this.httpsAgent.doRefresh()
         }
-        const jar = this.reqCookie
+        const cookie = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: sendType,
             url,
@@ -403,9 +410,9 @@ export default class NCredit extends EventEmitter {
                 "referer": referer,
                 "origin": origin,
             },
-            jar,
+            jar: cookie,
         }
-        // this.saveCookie(COOKIE_SITES, jar)
+        this.saveCookie(COOKIE_SITES, cookie)
         try {
             const buffer:Buffer | string = await request(options)
             if (typeof buffer === "string") {
@@ -457,6 +464,20 @@ export default class NCredit extends EventEmitter {
         nnbCookie.domain = "naver.com"
         nnbCookie.expires = new Date(2050, 11, 30)
         return nnbCookie
+    }
+    /**
+     * Generate Entcp Cookie
+     * 
+     * Need..?
+     */
+    private get entcpCookie() {
+        const entcpCookie = new Cookie()
+        entcpCookie.key = "nid_enctp"
+        entcpCookie.value = "1"
+        entcpCookie.path = "./"
+        entcpCookie.domain = "nid.naver.com"
+        entcpCookie.expires = new Date(2050, 11, 30)
+        return entcpCookie
     }
     private saveCookie(sites:string[], cookie:orgrq.CookieJar) {
         try {

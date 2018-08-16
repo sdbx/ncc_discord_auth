@@ -7,7 +7,7 @@ import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
     getRichTemplate, ParamAccept, ParamType, } from "../runutil"
-import { cloneMessage } from "./gather"
+import { cloneMessage, sendClonedMsg } from "./gather"
 
 const bulkLimit = 100
 // tslint:disable-next-line
@@ -52,20 +52,16 @@ export default class Purge extends Plugin {
                 const cloned = cloneMessage(msg)
                 if (cloned.embeds.length <= 0) {
                     const rich = new Discord.RichEmbed()
-                    if (cloned.attaches.length >= 1) {
-                        const file = cloned.attaches[0]
-                        rich.attachFile(file)
-                        rich.setImage("attachment://" + file.name)
+                    for (const file of cloned.attaches) {
+                        rich.addField("첨부했던 파일", file.name)
                     }
-                    if (cloned.content != null && cloned.content.length >= 1) {
-                        rich.setDescription(cloned.content)
-                    }
-                    rich.addField("보낸 사람", DiscordFormat.formatUser(msg.author))
-                    await hook.send(rich)
+                    rich.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
+                    // rich.addField("보낸 사람", )
+                    await hook.send(cloned.content, rich)
                 } else {
                     let sendFirst = false
                     for (const embed of cloned.embeds) {
-                        embed.addField("보낸 사람", DiscordFormat.formatUser(msg.author))
+                        embed.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
                         if (!sendFirst) {
                             sendFirst = true
                             await hook.send(cloned.content, embed)
@@ -77,23 +73,33 @@ export default class Purge extends Plugin {
             }
         })
         this.client.on("messageDeleteBulk", async (msg) => {
+            const format = (str:string) => `${this.lang.purge.deletedMsg}\`\`\`\n${str}\`\`\``
             const first = this.getFirstMap(msg)
             const backupS = await getBackupChannel(first.guild)
             if (backupS != null && first.channel.id !== backupS.id) {
                 try {
                     const send = msg.filter((v) => v.content.length >= 1)
                     .map((v) => `${DiscordFormat.getUserProfile(v.member)[0]} (${v.member.id}) : ${v.content}`)
-                    const cache:string = ""
+                    let cache:string = ""
                     // limit : 1997
-                    for (const part of send) {
-                        if (cache.length + part.length >= 1997) {
-                            throw afasfsasfaa
+                    const decoLength = 2000 - format("").length
+                    for (let part of send) {
+                        if (part.length >= decoLength) {
+                            part = part.substring(0, decoLength)
+                        }
+                        if (cache.length + part.length >= decoLength) {
+                            await backupS.send(format(cache))
+                            cache = part
                             // wip
+                        } else {
+                            if (cache.length > 0) {
+                                cache = cache + "\n" + part
+                            } else {
+                                cache = part
+                            }
                         }
                     }
-                    await backupS.send(`${this.lang.purge.deletedMsg}\`\`\`\n${msg.filter((v) => v.content.length >= 1)
-                        .map((v) => DiscordFormat.getUserProfile(v.member)[0] + " : " + v.content)
-                        .join("\n")}\`\`\``)
+                    await backupS.send(format(cache))
                 } catch (err) {
                     Log.e(err)
                 }
@@ -102,8 +108,8 @@ export default class Purge extends Plugin {
         this.client.on("messageUpdate", async (oldM,newM) => {
             const backupS = await getBackupChannel(newM.guild)
             if (backupS != null && newM.channel.id !== backupS.id && !newM.author.bot) {
-                const oldContent = oldM.content
-                const newContent = newM.content
+                const oldContent = oldM.content.trim().length <= 1 ? "없음" : oldM.content
+                const newContent = newM.content.trim().length <= 1 ? "없음" : newM.content
                 const names = DiscordFormat.getUserProfile(newM.member)
                 const hook = await this.getWebhook(backupS,
                     `${names[0]} (#${(newM.channel as Discord.TextChannel).name}, 수정됨)`, names[1]).catch(Log.e)
@@ -111,10 +117,18 @@ export default class Purge extends Plugin {
                     return
                 }
                 const rich = getRichTemplate(this.global, this.client)
+                rich.setDescription("사용자: " + DiscordFormat.formatUser(newM.author).mention)
                 rich.setTitle(this.lang.purge.editedMsg)
                 rich.addField("수정 전", oldContent)
                 rich.addField("수정 후", newContent)
                 rich.setTimestamp(new Date(oldM.createdTimestamp))
+                if (newM.attachments.size >= 1) {
+                    const a = this.getFirstMap(newM.attachments)
+                    if ([".png", ".jpg", ".jpeg"].indexOf(a.filename.substr(a.filename.lastIndexOf("."))) >= 0) {
+                        rich.attachFile(new Discord.Attachment(a.url, a.filename))
+                        rich.setImage("attachment://" + a.filename)
+                    }
+                }
                 await hook.send(newM.url, rich)
             }
         })

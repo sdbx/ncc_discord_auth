@@ -99,7 +99,7 @@ export default class EventNotifier extends Plugin {
 enum ChainType {
     WELCOME,
 }
-class EventConfig extends Config {
+export class EventConfig extends Config {
     public welcomeCh = "welcome"
     public botCh = "bot"
     public welcomeMsg = "Hello!"

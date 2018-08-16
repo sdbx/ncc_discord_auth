@@ -445,14 +445,14 @@ export class CommandHelp {
     }
 }
 export class DiscordFormat {
-    public static formatUser(user:Discord.User) {
+    public static formatUser(user:Discord.User | Discord.GuildMember) {
         return {
-            name:user.username,
-            mention:`<@${user.id}>`
+            name: user instanceof Discord.GuildMember ? this.getUserProfile(user)[0] : user.username,
+            mention:`<@!${user.id}>`
         }
     }
     public static mentionUser(userid:string) {
-        return `<@${userid}>`
+        return `<@!${userid}>`
     }
     public static mentionChannel(channelid:string) {
         return `<#${channelid}>`

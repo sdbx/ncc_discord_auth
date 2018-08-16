@@ -32,6 +32,11 @@ export default class Lang extends Config {
         failAdmin_noToken: "token이 없습니다.",
         wrongOTPCodeType: "OTP코드의 형식이 맞지 않습니다. 8자리 숫자여야 합니다.",
         wrongOTPCode: "OTP코드가 맞지 않습니다. 다시 해주세요.",
+        refreshing: "네이버 인증을 갱신하는 중입니다.",
+        refreshSuccess: "네이버 인증을 갱신했습니다.",
+        refreshFail: "네이버 인증 갱신을 실패했습니다.",
+        descLogin: "봇을 위해 네이버 아이디로 로그인합니다.",
+        descRefresh: "네이버 쿠키를 다시 만듭니다.",
     }
     /*
      * module: events

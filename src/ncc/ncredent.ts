@@ -6,11 +6,14 @@ import * as path from "path"
 import * as read from "read"
 import * as request from "request-promise-native"
 import { CookieJar } from "tough-cookie"
+import * as util from "util"
 import Cache from "../cache"
 import Config from "../config"
 import Log from "../log"
 import NCredit, { LoginError } from "./credit/ncredit"
 import NCaptcha from "./ncaptcha"
+
+const setTimeoutP = util.promisify(setTimeout)
 
 export default class NcCredent extends EventEmitter {
     protected credit:NCredit
@@ -20,26 +23,30 @@ export default class NcCredent extends EventEmitter {
         super()
         this.credit = new NCredit("id","pw")
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie")
-        this._name = new Cache("",1)
+        this._name = new Cache("",-1)
     }
     /**
      * This is not mean "auth is vaild.".
      * But it means buffer!
      */
     public get available():boolean {
-        return !this._name.expired && this._name.cache.length >= 2
+        return !this._name.expired && this._name.cache != null && this._name.cache.length >= 2
     }
     public get username():string {
         return this.credit.username
     }
     public async availableAsync():Promise<boolean> {
-        return Promise.resolve(this.available || await this.validateLogin() != null)
+        return Promise.resolve(this.available || await this.validateLogin(true) != null)
     }
     /**
      * Validate login
+     * @param ignoreCache Ignore cache?
      * @returns naver username or null(error)
      */
-    public async validateLogin():Promise<string> {
+    public async validateLogin(ignoreCache = false):Promise<string> {
+        if (!ignoreCache && this._name != null && this._name.cache.length >= 2 && !this._name.expired) {
+            return this._name.cache
+        }
         const username:string = await this.credit.validateLogin().then((u) => u).catch(() => null)
         if (username != null) {
             this._name = new Cache(username, 43200)
@@ -130,6 +137,57 @@ export default class NcCredent extends EventEmitter {
         return Promise.resolve(name)
     }
     /**
+     * Send Logout to naver
+     */
+    public async logout() {
+        const url = `https://nid.naver.com/nidlogin.logout?returl=https://talk.cafe.naver.com/`
+        await this.onLogout()
+        await this.credit.reqGet(url) // useless maybe?
+        this._name.revoke()
+        await this.credit.logout() // empty cookie
+        return Promise.resolve()
+    }
+    /**
+     * Refresh cookie via OTP
+     * 
+     * 개꿀잼몰카
+     * 
+     * @param delay Delay before login (0 ~ 60) - Blocking unexpected request
+     * @returns Resolve when success, reject when fail
+     */
+    public async refresh(minDelay = 3) {
+        if (await this.validateLogin(true) == null) {
+            return Promise.reject("Refresh Failed. Cause: Not logined.")
+        }
+        const backupJar = this.credit.export
+        try {
+            const otp = await this.credit.genOTP().catch(Log.e)
+            if (otp == null) {
+                return Promise.reject("Wrong OTP Result.")
+            }
+            if (otp.expires.getTime() + 1000 < Date.now()) {
+                return Promise.reject("Timestamp fail.")
+            }
+            const delay = Math.min(minDelay * 1000, Math.max(otp.expires.getTime() - Date.now() - 10000, 0))
+            Log.d("OTP", "OTP Code: " + otp.token + "\nExpirer: " + new Date(otp.expires) +
+                "\nDelay: " + Math.floor(delay / 100))
+            this._name = new Cache("", delay)
+            // wait delay
+            await setTimeoutP(delay)
+            // logout
+            await this.logout()
+            // login with otp
+            await this.loginOTP(otp.token)
+            return Promise.resolve()
+        } catch (err) {
+            Log.e(err)
+            await this.logout().catch(Log.e)
+            await this.loadCredit(backupJar)
+            // await this.credit.fetchUserID().catch(Log.e)
+            return Promise.reject("Unknown")
+        }
+    }
+    /**
      * get credentials from Naver OTP code
      * 
      * OTP gen: Naver Cafe APP
@@ -137,18 +195,39 @@ export default class NcCredent extends EventEmitter {
      * @returns naver username or null(error)
      */
     public async loginOTP(otpcode:number | string) {
-        const code = typeof otpcode === "number" ? otpcode.toString().padStart(8) : otpcode
+        const code = typeof otpcode === "number" ? otpcode.toString().padStart(8, "0") : otpcode
         return this.login(code, null)
     }
     /**
+     * Generates OTP
+     * 
+     * Token: **Number** 
+     * 
+     * To Use, `<token>.toString().padStart(8, "0")`
+     */
+    public async genOTP() {
+        if (await this.validateLogin() == null) {
+            return Promise.reject("Not Logined")
+        }
+        return this.credit.genOTP()
+    }
+    /**
      * load credit from cookie
+     * 
+     * @param manualCookie Manually loaded cookiestr
+     * 
      * @returns naver username or null(error)
      */
-    public async loadCredit():Promise<string> {
+    public async loadCredit(manualCookie:string = null):Promise<string> {
         this.credit.clear()
-        const cookieStr:string = await fs.readFile(this.cookiePath, "utf-8").catch(() => null)
-        if (cookieStr == null) {
-            return Promise.resolve(null)
+        let cookieStr:string
+        if (manualCookie == null) {
+            cookieStr = await fs.readFile(this.cookiePath, "utf-8").catch(() => null)
+            if (cookieStr == null) {
+                return Promise.resolve(null)
+            }
+        } else {
+            cookieStr = manualCookie
         }
         try {
             this.credit.import(cookieStr)
@@ -169,9 +248,19 @@ export default class NcCredent extends EventEmitter {
         }
         return Promise.resolve(userid == null ? valid : userid)
     }
+    /**
+     * onLogin Do
+     * @param username username
+     */
     protected async onLogin(username:string):Promise<void> {
         Log.i("Runtime-ncc",`Logined by ${username}.`)
         this.emit("login", username)
+        return Promise.resolve()
+    }
+    /**
+     * onLogout do
+     */
+    protected async onLogout():Promise<void> {
         return Promise.resolve()
     }
 }
