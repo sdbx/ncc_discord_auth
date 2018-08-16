@@ -53,7 +53,7 @@ export default class Gather extends Plugin {
             return Promise.resolve()
         }
         // cast to dest
-        await cloneMessage(webhook, msg)
+        await sendClonedMsg(webhook, cloneMessage(msg))
         return Promise.resolve()
     }
     /**
@@ -88,13 +88,15 @@ export default class Gather extends Plugin {
         return Promise.resolve()
     }
 }
-export async function cloneMessage(webhook:Discord.Webhook, msg:Discord.Message) {
-    let data:any = {
+export function cloneMessage(msg:Discord.Message) {
+    const attaches:Discord.Attachment[] = []
+    const embeds:Discord.RichEmbed[] = []
+    const data:any = {
         files: [],
     }
     const content = msg.content
-    for (const [key, attach] of msg.attachments) {
-        data.files.push({ attachment: attach.url, name: attach.filename })
+    for (const [, attach] of msg.attachments) {
+        attaches.push(new Discord.Attachment(attach.url,attach.filename))
     }
     for (const embed of msg.embeds) {
         const richEmbed = new Discord.RichEmbed()
@@ -131,16 +133,44 @@ export async function cloneMessage(webhook:Discord.Webhook, msg:Discord.Message)
         } else {
             richEmbed.setTimestamp(new Date(msg.createdTimestamp))
         }
-        data = richEmbed
-        break
-        // data.files.push({ attachment: attach.url, name: attach.filename });
+        richEmbed.attachFiles(attaches)
+        embeds.push(richEmbed)
     }
-    if (content.length === 0) {
-        await webhook.send(data)
+    return {
+        attaches,
+        embeds,
+        content,
+    } as ClonedMessage
+}
+export async function sendClonedMsg(webhook:Discord.Webhook, cloned:ClonedMessage) {
+    const {content, embeds, attaches} = cloned
+    const sendHook = async (_con:string, _data:any) => {
+        if (_con == null || _con.length === 0) {
+            return webhook.send(_data)
+        } else {
+            return webhook.send(_con, _data)
+        }
+    }
+    if (embeds.length >= 1) {
+        let sendedCon = false
+        for (const embed of embeds) {
+            if (!sendedCon) {
+                sendedCon = true
+                await sendHook(content, embed)
+            } else {
+                await sendHook(null, embed)
+            }
+        }
     } else {
-        await webhook.send(content, data)
+        await sendHook(content, {
+            files: attaches,
+        })
     }
-    return
+}
+interface ClonedMessage {
+    attaches:Discord.Attachment[];
+    embeds:Discord.RichEmbed[];
+    content:string;
 }
 class GatherConfig extends Config {
     public listenChannels = []

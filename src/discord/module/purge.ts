@@ -49,7 +49,31 @@ export default class Purge extends Plugin {
                 if (hook == null) {
                     return
                 }
-                await cloneMessage(hook, msg)
+                const cloned = cloneMessage(msg)
+                if (cloned.embeds.length <= 0) {
+                    const rich = new Discord.RichEmbed()
+                    if (cloned.attaches.length >= 1) {
+                        const file = cloned.attaches[0]
+                        rich.attachFile(file)
+                        rich.setImage("attachment://" + file.name)
+                    }
+                    if (cloned.content != null && cloned.content.length >= 1) {
+                        rich.setDescription(cloned.content)
+                    }
+                    rich.addField("보낸 사람", DiscordFormat.formatUser(msg.author))
+                    await hook.send(rich)
+                } else {
+                    let sendFirst = false
+                    for (const embed of cloned.embeds) {
+                        embed.addField("보낸 사람", DiscordFormat.formatUser(msg.author))
+                        if (!sendFirst) {
+                            sendFirst = true
+                            await hook.send(cloned.content, embed)
+                        } else {
+                            await hook.send(embed)
+                        }
+                    }
+                }
             }
         })
         this.client.on("messageDeleteBulk", async (msg) => {
@@ -57,6 +81,16 @@ export default class Purge extends Plugin {
             const backupS = await getBackupChannel(first.guild)
             if (backupS != null && first.channel.id !== backupS.id) {
                 try {
+                    const send = msg.filter((v) => v.content.length >= 1)
+                    .map((v) => `${DiscordFormat.getUserProfile(v.member)[0]} (${v.member.id}) : ${v.content}`)
+                    const cache:string = ""
+                    // limit : 1997
+                    for (const part of send) {
+                        if (cache.length + part.length >= 1997) {
+                            throw afasfsasfaa
+                            // wip
+                        }
+                    }
                     await backupS.send(`${this.lang.purge.deletedMsg}\`\`\`\n${msg.filter((v) => v.content.length >= 1)
                         .map((v) => DiscordFormat.getUserProfile(v.member)[0] + " : " + v.content)
                         .join("\n")}\`\`\``)
