@@ -335,11 +335,11 @@ export default class NcFetch extends NcCredent {
                         let style = value.attribs["style"]
                         if (style != null) {
                             style = style.replace(/\s+/ig, "")
-                            const _w = style.match(/width:\d+px/i)
+                            const _w = style.match(/width:\s*\d+px/i)
                             if (_w != null) {
                                 width = Number.parseInt(_w[0].match(/\d+/)[0])
                             }
-                            const _h = style.match(/height:\d+px/i)
+                            const _h = style.match(/height:\s*\d+px/i)
                             if (_h != null) {
                                 height = Number.parseInt(_h[0].match(/\d+/)[0])
                             }
