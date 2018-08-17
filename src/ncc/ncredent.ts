@@ -1,7 +1,6 @@
 import chalk, { Chalk } from "chalk"
 import { EventEmitter } from "events"
 import * as fs from "fs-extra"
-import Session, { Credentials } from "node-ncc-es6"
 import * as path from "path"
 import * as read from "read"
 import * as request from "request-promise-native"
@@ -32,9 +31,15 @@ export default class NcCredent extends EventEmitter {
     public get available():boolean {
         return !this._name.expired && this._name.cache != null && this._name.cache.length >= 2
     }
+    /**
+     * Naver ID
+     */
     public get username():string {
         return this.credit.username
     }
+    /**
+     * Check logined (Cached or fetch)
+     */
     public async availableAsync():Promise<boolean> {
         return Promise.resolve(this.available || await this.validateLogin(true) != null)
     }

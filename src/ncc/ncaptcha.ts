@@ -3,7 +3,14 @@ import NCredit from "./credit/ncredit"
 import { CHATAPI_CAPTCHA, INSECURE_CAPTCHA, NID_CAPTCHA } from "./ncconstant"
 import NcJson from "./talk/ncjson"
 
+/**
+ * Naver Captcha class
+ */
 export default class NCaptcha {
+    /**
+     * Generate captcha from Logined token.
+     * @param credit Naver Credit
+     */
     public static async gen(credit:NCredit) {
         const content = await credit.reqGet(CHATAPI_CAPTCHA)
         const response = new NcJson(content, (obj) => ({
@@ -19,9 +26,14 @@ export default class NCaptcha {
         }
         return captcha
     }
+    /**
+     * Generate Random Alphabetic String
+     * @param length The length of return string
+     * @param uppercase Generate uppercase?
+     */
     public static randomString(length:number, uppercase = false) {
-        let rand = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
-        if (uppercase) {
+        let rand = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZ"
+        if (!uppercase) {
             rand += "abcdefghiklmnopqrstuvwxyz"
         }
         let str = ""
@@ -30,8 +42,19 @@ export default class NCaptcha {
         }
         return str
     }
+    /**
+     * Image url
+     */
     public url:string
+    /**
+     * Captcha key
+     */
     public key:string
+    /**
+     * Captcha value
+     * 
+     * Need typing
+     */
     public value:string
     private constructor() {
         this.value = ""

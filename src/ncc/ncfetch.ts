@@ -553,10 +553,10 @@ export default class NcFetch extends NcCredent {
         return memberList
     }
     /**
-     * WIP
-     * @param cafeid 
-     * @param nickname 
-     * @param image 
+     * Change Nickname or image
+     * @param cafeid Naver CafeID
+     * @param nickname to change Nickname (null if u don't change)
+     * @param image to change Image (null if u don't change)
      */
     public async changeProfile(cafeid:number | Cafe, nickname?:string, image?:string) {
         if (typeof cafeid !== "number") {
