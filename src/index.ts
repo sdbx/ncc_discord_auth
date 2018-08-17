@@ -1,6 +1,5 @@
 import chalk from "chalk"
 import * as Discord from "discord.js"
-import { Room } from "node-ncc-es6"
 import * as readline from "readline"
 import * as request from "request-promise-native"
 import Runtime from "./discord/runtime"

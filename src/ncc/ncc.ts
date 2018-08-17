@@ -1,6 +1,5 @@
 import { EventEmitter } from "events"
 import * as get from "get-value"
-import Session, { Message } from "node-ncc-es6"
 import * as io from "socket.io-client"
 import { EventDispatcher, IEventHandler, ISimpleEventHandler, SimpleEventDispatcher } from "strongly-typed-events"
 import Cache from "../cache"
