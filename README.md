@@ -1,6 +1,7 @@
-# ncc_discord_auth
-Naver cafe auth by comment
+# ncc_discord_auth - Java
 
-=======
-해킹왕은 모든게 가능합니다.
+  - Check naver cafe joined via comment (Grant discord role)
+  - NaverCafe article notification
 
+## Java Version Deprecated
+  - Use (master or develop) branch
