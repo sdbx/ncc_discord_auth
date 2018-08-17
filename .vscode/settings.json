@@ -1,5 +1,12 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.tsdk": "node_modules/typescript/lib",
   // "typescript.implementationsCodeLens.enabled": true
   // "typescript.referencesCodeLens.enabled": true
+  "prettier.tslintIntegration": true,
+  "prettier.requireConfig": true,
+  "prettier.semi": false,
+  "prettier.printWidth": 120,
+  "prettier.tabWidth": 4,
+  "prettier.trailingComma": "all",
+  "prettier.arrowParens": "always",
 }
