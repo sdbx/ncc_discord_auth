@@ -33,6 +33,9 @@ export default class Purge extends Plugin {
         this.purge.complex = true
         // listen delete event
         const getBackupChannel = async (guild:Discord.Guild) => {
+            if (guild == null) {
+                return null
+            }
             const sub = await this.sub(this.config, guild.id)
             const backupS = guild.channels.find((v) => v.id === sub.backupChannel)
             if (backupS != null && backupS instanceof Discord.TextChannel) {
@@ -114,6 +117,10 @@ export default class Purge extends Plugin {
                 const hook = await this.getWebhook(backupS,
                     `${names[0]} (#${(newM.channel as Discord.TextChannel).name}, 수정됨)`, names[1]).catch(Log.e)
                 if (hook == null) {
+                    return
+                }
+                if (oldM.embeds.length <= 0 && newM.embeds.length >= 1 && oldContent === newContent) {
+                    // embed generated
                     return
                 }
                 const rich = getRichTemplate(this.global, this.client)
