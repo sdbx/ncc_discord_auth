@@ -355,23 +355,31 @@ export default class Ncc extends NcFetch {
         return Promise.resolve()
     }
     /**
-     * Remove autoSync
+     * Clear connected and joined channels (Cache)
      * 
-     * This is not removing AUTH! (see `ncc.logout()`)
+     * This doesn't effect on naver ID
      */
-    public disconnect() {
+    public clearChannels() {
         if (this.syncTask != null) {
             clearTimeout(this.syncTask)
         }
         this.connectedChannels.forEach((v) => v.disconnect())
         this.connectedChannels = []
         this.joinedChannels = []
+    }
+    /**
+     * Destory Ncc
+     * 
+     * Unusable this object if call.
+     */
+    public destory() {
+        this.clearChannels()
         for (const e of Object.values(this.events)) {
             if (typeof e["clear"] === "function") {
                 e.clear()
             }
         }
-        // this.credit = new NCredit()
+        this.credit = new NCredit()
     }
     /**
      * Sync Channels and fetch auto
@@ -512,7 +520,7 @@ export default class Ncc extends NcFetch {
         return super.onLogin(username)
     }
     protected async onLogout():Promise<void> {
-        this.disconnect()
+        this.clearChannels()
         return super.onLogout()
     }
     /**

@@ -144,7 +144,7 @@ export default class Runtime extends EventEmitter {
             for (const plugin of this.plugins) {
                 await plugin.onDestroy()
             }
-            this.ncc.disconnect()
+            this.ncc.destory()
         } catch (err) {
             Log.e(err)
             process.exit(-1)
