@@ -554,9 +554,35 @@ export default abstract class Plugin {
         }
         return webhook
     }
+    protected async sendMsgToHook(webhook:Discord.Webhook, con:string, data:any) {
+        if (!con || con.length === 0) {
+            return webhook.send(data)
+        } else {
+            return webhook.send(con, data)
+        }
+    }
+    protected async cloneMsgToHook(webhook:Discord.Webhook, msg:Discord.Message) {
+        const cloned = this.cloneMessage(msg)
+        const {content, embeds, attaches} = cloned
+        if (embeds.length >= 1) {
+            let sendedCon = false
+            for (const embed of embeds) {
+                if (!sendedCon) {
+                    sendedCon = true
+                    await this.sendMsgToHook(webhook, content, embed)
+                } else {
+                    await this.sendMsgToHook(webhook, null, embed)
+                }
+            }
+        } else {
+            await this.sendMsgToHook(webhook, content, {
+                files: attaches,
+            })
+        }
+    }
     /**
      * Filter editable configs
-     * 
+     *
      * Default: all
      * @param key config key
      * @param obj to set value
@@ -570,5 +596,63 @@ export default abstract class Plugin {
     }
     protected getFirstMap<T, V>(m:Map<T, V>):V {
         return getFirstMap(m)
+    }
+    private cloneMessage(msg:Discord.Message) {
+        const attaches:Discord.Attachment[] = []
+        const embeds:Discord.RichEmbed[] = []
+        const data:any = {
+            files: [],
+        }
+        const content = msg.content
+        for (const [, attach] of msg.attachments) {
+            attaches.push(new Discord.Attachment(attach.url,attach.filename))
+        }
+        for (const embed of msg.embeds) {
+            const richEmbed = new Discord.RichEmbed()
+            if (embed.author != null) {
+                const author = embed.author
+                richEmbed.setAuthor(author.name, author.iconURL, author.url)
+            }
+            if (embed.color != null) {
+                richEmbed.setColor(embed.color)
+            }
+            if (embed.description != null) {
+                richEmbed.setDescription(embed.description)
+            }
+            for (const field of embed.fields) {
+                if (field.name.length >= 1 && field.value.length >= 1) {
+                    richEmbed.addField(field.name, field.value, field.inline)
+                } else {
+                    richEmbed.addBlankField(field.inline)
+                }
+            }
+            if (embed.footer != null) {
+                richEmbed.setFooter(embed.footer.text, embed.footer.iconURL)
+            }
+            if (embed.thumbnail != null) {
+                richEmbed.setThumbnail(embed.thumbnail.url)
+            }
+            if (embed.title != null) {
+                richEmbed.setTitle(embed.title)
+            }
+            if (embed.url != null) {
+                richEmbed.setURL(embed.url)
+            }
+            if (embed.image != null) {
+                richEmbed.setImage(embed.image.url)
+            }
+            if (embed.timestamp != null) {
+                richEmbed.setTimestamp(new Date(embed.timestamp))
+            } else {
+                richEmbed.setTimestamp(new Date(msg.createdTimestamp))
+            }
+            richEmbed.attachFiles(attaches)
+            embeds.push(richEmbed)
+        }
+        return {
+            attaches,
+            embeds,
+            content,
+        }
     }
 }

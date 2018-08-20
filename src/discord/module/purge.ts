@@ -5,9 +5,8 @@ import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
-    getRichTemplate, ParamAccept, ParamType, } from "../runutil"
-import { cloneMessage, sendClonedMsg } from "./gather"
+import { ChainData, cloneMessage, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
+    getRichTemplate, ParamAccept, ParamType, sendClonedMsg } from "../runutil"
 
 const bulkLimit = 100
 // tslint:disable-next-line
@@ -47,9 +46,9 @@ export default class Purge extends Plugin {
             const backupS = await getBackupChannel(msg.guild)
             if (backupS != null && msg.channel.id !== backupS.id && !msg.author.bot) {
                 const names = DiscordFormat.getUserProfile(msg.member)
-                const hook = await this.getWebhook(backupS, 
+                const webhook = await this.getWebhook(backupS,
                     `${names[0]} (#${(msg.channel as Discord.TextChannel).name}, 삭제됨)`, names[1]).catch(Log.e)
-                if (hook == null) {
+                if (webhook == null) {
                     return
                 }
                 const cloned = cloneMessage(msg)
@@ -59,17 +58,18 @@ export default class Purge extends Plugin {
                         rich.addField("첨부했던 파일", file.name)
                     }
                     rich.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
-                    // rich.addField("보낸 사람", )
-                    await hook.send(cloned.content, rich)
+                    await webhook.send(DiscordFormat.normalize(cloned.content, msg.guild, true), rich)
                 } else {
                     let sendFirst = false
                     for (const embed of cloned.embeds) {
-                        embed.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
+                        const em = DiscordFormat.normalizeEmbed(embed, msg.guild, true)
                         if (!sendFirst) {
+                            const con = DiscordFormat.normalize(cloned.content, msg.guild, true)
                             sendFirst = true
-                            await hook.send(cloned.content, embed)
+                            em.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
+                            await webhook.send(con, embed)
                         } else {
-                            await hook.send(embed)
+                            await webhook.send(embed)
                         }
                     }
                 }
@@ -114,9 +114,9 @@ export default class Purge extends Plugin {
                 const oldContent = oldM.content.trim().length <= 1 ? "없음" : oldM.content
                 const newContent = newM.content.trim().length <= 1 ? "없음" : newM.content
                 const names = DiscordFormat.getUserProfile(newM.member)
-                const hook = await this.getWebhook(backupS,
+                const webhook = await this.getWebhook(backupS,
                     `${names[0]} (#${(newM.channel as Discord.TextChannel).name}, 수정됨)`, names[1]).catch(Log.e)
-                if (hook == null) {
+                if (webhook == null) {
                     return
                 }
                 if (oldM.embeds.length <= 0 && newM.embeds.length >= 1 && oldContent === newContent) {
@@ -126,8 +126,8 @@ export default class Purge extends Plugin {
                 const rich = getRichTemplate(this.global, this.client)
                 rich.setDescription("사용자: " + DiscordFormat.formatUser(newM.author).mention)
                 rich.setTitle(this.lang.purge.editedMsg)
-                rich.addField("수정 전", oldContent)
-                rich.addField("수정 후", newContent)
+                rich.addField("수정 전", DiscordFormat.normalize(oldContent, newM.guild, true))
+                rich.addField("수정 후", DiscordFormat.normalize(newContent, newM.guild, true))
                 rich.setTimestamp(new Date(oldM.createdTimestamp))
                 if (newM.attachments.size >= 1) {
                     const a = this.getFirstMap(newM.attachments)
@@ -136,7 +136,7 @@ export default class Purge extends Plugin {
                         rich.setImage("attachment://" + a.filename)
                     }
                 }
-                await hook.send(newM.url, rich)
+                await webhook.send(newM.url, rich)
             }
         })
         return Promise.resolve()

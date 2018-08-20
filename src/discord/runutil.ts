@@ -476,20 +476,45 @@ export class DiscordFormat {
         const u = member.user
         return [this.getNickname(member), this.getAvatarImage(member.user)]
     }
-    public static normalize(msg:string, guild:Discord.Guild) {
+    public static normalizeMsg(msg:Discord.Message, guild:Discord.Guild,
+        onlyMention:boolean = false):Discord.Message {
+        msg.content = this.normalize(msg.content, guild, onlyMention)
+        return msg
+    }
+    public static normalizeEmbed(embed:Discord.RichEmbed, guild:Discord.Guild,
+        onlyMention:boolean = false):Discord.RichEmbed {
+        embed.description = this.normalize(embed.description, guild, onlyMention)
+        embed.title = this.normalize(embed.title, guild, onlyMention)
+        if (embed.footer) {
+            embed.footer.text = this.normalize(embed.footer.text, guild, onlyMention)
+        }
+        embed.url = this.normalize(embed.url, guild, onlyMention)
+        embed.fields = embed.fields.map( f => {
+            f.name = this.normalize(f.name, guild, onlyMention)
+            f.value = this.normalize(f.value, guild, onlyMention)
+            return f
+        })
+        return embed
+    }
+    public static normalize(msg:string, guild:Discord.Guild, onlyMention:boolean = false):string {
+        console.log(msg)
         let chain = msg
-        // 1. Bold
-        chain = this.replaceTo(chain, /\*\*.+?\*\*/g, (str) => str.substring(2, str.length - 2))
-        // 2. Italic
-        chain = this.replaceTo(chain, /\*.+?\*/g, (str) => str.substring(1, str.length - 1))
-        // 3. Underline
-        chain = this.replaceTo(chain, /__.+?__/g, (str) => str.substring(2, str.length - 2))
-        // 4. NamuWiki
-        chain = this.replaceTo(chain, /~~.+?~~/g, (str) => str.substring(2, str.length - 2))
-        // 5. codeBlocks
-        chain = chain.replace(/```.*?```/, "").replace(/`.*?`/ig, "")
-        // 6. mention
-        chain = this.replaceTo(chain, /<@!\d+>/g, (str) => {
+        if (!onlyMention) {
+            // 1. Bold
+            chain = this.replaceTo(chain, /\*\*.+?\*\*/g, (str) => str.substring(2, str.length - 2))
+            // 2. Italic
+            chain = this.replaceTo(chain, /\*.+?\*/g, (str) => str.substring(1, str.length - 1))
+            // 3. Underline
+            chain = this.replaceTo(chain, /__.+?__/g, (str) => str.substring(2, str.length - 2))
+            // 4. NamuWiki
+            chain = this.replaceTo(chain, /~~.+?~~/g, (str) => str.substring(2, str.length - 2))
+            // 5. codeBlocks
+            chain = chain.replace(/```.*?```/, "").replace(/`.*?`/ig, "")
+            // 6. emote
+            chain = this.replaceTo(chain, /<a?:\S+:\d+>/g, (str) => "")
+        }
+        // 7. mention
+        chain = this.replaceTo(chain, /<@[!]?\d+>/g, (str) => {
             const id = str.match(/\d+/i)[0]
             if (guild == null || !guild.available) {
                 return ""
@@ -501,10 +526,10 @@ export class DiscordFormat {
                 return ""
             }
         })
-        // 7. everyone and here
-        chain = chain.replace(/@(everyone|here)/g, "")
-        // 8. channel
-        chain = this.replaceTo(chain, /<#\d+>/g, (str) => {
+        // 8. everyone and here
+        chain = chain.replace(/@(everyone|here)/g, "유 워너 비 뚜따?")
+        // 9. channel
+        chain = this.replaceTo(chain, /<#[!]?\d+>/g, (str) => {
             const id = str.match(/\d+/i)[0]
             if (guild == null || !guild.available) {
                 return ""
@@ -516,7 +541,7 @@ export class DiscordFormat {
                 return ""
             }
         })
-        // 9. role
+        // 10. role
         chain = this.replaceTo(chain, /<@&\d+>/g, (str) => {
             const id = str.match(/\d+/i)[0]
             if (guild == null || !guild.available) {
@@ -529,8 +554,6 @@ export class DiscordFormat {
                 return ""
             }
         })
-        // 10. emote
-        chain = this.replaceTo(chain, /<a?:\S+:\d+>/g, (str) => "")
         return chain
     }
     private static replaceTo(data:string, regex:RegExp, after:(str:string) => string) {
@@ -540,7 +563,7 @@ export class DiscordFormat {
         }
         let chain = data
         for (const matchStr of matches) {
-            chain = chain.replace(matchStr, after(matchStr))            
+            chain = chain.replace(matchStr, after(matchStr))
         }
         return chain
     }
@@ -770,4 +793,92 @@ export function getRichTemplate(global:MainCfg, client:Discord.Client) {
     // rich.setFooter(client.user.username, client.user.avatarURL)
     rich.setTimestamp(new Date(Date.now()))
     return rich
+}
+export function cloneMessage(msg:Discord.Message) {
+    const attaches:Discord.Attachment[] = []
+    const embeds:Discord.RichEmbed[] = []
+    const data:any = {
+        files: [],
+    }
+    const content = msg.content
+    for (const [, attach] of msg.attachments) {
+        attaches.push(new Discord.Attachment(attach.url,attach.filename))
+    }
+    for (const embed of msg.embeds) {
+        const richEmbed = new Discord.RichEmbed()
+        if (embed.author != null) {
+            const author = embed.author
+            richEmbed.setAuthor(author.name, author.iconURL, author.url)
+        }
+        if (embed.color != null) {
+            richEmbed.setColor(embed.color)
+        }
+        if (embed.description != null) {
+            richEmbed.setDescription(embed.description)
+        }
+        for (const field of embed.fields) {
+            if (field.name.length >= 1 && field.value.length >= 1) {
+                richEmbed.addField(field.name, field.value, field.inline)
+            } else {
+                richEmbed.addBlankField(field.inline)
+            }
+        }
+        if (embed.footer != null) {
+            richEmbed.setFooter(embed.footer.text, embed.footer.iconURL)
+        }
+        if (embed.thumbnail != null) {
+            richEmbed.setThumbnail(embed.thumbnail.url)
+        }
+        if (embed.title != null) {
+            richEmbed.setTitle(embed.title)
+        }
+        if (embed.url != null) {
+            richEmbed.setURL(embed.url)
+        }
+        if (embed.image != null) {
+            richEmbed.setImage(embed.image.url)
+        }
+        if (embed.timestamp != null) {
+            richEmbed.setTimestamp(new Date(embed.timestamp))
+        } else {
+            richEmbed.setTimestamp(new Date(msg.createdTimestamp))
+        }
+        richEmbed.attachFiles(attaches)
+        embeds.push(richEmbed)
+    }
+    return {
+        attaches,
+        embeds,
+        content,
+    } as ClonedMessage
+}
+export async function sendClonedMsg(webhook:Discord.Webhook, cloned:ClonedMessage) {
+    const {content, embeds, attaches} = cloned
+    const sendHook = async (_con:string, _data:any) => {
+        if (_con == null || _con.length === 0) {
+            return webhook.send(_data)
+        } else {
+            return webhook.send(_con, _data)
+        }
+    }
+    if (embeds.length >= 1) {
+        let sendedCon = false
+        for (const embed of embeds) {
+            if (!sendedCon) {
+                sendedCon = true
+                await sendHook(content, embed)
+            } else {
+                await sendHook(null, embed)
+            }
+        }
+    } else {
+        await sendHook(content, {
+            files: attaches,
+        })
+    }
+}
+export interface ClonedMessage {
+    attaches:Discord.Attachment[];
+    embeds:Discord.RichEmbed[];
+    content:string;
 }
