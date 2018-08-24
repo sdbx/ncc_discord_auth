@@ -518,7 +518,7 @@ export default abstract class Plugin {
                 name = name.substring(0,32)
             }
         }
-        if (!channel.permissionsFor(this.client.user).hasPermission("MANAGE_WEBHOOKS")) {
+        if (!channel.permissionsFor(this.client.user).has("MANAGE_WEBHOOKS")) {
             return Promise.reject("No Permission")
         }
         if (!this.webhooks.has(channel.id) || this.webhooks.get(channel.id).expired) {

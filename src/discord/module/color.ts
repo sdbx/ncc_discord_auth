@@ -42,7 +42,7 @@ export default class Color extends Plugin {
             this.lastMessaged.set(key, now)
             return 
         }
-        if (!msg.guild.members.find((v) => v.id === this.client.user.id).hasPermission("MANAGE_ROLES")) {
+        if (!msg.guild.members.find((v) => v.id === this.client.user.id).permissions.has("MANAGE_ROLES")) {
             return
         }
         if (Date.now() - time >= 10000) {
