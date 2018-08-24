@@ -5,8 +5,8 @@ import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
-import { ChainData, cloneMessage, CmdParam, CommandHelp,
-  CommandStatus, DiscordFormat, ParamType, sendClonedMsg } from "../runutil"
+import { ChainData, ClonedMessage, cloneMessage, CmdParam,
+  CommandHelp, CommandStatus, DiscordFormat, ParamType } from "../runutil"
 
 const regexEmoji = /<:[A-Za-z0-9_]{2,}:\d+>/ig
 export default class Gather extends Plugin {
@@ -54,9 +54,8 @@ export default class Gather extends Plugin {
             Log.w("Gather", "skip - no webhook")
             return Promise.resolve()
         }
-        const msg2 = DiscordFormat.normalizeMsg(msg, msg.guild, true)
         // cast to dest
-        await sendClonedMsg(webhook, cloneMessage(msg2))
+        await this.sendClonedMsg(webhook, cloneMessage(msg), msg.guild)
         return Promise.resolve()
     }
     /**
@@ -89,6 +88,33 @@ export default class Gather extends Plugin {
             await cfg.export()
         }
         return Promise.resolve()
+    }
+    protected async sendClonedMsg(webhook:Discord.Webhook, cloned:ClonedMessage, guild:Discord.Guild) {
+        const {embeds, attaches} = cloned
+        let content = cloned.content
+        content = DiscordFormat.normalizeVariable(content, guild)
+        const sendHook = async (_con:string, _data:any) => {
+            if (_con == null || _con.length === 0) {
+                return webhook.send(_data)
+            } else {
+                return webhook.send(_con, _data)
+            }
+        }
+        if (embeds.length >= 1) {
+            let sendedCon = false
+            for (const embed of embeds) {
+                if (!sendedCon) {
+                    sendedCon = true
+                    await sendHook(content, embed)
+                } else {
+                    await sendHook(null, embed)
+                }
+            }
+        } else {
+            await sendHook(content, {
+                files: attaches,
+            })
+        }
     }
 }
 class GatherConfig extends Config {

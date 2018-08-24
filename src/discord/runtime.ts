@@ -182,6 +182,8 @@ export default class Runtime extends EventEmitter {
                 subConfigs: this.locals,
             })
         }
+        // set client option
+        this.client.options.disabledEvents = ["PRESENCE_UPDATE", "TYPING_START"]
         this.emit("ready")
     }
     /**

@@ -6,7 +6,7 @@ import Log from "../../log"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, cloneMessage, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
-    getRichTemplate, ParamAccept, ParamType, sendClonedMsg } from "../runutil"
+    getFirstMap, getRichTemplate, ParamAccept, ParamType } from "../runutil"
 
 const bulkLimit = 100
 // tslint:disable-next-line
@@ -31,7 +31,7 @@ export default class Purge extends Plugin {
         // get parameter as complex
         this.purge.complex = true
         // listen delete event
-        const getBackupChannel = async (guild:Discord.Guild) => {
+        const getBackupChannel = (async (guild:Discord.Guild) => {
             if (guild == null) {
                 return null
             }
@@ -41,7 +41,7 @@ export default class Purge extends Plugin {
                 return backupS
             }
             return null
-        }
+        }).bind(this)
         this.client.on("messageDelete", async (msg) => {
             const backupS = await getBackupChannel(msg.guild)
             if (backupS != null && msg.channel.id !== backupS.id && !msg.author.bot) {
@@ -52,22 +52,21 @@ export default class Purge extends Plugin {
                     return
                 }
                 const cloned = cloneMessage(msg)
+                cloned.content = DiscordFormat.normalizeMention(cloned.content, msg.guild)
                 if (cloned.embeds.length <= 0) {
                     const rich = new Discord.RichEmbed()
                     for (const file of cloned.attaches) {
                         rich.addField("첨부했던 파일", file.name)
                     }
-                    rich.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
-                    await webhook.send(DiscordFormat.normalize(cloned.content, msg.guild, true), rich)
+                    rich.setDescription("사용자: " + DiscordFormat.mentionUser(msg.author.id))
+                    await webhook.send(cloned.content, rich)
                 } else {
                     let sendFirst = false
                     for (const embed of cloned.embeds) {
-                        const em = DiscordFormat.normalizeEmbed(embed, msg.guild, true)
                         if (!sendFirst) {
-                            const con = DiscordFormat.normalize(cloned.content, msg.guild, true)
                             sendFirst = true
-                            em.setDescription("사용자: " + DiscordFormat.formatUser(msg.author).mention)
-                            await webhook.send(con, embed)
+                            embed.setDescription("사용자: " + DiscordFormat.mentionUser(msg.author.id))
+                            await webhook.send(cloned.content, embed)
                         } else {
                             await webhook.send(embed)
                         }
@@ -77,12 +76,14 @@ export default class Purge extends Plugin {
         })
         this.client.on("messageDeleteBulk", async (msg) => {
             const format = (str:string) => `${this.lang.purge.deletedMsg}\`\`\`\n${str}\`\`\``
-            const first = this.getFirstMap(msg)
+            const first = getFirstMap(msg)
             const backupS = await getBackupChannel(first.guild)
             if (backupS != null && first.channel.id !== backupS.id) {
                 try {
                     const send = msg.filter((v) => v.content.length >= 1)
-                    .map((v) => `${DiscordFormat.getUserProfile(v.member)[0]} (${v.member.id}) : ${v.content}`)
+                    .map((v) => `${DiscordFormat.getUserProfile(v.member)[0]} (${v.member.id}) : ${
+                        DiscordFormat.normalize(v.content, first.guild, false)
+                    }`)
                     let cache:string = ""
                     // limit : 1997
                     const decoLength = 2000 - format("").length
@@ -124,13 +125,13 @@ export default class Purge extends Plugin {
                     return
                 }
                 const rich = getRichTemplate(this.global, this.client)
-                rich.setDescription("사용자: " + DiscordFormat.formatUser(newM.author).mention)
+                rich.setDescription("사용자: " + DiscordFormat.mentionUser(newM.author.id))
                 rich.setTitle(this.lang.purge.editedMsg)
-                rich.addField("수정 전", DiscordFormat.normalize(oldContent, newM.guild, true))
-                rich.addField("수정 후", DiscordFormat.normalize(newContent, newM.guild, true))
+                rich.addField("수정 전", DiscordFormat.normalizeMention(oldContent, newM.guild))
+                rich.addField("수정 후", DiscordFormat.normalizeMention(newContent, newM.guild))
                 rich.setTimestamp(new Date(oldM.createdTimestamp))
                 if (newM.attachments.size >= 1) {
-                    const a = this.getFirstMap(newM.attachments)
+                    const a = getFirstMap(newM.attachments)
                     if ([".png", ".jpg", ".jpeg"].indexOf(a.filename.substr(a.filename.lastIndexOf("."))) >= 0) {
                         rich.attachFile(new Discord.Attachment(a.url, a.filename))
                         rich.setImage("attachment://" + a.filename)

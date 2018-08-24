@@ -29,13 +29,10 @@ export default class NCaptcha {
     /**
      * Generate Random Alphabetic String
      * @param length The length of return string
-     * @param uppercase Generate uppercase?
+     * @param randKey Customize Possible Pattern?
      */
-    public static randomString(length:number, uppercase = false) {
-        let rand = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZ"
-        if (!uppercase) {
-            rand += "abcdefghiklmnopqrstuvwxyz"
-        }
+    public static randomString(length:number, randKey?:string) {
+        const rand = randKey == null ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz" : randKey
         let str = ""
         for (let i = 0; i < length; i += 1) {
             str += rand.charAt(Math.floor(Math.random() * rand.length))

@@ -44,6 +44,7 @@
     "max-line-length": {"options":[120]},
     "indent": [true, "spaces", 4],
     "semicolon": [true, "never", "ignore-interfaces"],
-    "radix": false
+    "radix": false,
+    "deprecation": true
   }
 }

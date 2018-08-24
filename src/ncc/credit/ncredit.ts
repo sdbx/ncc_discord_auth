@@ -235,7 +235,7 @@ export default class NCredit extends EventEmitter {
             mode: "req_req_token",
             oauth_callback: "https://nid.naver.com/com.nhn.login_global/inweb/finish",
             oauth_consumer_key: consumerKey,
-            oauth_nonce: NCaptcha.randomString(20, false).replace(/0/g, "1"),
+            oauth_nonce: NCaptcha.randomString(20).replace(/0/g, "1"),
             oauth_signature_method: "HMAC_SHA1",
             oauth_timestamp: timestamp,
             use: "number",
@@ -459,7 +459,7 @@ export default class NCredit extends EventEmitter {
     private get nnbCookie() {
         const nnbCookie = new Cookie()
         nnbCookie.key = "NNB"
-        nnbCookie.value = NCaptcha.randomString(11, true)
+        nnbCookie.value = NCaptcha.randomString(11).toUpperCase()
         nnbCookie.path = "./"
         nnbCookie.domain = "naver.com"
         nnbCookie.expires = new Date(2050, 11, 30)

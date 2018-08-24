@@ -1,5 +1,7 @@
 import * as Discord from "discord.js"
+import { MessageMentions } from "discord.js"
 import Log from "../log"
+import NCaptcha from "../ncc/ncaptcha"
 import { MainCfg } from "./runtime"
 
 export const blankChar = "\u{17B5}"
@@ -444,77 +446,90 @@ export class CommandHelp {
         return null
     }
 }
+/**
+ * Discord Markdown Helper
+ */
 export class DiscordFormat {
-    public static formatUser(user:Discord.User | Discord.GuildMember) {
+    /**
+     * Format discord user to useable
+     * @param member User
+     */
+    public static formatUser(member:Discord.User | Discord.GuildMember) {
+        if (member == null) {
+            return null
+        }
         return {
-            name: user instanceof Discord.GuildMember ? this.getUserProfile(user)[0] : user.username,
-            mention:`<@!${user.id}>`
+            name: this.getNickname(member),
+            profileURL: this.getAvatarImage(member),
+            mention: this.mentionUser(member.id),
         }
     }
+    /**
+     * Discord UserID -> `@User`
+     * @param userid User's id
+     */
     public static mentionUser(userid:string) {
         return `<@!${userid}>`
     }
+    /**
+     * Discord ChannelID -> `#Channel`
+     * @param channelid Channel's id
+     */
     public static mentionChannel(channelid:string) {
         return `<#${channelid}>`
     }
+    /**
+     * Format discord Emoji
+     * @param emojiName Emoji Name (Ex. thinking)
+     * @param emojiId Emoji ID (Ex. 53535321313)
+     * @param animated Animated?
+     * @returns `<a:thinking:53535353>`
+     */
     public static emoji(emojiName:string, emojiId:string, animated = false) {
         return `<${animated ? "a" : ""}:${emojiName}:${emojiId}>`
     }
-    public static getNickname(member:Discord.GuildMember) {
-        if (member == null) {
+    /**
+     * Get nickname from user
+     * @param user User | GuildMemeber
+     */
+    public static getNickname(user:Discord.GuildMember | Discord.User) {
+        if (user == null) {
             return null
         }
-        return member.nickname != null ? member.nickname : member.user.username
+        return user instanceof Discord.GuildMember ? 
+            (user.nickname == null ? user.user.username : user.nickname) : user.username
     }
-    public static getAvatarImage(u:Discord.User) {
+    /**
+     * Get avatar image from User
+     * @param member Discord User
+     */
+    public static getAvatarImage(member:Discord.User | Discord.GuildMember) {
+        const u = this.getUser(member)
         return u.avatarURL == null ? u.defaultAvatarURL : u.avatarURL
     }
-    public static getUserProfile(member:Discord.GuildMember):[string, string] {
+    /**
+     * @deprecated Use formatUser
+     * @param member Discord User
+     * @returns [Nickname, Profile]
+     */
+    public static getUserProfile(member:Discord.GuildMember | Discord.User):[string, string] {
         if (member == null) {
             return null
         }
-        const u = member.user
-        return [this.getNickname(member), this.getAvatarImage(member.user)]
+        const pair = this.formatUser(member)
+        return [pair.name, pair.profileURL]
     }
-    public static normalizeMsg(msg:Discord.Message, guild:Discord.Guild,
-        onlyMention:boolean = false):Discord.Message {
-        msg.content = this.normalize(msg.content, guild, onlyMention)
-        return msg
-    }
-    public static normalizeEmbed(embed:Discord.RichEmbed, guild:Discord.Guild,
-        onlyMention:boolean = false):Discord.RichEmbed {
-        embed.description = this.normalize(embed.description, guild, onlyMention)
-        embed.title = this.normalize(embed.title, guild, onlyMention)
-        if (embed.footer) {
-            embed.footer.text = this.normalize(embed.footer.text, guild, onlyMention)
-        }
-        embed.url = this.normalize(embed.url, guild, onlyMention)
-        embed.fields = embed.fields.map( f => {
-            f.name = this.normalize(f.name, guild, onlyMention)
-            f.value = this.normalize(f.value, guild, onlyMention)
-            return f
-        })
-        return embed
-    }
-    public static normalize(msg:string, guild:Discord.Guild, onlyMention:boolean = false):string {
-        console.log(msg)
+    /**
+     * Normalize user mention & everyone to plain text
+     * 
+     * This makes msg *no mention*
+     * @param msg Message string
+     * @param guild Guild
+     */
+    public static normalizeMention(msg:string, guild:Discord.Guild) {
         let chain = msg
-        if (!onlyMention) {
-            // 1. Bold
-            chain = this.replaceTo(chain, /\*\*.+?\*\*/g, (str) => str.substring(2, str.length - 2))
-            // 2. Italic
-            chain = this.replaceTo(chain, /\*.+?\*/g, (str) => str.substring(1, str.length - 1))
-            // 3. Underline
-            chain = this.replaceTo(chain, /__.+?__/g, (str) => str.substring(2, str.length - 2))
-            // 4. NamuWiki
-            chain = this.replaceTo(chain, /~~.+?~~/g, (str) => str.substring(2, str.length - 2))
-            // 5. codeBlocks
-            chain = chain.replace(/```.*?```/, "").replace(/`.*?`/ig, "")
-            // 6. emote
-            chain = this.replaceTo(chain, /<a?:\S+:\d+>/g, (str) => "")
-        }
-        // 7. mention
-        chain = this.replaceTo(chain, /<@[!]?\d+>/g, (str) => {
+        // 1. mention
+        chain = this.replaceTo(chain, MessageMentions.USERS_PATTERN, (str) => {
             const id = str.match(/\d+/i)[0]
             if (guild == null || !guild.available) {
                 return ""
@@ -526,10 +541,22 @@ export class DiscordFormat {
                 return ""
             }
         })
-        // 8. everyone and here
-        chain = chain.replace(/@(everyone|here)/g, "유 워너 비 뚜따?")
-        // 9. channel
-        chain = this.replaceTo(chain, /<#[!]?\d+>/g, (str) => {
+        // 2. everyone and here
+        chain = this.replaceTo(chain, MessageMentions.EVERYONE_PATTERN, (str) => str.replace("@", "@" + blankChar))
+        return chain
+    }
+    /**
+     * Normalize variable values to plain text
+     * 
+     * ***variable*** *values* : Role, Channel, User mention, Everyone
+     * @param msg Message string
+     * @param guild Guild
+     */
+    public static normalizeVariable(msg:string, guild:Discord.Guild) {
+        // 1. user mention
+        let chain = this.normalizeMention(msg, guild)
+        // 2. channel
+        chain = this.replaceTo(chain, MessageMentions.CHANNELS_PATTERN, (str) => {
             const id = str.match(/\d+/i)[0]
             if (guild == null || !guild.available) {
                 return ""
@@ -541,8 +568,8 @@ export class DiscordFormat {
                 return ""
             }
         })
-        // 10. role
-        chain = this.replaceTo(chain, /<@&\d+>/g, (str) => {
+        // 3. role
+        chain = this.replaceTo(chain, MessageMentions.ROLES_PATTERN, (str) => {
             const id = str.match(/\d+/i)[0]
             if (guild == null || !guild.available) {
                 return ""
@@ -556,16 +583,84 @@ export class DiscordFormat {
         })
         return chain
     }
-    private static replaceTo(data:string, regex:RegExp, after:(str:string) => string) {
+    /**
+     * Normalize All discord markdown to plain text
+     * 
+     * @param msg Message string
+     * @param guild Guild
+     * @param normalInCode Normalize in code block?
+     */
+    public static normalize(msg:string, guild:Discord.Guild, normalInCode = false):string {
+        let chain = msg
+        // 0. codeBlock rollup
+        const codeID = NCaptcha.randomString(5, "ABCDEFGHIJKMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+        const codeSmalls:string[] = []
+        const codeBigs:string[] = []
+        if (!normalInCode) {
+            // codeBlock - big
+            chain = this.replaceTo(chain, /```.*?```/g, (str, index) => {
+                codeBigs.push(str.substring(3, str.length - 3))
+                return `$${codeID}{b${index.toString()}}`
+            })
+            // codeBlock - small
+            chain = this.replaceTo(chain, /`.*?`/g, (str, index) => {
+                codeSmalls.push(str.substring(1, str.length - 1))
+                return `$${codeID}{s${index.toString()}}`
+            })
+        } else {
+            // remove codeBlock
+            chain = this.replaceTo(chain, /```.*?```/g, (str) => `\n${str.substring(3, str.length - 3)}\n`)
+            chain = this.replaceTo(chain, /`.*?`/g, (str) => str.substring(1, str.length - 1))
+        }
+        // 1. Bold
+        chain = this.replaceTo(chain, /\*\*.+?\*\*/g, (str) => str.substring(2, str.length - 2))
+        // 2. Italic
+        chain = this.replaceTo(chain, /\*.+?\*/g, (str) => str.substring(1, str.length - 1))
+        // 3. Underline
+        chain = this.replaceTo(chain, /__.+?__/g, (str) => str.substring(2, str.length - 2))
+        // 4. NamuWiki
+        chain = this.replaceTo(chain, /~~.+?~~/g, (str) => str.substring(2, str.length - 2))
+        // 5. emote
+        chain = this.replaceTo(chain, /<a?:\S+:\d+>/g, () => "")
+        // 6. role & channel & user mention
+        chain = this.normalizeVariable(chain, guild)
+        // 7. codeBlocks (recover)
+        if (!normalInCode) {
+            chain = this.replaceTo(chain, new RegExp("\\$" + codeID + "\\{[bs]\d+\\}", "g"), (str) => {
+                const i = Number.parseInt(str.match("\d+")[0])
+                if (Number.isNaN(i)) {
+                    return ""
+                }
+                try {
+                    if (str.indexOf("{b") >= 0) {
+                        // big
+                        return `\n${codeBigs[i]}\n`
+                    } else if (str.indexOf("{s") >= 0) {
+                        // small
+                        return codeSmalls[i]
+                    }
+                } catch {
+                    // wtf
+                }
+                return ""
+            })
+        }
+        return chain
+    }
+    private static replaceTo(data:string, regex:RegExp, after:(str:string, index?:number) => string) {
         const matches = data.match(regex)
         if (matches == null || matches.length <= 0) {
             return data
         }
         let chain = data
-        for (const matchStr of matches) {
-            chain = chain.replace(matchStr, after(matchStr))
+        for (let i = 0; i < matches.length; i += 1) {
+            const matchStr = matches[i]
+            chain = chain.replace(matchStr, after(matchStr, i))
         }
         return chain
+    }
+    private static getUser(user:Discord.User | Discord.GuildMember) {
+        return user instanceof Discord.GuildMember ? user.user : user
     }
 
     private _italic = false
@@ -728,7 +823,10 @@ interface FieldBlock {
     type?:ParamType;
     ends:string;
 }
-
+/**
+ * Get first element in Array
+ * @param arr Array
+ */
 export function getFirst<T>(arr:T[]):T {
     if (arr != null && arr.length >= 1) {
         return arr[0]
@@ -736,6 +834,10 @@ export function getFirst<T>(arr:T[]):T {
         return null
     }
 }
+/**
+ * Get first element in Map
+ * @param m Map
+ */
 export function getFirstMap<T, V>(m:Map<T, V>):V {
     if (m != null && m.size >= 1) {
         for (const [k, v] of m) {
@@ -794,6 +896,12 @@ export function getRichTemplate(global:MainCfg, client:Discord.Client) {
     rich.setTimestamp(new Date(Date.now()))
     return rich
 }
+/**
+ * Clone message
+ * 
+ * Unsafe.
+ * @param msg Message 
+ */
 export function cloneMessage(msg:Discord.Message) {
     const attaches:Discord.Attachment[] = []
     const embeds:Discord.RichEmbed[] = []
@@ -851,31 +959,6 @@ export function cloneMessage(msg:Discord.Message) {
         embeds,
         content,
     } as ClonedMessage
-}
-export async function sendClonedMsg(webhook:Discord.Webhook, cloned:ClonedMessage) {
-    const {content, embeds, attaches} = cloned
-    const sendHook = async (_con:string, _data:any) => {
-        if (_con == null || _con.length === 0) {
-            return webhook.send(_data)
-        } else {
-            return webhook.send(_con, _data)
-        }
-    }
-    if (embeds.length >= 1) {
-        let sendedCon = false
-        for (const embed of embeds) {
-            if (!sendedCon) {
-                sendedCon = true
-                await sendHook(content, embed)
-            } else {
-                await sendHook(null, embed)
-            }
-        }
-    } else {
-        await sendHook(content, {
-            files: attaches,
-        })
-    }
 }
 export interface ClonedMessage {
     attaches:Discord.Attachment[];
