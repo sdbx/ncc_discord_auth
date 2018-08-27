@@ -229,7 +229,7 @@ export default class Runtime extends EventEmitter {
                   * hard coding!
                 */
                 if (!await this.hardCodingCmd(msg, text, status)) {
-                    await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)))
+                    Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)))
                 }
             } catch (err) {
                 Log.e(err)

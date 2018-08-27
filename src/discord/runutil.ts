@@ -14,6 +14,7 @@ export enum ParamType {
     to = "으로/로",
     from = "에서",
     do = "해줘/해/줘",
+    much = "만큼",
 }
 export enum ParamAccept {
     ANY,

@@ -9,13 +9,19 @@ import { ChainData, cloneMessage, CmdParam, CommandHelp, CommandStatus, DiscordF
     getFirstMap, getRichTemplate, ParamAccept, ParamType } from "../runutil"
 
 const bulkLimit = 100
+const timeLimit = 1000 * 3600 * 24 * 14 + 300000
 // tslint:disable-next-line
 const filterSimple = ['씨발', '시발', '씨ㅂ', '씨바', 'ㅆ발', 'ㅆ바', '시바', '시ㅂ', 'ㅅ바', 'ㅅ발', 'ㅅㅂ', '개새끼', '새끼', '썅', 'ㅅㄲ', '凸', '병신', 'ㅂㅅ', 'ㅄ', '병ㅅ', '병시', 'ㅂ신', '빙신', '지랄', 'ㅈㄹ', '지ㄹ', 'ㅈ랄', '개소리', '슈바', '슈발', '슈ㅂ', '조까', '좆까', '개소리', 'ㅆㅂ', '니애미', '닥쳐', 'ㄷㅊ', '닥ㅊ', 'ㄷ쳐', '느금마', '니애비', '씨부랄', '시부랄', '좆']
 export default class Purge extends Plugin {
     // declare command.
     protected config = new PurgeConfig()
     private purge:CommandHelp
-    private listCache:Map<string, Cache<Array<[string, string]>>> = new Map()
+    /**
+     * Message List
+     * 
+     * Order: New -> Old (0:New, ... last:Old)
+     */
+    private listMessage:Map<string, MessageID[]> = new Map()
     private working:string[] = []
     private caching = false
     private filterRegex = new RegExp(`(${filterSimple.join("|")})`, "ig")
@@ -27,7 +33,7 @@ export default class Purge extends Plugin {
         await super.ready()
         // CommandHelp: suffix, description
         this.purge = new CommandHelp("purge/삭제", this.lang.purge.purgeDesc)
-        this.purge.addField(ParamType.dest, "삭제할 갯수 | ALL", true, {code: ["num/개"]})
+        this.purge.addField(ParamType.much, "삭제할 갯수 | ALL", true, {code: ["num/개"]})
         // get parameter as complex
         this.purge.complex = true
         // listen delete event
@@ -165,10 +171,11 @@ export default class Purge extends Plugin {
         // test command if match
         const testPurge = this.purge.check(this.global, command, state)
         if (testPurge.match && !msg.author.bot) {
-            const numStr = testPurge.get(ParamType.dest)
+            const numStr = testPurge.get(ParamType.much)
             let all = false // All message (author: me)
             let deleteALL = false // All Author's message (length: defined)
             let num = Number.parseInt(numStr)
+            // check number of delete
             if (numStr.toUpperCase() === "ALL" || numStr.toUpperCase() === "-ALL") {
                 all = true
                 if (numStr.startsWith("-")) {
@@ -179,6 +186,7 @@ export default class Purge extends Plugin {
                 await msg.channel.send("Not int.")
                 return Promise.resolve()
             }
+            // check permission
             let checkPm = false
             if (msg.channel instanceof Discord.GuildChannel) {
                 const perms = msg.channel.permissionsFor(msg.guild.members.find((v) => v.id === this.client.user.id))
@@ -192,6 +200,7 @@ export default class Purge extends Plugin {
                 await msg.channel.send(this.lang.purge.noPerm)
                 return Promise.resolve()
             }
+            // check delete count / convert to sudo
             let deleteCount = num
             if (deleteCount === 0) {
                 await msg.delete()
@@ -212,25 +221,25 @@ export default class Purge extends Plugin {
                 return Promise.resolve()
             }
             // check cache
-            const check = await this.checkCache(msg.channel, msg.id, msg.author.id)
-            if (check != null) {
-                Log.d("Caching", check)
-                // await msg.channel.send(check)
+            const caching = this.caching
+            const progress = await this.updateCache(msg.channel, msg.id, caching)
+            if (caching) {
+                await progress.delete(2000)
                 return Promise.resolve()
             }
             // add queue
             this.working.push(msg.author.id)
             // add
             const deleteIDs:string[] = []
-            const recents = this.listCache.get(msg.channel.id).cache
+            const recents = this.listMessage.get(msg.channel.id)
             let recentL = recents.length
             for (let i = 0; i < recentL; i += 1) {
-                const [userid, msgid] = recents[i]
-                if (deleteALL || userid.toString() === msg.author.id) {
+                const {authorId, msgId} = recents[i]
+                if (deleteALL || authorId.toString() === msg.author.id) {
                     recentL -= 1
                     recents.splice(i, 1)
                     i -= 1
-                    deleteIDs.push(msgid.toString())
+                    deleteIDs.push(msgId.toString())
                 }
                 if (!all && deleteIDs.length >= deleteCount) {
                     break
@@ -241,7 +250,7 @@ export default class Purge extends Plugin {
                 startMsg = await msg.channel.send(
                     sprintf(this.lang.purge.deleting, { total: deleteIDs.length })) as Discord.Message
             }
-            deleteIDs.unshift(msg.id)
+            deleteIDs.unshift(msg.id, progress.id)
             // remove
             while (deleteIDs.length > 0) {
                 const del = deleteIDs.splice(0, Math.min(deleteIDs.length, 100))
@@ -260,45 +269,70 @@ export default class Purge extends Plugin {
         }
         return Promise.resolve()
     }
-    private async checkCache(channel:Discord.TextChannel, lastID:string, userid:string = null) {
+    /**
+     * Ensure cache is up to date (or error)
+     * 
+     * Takes Long Time!
+     * @param channel Channel to create cache
+     * @param lastID end of Message ID
+     * @param caching override caching value
+     * @returns State Message
+     */
+    private async updateCache(channel:Discord.TextChannel, lastID:string, caching = this.caching) {
         // check cache
         const key = channel.id
-        if (!this.caching) {
-            if (!this.listCache.has(key)) {
-                this.caching = true
-                const msg = await channel.send(this.lang.purge.fetchStart) as Discord.Message
-                this.fetchMessages(channel, lastID).then((v) => {
-                    this.listCache.set(key, new Cache(v, 1209600))
-                    this.caching = false
-                    msg.delete()
-                    channel.send(DiscordFormat.mentionUser(userid) + " " + this.lang.purge.fetchEnd)
-                    .then((m:Discord.Message) => {
-                        m.delete(3000)
-                    })
-                })
-                return "Cache request."
-            } else {
-                const data = this.listCache.get(key)
-                if (data.expired || data.cache.length <= 0) {
-                    this.listCache.delete(key)
-                    this.caching = true
-                    this.fetchMessages(channel, lastID)
-                    return "Cache request (expired)."
+        if (!caching) {
+            this.caching = true
+            const msg = await channel.send(this.lang.purge.fetchStart).catch(() => null) as Discord.Message
+            let lid:string = null
+            if (this.listMessage.has(key)) {
+                const data = this.listMessage.get(key)
+                if (data.length >= 1) {
+                    lid = data[0].msgId
                 }
-                const lid = data.cache[0][1]
-                data.cache.unshift(...await this.fetchMessages(channel, lastID, lid))
-                return null
             }
+            // takes long!
+            const msgIDs:MessageID[] = await this.fetchMessages(channel, lastID, lid).catch(() => [])
+            this.caching = false
+            if (lid == null) {
+                this.listMessage.set(key, msgIDs)
+            } else {
+                const timeout = Date.now() - timeLimit
+                this.cleanLinear(key, timeout)
+                this.listMessage.get(key).unshift(...msgIDs)
+            }
+            /*
+            if (msg != null) {
+                await msg.delete()
+            }
+            */
+            return msg
         } else {
-            return "Caching."
+            return channel.send(this.lang.purge.fetching).catch(() => null) as Promise<Discord.Message>
         }
+    }
+    private cleanLinear(key:string, time:number) {
+        // use linear search because I think that takes not so long
+        if (!this.listMessage.has(key)) {
+            return
+        }
+        const list = this.listMessage.get(key)
+        const length = list.length
+        // tslint:disable-next-line
+        let i;
+        for (i = length - 1; i >= 0; --i) {
+            const msg = list[i]
+            if (msg.timestamp > time) {
+                break
+            }
+        }
+        list.splice(i,length - i)
     }
     private async fetchMessages(channel:Discord.TextChannel, lastID:string, end:string = null) {
         // limit of bulkdelete
-        const stamp = Date.now()
-        const timeout = stamp - 1000 * 3600 * 24 * 14 + 300000
+        const timeout = Date.now() - timeLimit
         let msgid = lastID
-        const messages:Array<[string, string]> = []
+        const messages:MessageID[] = []
         while (true) {
             let breakL = false
             const fetch = await channel.fetchMessages({
@@ -321,7 +355,11 @@ export default class Purge extends Plugin {
                     breakL = true
                     break
                 } else {
-                    messages.push([fMsg.author.id, fMsg.id])
+                    messages.push({
+                        authorId:fMsg.author.id,
+                        msgId:fMsg.id,
+                        timestamp: fMsg.createdTimestamp
+                    })
                 }
                 i += 1
             }
@@ -342,4 +380,9 @@ class PurgeConfig extends Config {
     constructor() {
         super("purger")
     }
+}
+interface MessageID {
+    authorId:string;
+    msgId:string;
+    timestamp:number;
 }
