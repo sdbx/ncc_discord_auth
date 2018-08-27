@@ -6,7 +6,7 @@ import Log from "../../log"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, cloneMessage, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
-    getFirstMap, getRichTemplate, ParamAccept, ParamType } from "../runutil"
+    getFirstMap, getRichTemplate, ParamAccept, ParamType, SnowFlake } from "../runutil"
 
 const bulkLimit = 100
 const timeLimit = 1000 * 3600 * 24 * 14 + 300000
@@ -283,14 +283,25 @@ export default class Purge extends Plugin {
         const key = channel.id
         if (!caching) {
             this.caching = true
-            const msg = await channel.send(this.lang.purge.fetchStart).catch(() => null) as Discord.Message
+            let rich:Discord.RichEmbed = null
             let lid:string = null
             if (this.listMessage.has(key)) {
                 const data = this.listMessage.get(key)
                 if (data.length >= 1) {
+                    rich = this.defaultRich
                     lid = data[0].msgId
+                    const snowC = SnowFlake.from(lid)
+                    const snowN = SnowFlake.from(lastID)
+                    rich.addField("캐시 크기", data.length)
+                    rich.addField("캐시 ID", snowC.increment, true)
+                    rich.addField("현재 ID", snowN.increment, true)
+                    rich.addField("캐시 Timestamp", snowC.timestamp)
+                    rich.addField("현재 Timestamp", snowN.timestamp)
+                    const url = "https://discordapp.com/channels/" + [channel.guild.id, channel.id, lid].join("/")
+                    rich.setDescription(url)
                 }
             }
+            const msg = await channel.send(this.lang.purge.fetchStart, rich).catch(() => null) as Discord.Message
             // takes long!
             const msgIDs:MessageID[] = await this.fetchMessages(channel, lastID, lid).catch(() => [])
             this.caching = false
@@ -342,7 +353,11 @@ export default class Purge extends Plugin {
             })
             let i = 0
             for (const [k, fMsg] of fetch) {
+                if (end != null && Number.isNaN(Number.parseInt(end))) {
+                    Log.d("NaN", end)
+                }
                 if (end != null && Number.parseInt(fMsg.id) <= Number.parseInt(end)) {
+                    Log.d("EndPoint found", end)
                     breakL = true
                     break
                 }
@@ -370,7 +385,6 @@ export default class Purge extends Plugin {
                 break
             }
         }
-        Log.d("Cached Mesasges", messages.length + "")
         return messages
     }
 }

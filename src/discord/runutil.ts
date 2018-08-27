@@ -1,5 +1,6 @@
 import * as Discord from "discord.js"
 import { MessageMentions } from "discord.js"
+import * as Long from "long"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
 import { MainCfg } from "./runtime"
@@ -965,4 +966,27 @@ export interface ClonedMessage {
     attaches:Discord.Attachment[];
     embeds:Discord.RichEmbed[];
     content:string;
+}
+export class SnowFlake {
+    public static from(snowflake:string) {
+        const L = Long.fromString(snowflake, true, 10)
+        const th = new SnowFlake()
+        
+        th.timestamp = new Date(L.shiftRight(22).toNumber() + 1420070400000)
+        th.increment = L.and(0xFFF).toNumber()
+        th.iWorkerID = L.and(0x3E0000).shiftRight(17).toNumber()
+        th.iProcessID = L.and(0x1F000).shiftRight(12).toNumber()
+        return th
+    }
+    public timestamp:Date
+    public increment:number
+    private iWorkerID:number
+    private iProcessID:number
+    private _original:string
+    public toString() {
+        return this._original
+    }
+    public get id() {
+        return this._original
+    }
 }
