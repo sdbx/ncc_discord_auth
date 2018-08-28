@@ -23,8 +23,8 @@ async function start() {
 }
 // Log.hook()
 Log.enable = true
-start()
-// init()
+// start()
+init()
 // client()
 
 async function init() {
@@ -45,6 +45,8 @@ async function init() {
             } catch (err) {
                 Log.e(err)
             }
+            const cafe = await ncc.parseNaverDetail(26686242)
+            await ncc.uploadFile(cafe, "/home/alyac/Downloads/욕목록.txt", "test.txt")
         }
     }
 }

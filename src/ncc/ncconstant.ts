@@ -19,6 +19,7 @@ export const INSECURE_CAPTCHA = `http://captcha.naver.com`
 export const CAFE_LOGIN_CHECK = `${cafePrefix}/LoginCheck.nhn?m=check`
 export const CAFE_PROFILE_UPDATE = `${cafePrefix}/CafeMemberInfoUpdate.nhn`
 export const CAFE_NICKNAME_CHECK = `${cafePrefix}/CafeMemberNicknameCheckAjax.nhn`
+export const CAFE_UPLOAD_FILE = `https://up.cafe.naver.com/AttachFile.nhn`
 
 export const CHAT_BACKEND_URL = "https://talkwss.cafe.naver.com"
 export const CHAT_SOCKET_IO = `${CHAT_BACKEND_URL}/socket.io/`

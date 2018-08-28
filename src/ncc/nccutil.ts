@@ -1,5 +1,9 @@
+import * as fs from "fs-extra"
 import * as get from "get-value"
 import * as mime from "mime-types"
+import * as path from "path"
+import * as request from "request-promise-native"
+import { Stream } from "stream"
 import Log from "../log"
 import Cafe from "./structure/cafe"
 import Profile from "./structure/profile"
@@ -114,6 +118,47 @@ export function withName<T>(value:T, filename:string = null) {
            contentType
        }
    }
+}
+/**
+ * Get sendable file from parameter
+ * 
+ * Result can be null
+ * @param file File URL | File Path | File Buffer
+ * @param filename File's name
+ */
+export async function parseFile(file:string | Buffer, filename:string = null, defaultFileName = "unknown.png") {
+    let send:Buffer | Stream = null
+    let filesize:number = -1
+    if (typeof file === "string") {
+        if (/http(s)?:\/\//.test(file)) {
+            if (filename == null) {
+                filename = decodeURIComponent(file.replace(/\?.*/ig, ""))
+                filename = filename.substring(filename.lastIndexOf("/") + 1)
+            }
+            send = await request.get(file, {encoding: null}).catch((err) => null)
+            filesize = (send as Buffer).byteLength
+        } else {
+            file = file.replace(/\\\s/ig, " ")
+            const p = path.resolve(file)
+            if (await fs.pathExists(p)) {
+                filesize = (await fs.stat(p)).size
+                if (filename == null) {
+                    filename = path.basename(file)
+                }
+                send = fs.createReadStream(p)
+            }
+        }
+    } else {
+        if (filename == null) {
+            filename = defaultFileName
+        }
+        send = file
+    }
+    return {
+        sendable:send,
+        filename,
+        filesize,
+    }
 }
 export class ParamStr {
     public static make(str:string) {

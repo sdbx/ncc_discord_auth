@@ -9,13 +9,15 @@ import * as request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE,
-    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, naverRegex, whitelistDig } from "./ncconstant"
+    CAFE_UPLOAD_FILE, cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, naverRegex, whitelistDig } from "./ncconstant"
+import { parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
 import Article from "./structure/article"
 import Cafe from "./structure/cafe"
 import Comment from "./structure/comment"
 import Profile from "./structure/profile"
 import NcJson from "./talk/ncjson"
+import uploadImage from "./talk/uploadphoto"
 const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0"
 /**
  * Naver fetcher class using **jQuery**
@@ -559,6 +561,39 @@ export default class NcFetch extends NcCredent {
         return memberList
     }
     /**
+     * Upload image to naver server
+     * @param file File Path | File URL | File Buffer
+     * @param filename FileName
+     * @returns Image info / reject (if not logined or fail)
+     */
+    public async uploadImage(file:string | Buffer, filename?:string) {
+        if (!await this.availableAsync()) {
+            return Promise.reject("Not Logined")
+        }
+        return uploadImage(this.credit, file, filename)
+    }
+    public async uploadFile(cafe:Cafe, file:string | Buffer, filename:string) {
+        if (cafe.cafeName == null) {
+            return Promise.reject(new Error("Cafe code need."))
+        }
+        const url = CAFE_UPLOAD_FILE
+        const sendFile = await parseFile(file, filename, "unknown")
+        const param = {
+            "attachsizerealsum":sendFile.filesize,
+            "attachFileType": "F",
+            "cluburl": cafe.cafeName,
+            "clubid": cafe.cafeId,
+            "isNdrive": false,
+            "fileinfos": null,
+            "servicetype": "CAFE-FILE",
+            "attachfile": withName(sendFile.sendable, sendFile.filename),
+        }
+        const r = await this.credit.reqPost(url, {}, param,
+            `https://up.cafe.naver.com/AttachFileView.nhn?cluburl=${cafe.cafeName}&clubid=${cafe.cafeId}`) as string
+        Log.d("test", r)
+        return r
+    }
+    /**
      * Change Nickname or image
      * @param cafeid Naver CafeID
      * @param nickname to change Nickname (null if u don't change)
@@ -567,6 +602,9 @@ export default class NcFetch extends NcCredent {
     public async changeProfile(cafeid:number | Cafe, nickname?:string, image?:string) {
         if (typeof cafeid !== "number") {
             cafeid = cafeid.cafeId
+        }
+        if (!await this.availableAsync()) {
+            return Promise.resolve(null)
         }
         const uname = this.credit.username
         if (nickname == null || image == null) {
@@ -612,7 +650,9 @@ export default class NcFetch extends NcCredent {
         return Promise.resolve(t[0])
     }
     /**
-     * 닉네임 검색
+     * Query users using nick
+     * @param cafeid CafeID
+     * @param nick Nickname
      */
     protected async queryMembersByNick(cafeid:number,nick:string) {
         // http://cafe.naver.com/static/js/mycafe/javascript/nickNameValidationChk-1516327387000-7861.js
