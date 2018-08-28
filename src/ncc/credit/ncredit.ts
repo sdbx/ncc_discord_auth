@@ -7,6 +7,7 @@ import { Agent } from "https"
 import * as querystring from "querystring"
 import * as orgrq from "request"
 import * as request from "request-promise-native"
+import { Stream } from "stream"
 import { Cookie, CookieJar, parseDate } from "tough-cookie"
 import Cache from "../../cache"
 import Log from "../../log"
@@ -416,7 +417,7 @@ export default class NCredit extends EventEmitter {
                     if (value == null) {
                         continue
                     }
-                    if (value instanceof Buffer) {
+                    if (value instanceof Buffer || value instanceof Stream) {
                         return true
                     }
                     if (typeof value === "object") {
@@ -444,7 +445,7 @@ export default class NCredit extends EventEmitter {
             formData: binary ? postD : undefined,
             agent: this.httpsAgent.value,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
-            strictSSL: true,
+            strictSSL: false,
             headers: {
                 // "cache-control": "no-cache, no-store, max-age=0",
                 "referer": referer,
@@ -452,9 +453,9 @@ export default class NCredit extends EventEmitter {
             },
             jar: cookie,
         }
-        this.saveCookie(COOKIE_SITES, cookie)
         try {
             const buffer:Buffer | string = await request(options)
+            this.saveCookie(COOKIE_SITES, cookie)
             if (typeof buffer === "string") {
                 // utf-8 encoded
                 return Promise.resolve(buffer)
@@ -490,6 +491,25 @@ export default class NCredit extends EventEmitter {
         } catch {
             log("Cookie parse:fail")
         }
+    }
+    /**
+     * Check cookie exists.
+     * @param url Cookie's URL
+     * @param key Cookie's key
+     */
+    public hasCookie(url:string, key?:string) {
+        const cookies = this.cookieJar.getCookiesSync(url)
+        if (cookies.length < 0) {
+            return false
+        } else if (key == null) {
+            return true
+        }
+        for (const cookie of cookies) {
+            if (cookie.key === key) {
+                return true
+            }
+        }
+        return false
     }
     /**
      * Generate NNB cookie

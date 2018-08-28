@@ -1,6 +1,7 @@
 import * as caller from "caller"
 import * as cheerio from "cheerio"
 import * as encoding from "encoding"
+import * as fs from 'fs-extra'
 import * as get from "get-value"
 import * as Entities from "html-entities"
 import { Agent } from "https"
@@ -8,9 +9,10 @@ import * as querystring from "querystring"
 import * as request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
-import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE,
-    CAFE_UPLOAD_FILE, cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, naverRegex, whitelistDig } from "./ncconstant"
-import { parseFile, withName } from "./nccutil"
+import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
+    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix,
+    naverRegex, whitelistDig } from "./ncconstant"
+import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
 import Article from "./structure/article"
 import Cafe from "./structure/cafe"
@@ -57,6 +59,13 @@ export default class NcFetch extends NcCredent {
         if (option.useAuth && (!isNaver || !await this.availableAsync())) {
             Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`)
             return Promise.reject()
+        }
+        if (option.eucKR && option.type === SendType.POST && option.postdata != null) {
+            // Legacy need
+        } else {
+            const reqBody = await this.credit.req(
+                option.type, requrl, param, option.postdata, option.referer, option.eucKR ? "ms949" : "utf-8") as string
+            return cheerio.load(reqBody)
         }
         /**
          * form data modification
@@ -571,27 +580,6 @@ export default class NcFetch extends NcCredent {
             return Promise.reject("Not Logined")
         }
         return uploadImage(this.credit, file, filename)
-    }
-    public async uploadFile(cafe:Cafe, file:string | Buffer, filename:string) {
-        if (cafe.cafeName == null) {
-            return Promise.reject(new Error("Cafe code need."))
-        }
-        const url = CAFE_UPLOAD_FILE
-        const sendFile = await parseFile(file, filename, "unknown")
-        const param = {
-            "attachsizerealsum":sendFile.filesize,
-            "attachFileType": "F",
-            "cluburl": cafe.cafeName,
-            "clubid": cafe.cafeId,
-            "isNdrive": false,
-            "fileinfos": null,
-            "servicetype": "CAFE-FILE",
-            "attachfile": withName(sendFile.sendable, sendFile.filename),
-        }
-        const r = await this.credit.reqPost(url, {}, param,
-            `https://up.cafe.naver.com/AttachFileView.nhn?cluburl=${cafe.cafeName}&clubid=${cafe.cafeId}`) as string
-        Log.d("test", r)
-        return r
     }
     /**
      * Change Nickname or image
