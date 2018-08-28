@@ -45,8 +45,6 @@
     "indent": [true, "spaces", 4],
     "semicolon": [true, "never", "ignore-interfaces"],
     "radix": false,
-    "deprecation": true,
-    "linebreak-style": [true, "LF"],
-    "match-default-export-name": true
+    "linebreak-style": [true, "LF"]
   }
 }

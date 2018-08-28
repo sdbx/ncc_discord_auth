@@ -40,10 +40,11 @@ export default class NcFetch extends NcCredent {
     }
     /**
      * Get Cheerio(jQuery) object from url
-     * @returns jQuery
      * @param requrl URL request
      * @param param get parameter
      * @param option convert to EUC-KR / use cookie for auth
+     * @returns jQuery
+     * @deprecated use NCredit.
      */
     public async getWeb(requrl:string, param:{ [key:string]: string | number } = {},
             option = new RequestOption()):Promise<CheerioStatic> {
