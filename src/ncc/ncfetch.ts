@@ -30,6 +30,7 @@ export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities()
     private cacheDetail = new Map<number, Cache<Cafe>>()
     private cacheCafeID = new Map<string, Cache<number>>()
+    private cacheNCMC4:Cache<string>
     private httpsAgent:Cache<Agent>
     constructor() {
         super()
@@ -56,8 +57,8 @@ export default class NcFetch extends NcCredent {
          * Check cookie status
          */
         const isNaver = naverRegex.test(requrl)
-        if (option.useAuth && (!isNaver || !await this.availableAsync())) {
-            Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`)
+        if (option.useAuth && !await this.availableAsync()) {
+            Log.w("ncc-getWeb",`${requrl}: ${!isNaver ? "Wrong url" : "Cookie error!"}`)
             return Promise.reject()
         }
         if (option.eucKR && option.type === SendType.POST && option.postdata != null) {
@@ -580,6 +581,34 @@ export default class NcFetch extends NcCredent {
             return Promise.reject("Not Logined")
         }
         return uploadImage(this.credit, file, filename)
+    }
+    public async fetchWatching(cafeid:number) {
+        if (this.cacheNCMC4 == null || this.cacheNCMC4.expired) {
+            if (!await this.availableAsync()) {
+                return Promise.reject("Not Logined")
+            }
+            const str = await this.credit.reqGet("https://cafe.naver.com/sdbx") as string
+            const first = getFirst(str.match(/.+ncmc4.+/ig))
+            if (first == null) {
+                return Promise.reject("Not Logined")
+            }
+            this.cacheNCMC4 = new Cache(first.substring(first.indexOf("\"") + 1, first.lastIndexOf("\"")), 3600)
+        }
+        const url = "https://lm02.cafe.naver.com/addAndList.nhn"
+        const query = {
+            "r": "linkedMember",
+            "cafeKey": cafeid,
+            "ncmc4": this.cacheNCMC4.value
+        }
+        const json = JSON.parse(await this.credit.reqGet(url, query) as string)
+        const users:Array<{userid:string, name:string}> = []
+        for (const obj of get(json, "l")) {
+            users.push({
+                userid: get(obj, "m"),
+                name: get(obj, "n"),
+            })
+        }
+        return users
     }
     /**
      * Change Nickname or image

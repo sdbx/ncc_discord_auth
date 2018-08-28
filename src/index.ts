@@ -3,6 +3,7 @@ import * as Discord from "discord.js"
 import * as readline from "readline"
 import * as request from "request-promise-native"
 import Runtime from "./discord/runtime"
+import { getFirst } from "./discord/runutil"
 import Log from "./log"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
 import Cafe from "./ncc/structure/cafe"
@@ -46,6 +47,11 @@ async function init() {
                 Log.e(err)
             }
             const cafe = await ncc.parseNaverDetail(26686242)
+            const str = await ncc["credit"].reqGet("https://cafe.naver.com/sdbx") as string
+            const first = getFirst(str.match(/.+ncmc4.+/ig))
+            if (first != null) {
+                Log.d("Test", first)
+            }
         }
     }
 }

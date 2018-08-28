@@ -12,6 +12,9 @@ export default class EventNotifier extends Plugin {
     // declare command.
     private welcome:CommandHelp
     private eventR:CommandHelp
+    private watchAct:CommandHelp
+    private cafeWatchT:NodeJS.Timer
+    private lastWatchers:Map<number, ActiveUser[]>
     /**
      * Initialize command
      */
@@ -21,6 +24,8 @@ export default class EventNotifier extends Plugin {
         // CommandHelp: suffix, description
         this.welcome = new CommandHelp("환영", this.lang.events.descWelcome, true, {reqAdmin: true})
         this.eventR = new CommandHelp("이벤트 수신", this.lang.events.descBotCh, true, {reqAdmin: true})
+        this.watchAct = new CommandHelp("접속자 체크", "카페 접속자 체크", true, {reqAdmin: true})
+        this.watchAct.addField(ParamType.dest, "카페URL", false)
         this.client.on("guildMemberAdd",(async (member:Discord.GuildMember) => {
             const guild = member.guild
             const cfg = await this.sub(this.config, guild.id)
@@ -50,6 +55,8 @@ export default class EventNotifier extends Plugin {
                 await this.sendContent(guild, cfg.botCh, DiscordFormat.mentionUser(newMember.user.id), rich)
             }
         }).bind(this))
+        this.lastWatchers = new Map()
+        this.cafeWatchT = setInterval(this.syncWatcher.bind(this), 10000)
         return Promise.resolve()
     }
     /**
@@ -58,18 +65,49 @@ export default class EventNotifier extends Plugin {
     public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // test command if match
         const testWelcome = this.welcome.check(this.global, command, state)
-        const testReceive = this.eventR.check(this.global, command, state)
         if (testWelcome.match) {
             await msg.channel.send(this.lang.events.typeWelcomeMsg)
             this.startChain(msg.channel.id, msg.author.id, ChainType.WELCOME)
             return Promise.resolve()
         }
+        const testReceive = this.eventR.check(this.global, command, state)
         if (testReceive.match) {
             const cfg = await this.sub(this.config, msg.guild.id)
             cfg.botCh = msg.channel.id
             await msg.channel.send(this.lang.events.setBotCh)
             await cfg.export()
+            return Promise.resolve()
         }
+        const testWatch = this.watchAct.check(this.global, command, state)
+        if (testWatch.match && msg.guild != null) {
+            const arr = this.config.subCafes
+            for (let i = 0; i < arr.length; i += 1) {
+                const sub = arr[i]
+                if (sub.guildid === msg.guild.id) {
+                    arr.splice(i, 1)
+                    await msg.channel.send("구독 해제 완료.")
+                    return Promise.resolve()
+                }
+            }
+            if (testWatch.has(ParamType.dest)) {
+                Log.d("url", testWatch.get(ParamType.dest))
+                const cafeI = await this.ncc.parseNaver(testWatch.get(ParamType.dest)).catch(Log.e)
+                if (cafeI == null) {
+                    await msg.channel.send("오류.")
+                    return Promise.resolve()
+                }
+                arr.push({
+                    cafeid: cafeI.cafeId,
+                    guildid: msg.guild.id,
+                })
+                await msg.channel.send("구독 완료.")
+            }
+        }
+        return Promise.resolve()
+    }
+    public async onDestroy() {
+        await super.onDestroy()
+        clearInterval(this.cafeWatchT)
         return Promise.resolve()
     }
     protected async sendContent(guild:Discord.Guild, channelID:string, text:string, rich:Discord.RichEmbed = null) {
@@ -95,6 +133,50 @@ export default class EventNotifier extends Plugin {
             }))
         return Promise.resolve()
     }
+    protected async syncWatcher() {
+        const buffer = new Map<number, ActiveUser[]>()
+        for (const watch of this.config.subCafes) {
+            if (!buffer.has(watch.cafeid)) {
+                buffer.set(watch.cafeid, await this.ncc.fetchWatching(watch.cafeid))
+            }
+            const added:ActiveUser[] = []
+            const removed:ActiveUser[] = []
+            const users = buffer.get(watch.cafeid)
+            const org = this.lastWatchers.has(watch.cafeid) ? this.lastWatchers.get(watch.cafeid) : []
+            for (const u of users) {
+                const i = this.getFirst(org.map((v, _i) => ({id:v.userid, index:_i}))
+                    .filter((v) => v.id === u.userid))
+                if (i == null) {
+                    added.push(u)
+                } else {
+                    org.splice(i.index, 1)
+                }
+            }
+            removed.push(...org)
+            this.lastWatchers.set(watch.cafeid, users)
+            if (added.length + removed.length === 0) {
+                return Promise.resolve()
+            }
+            const sub = await this.sub(this.config, watch.guildid)
+            const ch = this.client.channels.has(sub.botCh) ?
+                this.client.channels.get(sub.botCh) as Discord.TextChannel : null
+            if (ch != null) {
+                const rich = this.defaultRich
+                rich.setTitle("카페 접속자")
+                rich.setDescription(users.map((v) => v.name).join(", "))
+                const _n = added.map((v) => v.name).join(", ")
+                if (_n.length >= 1) {
+                    rich.addField("새 접속자", _n, true)
+                }
+                const _r = removed.map((v) => v.name).join(", ")
+                if (_r.length >= 1) {
+                    rich.addField("끈 사람", _r, true)
+                }
+                await ch.send(rich)
+            }
+        }
+        // lastWatchers
+    }
 }
 enum ChainType {
     WELCOME,
@@ -103,7 +185,16 @@ export class EventConfig extends Config {
     public welcomeCh = "welcome"
     public botCh = "bot"
     public welcomeMsg = "Hello!"
+    public subCafes:SubCafe[] = []
     constructor() {
         super("event")
     }
+}
+interface SubCafe {
+    guildid:string;
+    cafeid:number;
+}
+interface ActiveUser {
+    userid:string;
+    name:string;
 }

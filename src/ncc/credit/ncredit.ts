@@ -42,6 +42,7 @@ export default class NCredit extends EventEmitter {
      * Https keep-Alive
      */
     private httpsAgent:Cache<Agent>
+    private urlTimestamp:Map<string, number>
     /**
      * Create NCredit with id, password
      * 
@@ -52,6 +53,7 @@ export default class NCredit extends EventEmitter {
     constructor(username?:string, password?:string) {
         super()
         this.set(username, password)
+        this.urlTimestamp = new Map()
         this.httpsAgent = new Cache((old) => {
             if (old != null) {
                 old.destroy()
@@ -407,7 +409,10 @@ export default class NCredit extends EventEmitter {
         if (from != null) {
             from = from.substr(from.lastIndexOf("/") + 1)
         }
-        Log.url("Fetch URL", _url, from)
+        if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 120000 < Date.now()) {
+            Log.url("Fetch URL", _url, from)
+            this.urlTimestamp.set(_url, Date.now())
+        }
         // check post type
         const likePost = likepost.indexOf(sendType) >= 0
         let binary = false

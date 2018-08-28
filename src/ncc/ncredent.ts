@@ -46,7 +46,7 @@ export default class NcCredent extends EventEmitter {
      * Check logined (Cached or fetch)
      */
     public async availableAsync():Promise<boolean> {
-        return Promise.resolve(this.available || await this.validateLogin(true) != null)
+        return Promise.resolve(this.available || (await this.validateLogin(true)) != null)
     }
     /**
      * Validate login

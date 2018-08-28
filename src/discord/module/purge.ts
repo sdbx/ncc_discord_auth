@@ -361,11 +361,6 @@ export default class Purge extends Plugin {
                     breakL = true
                     break
                 }
-                if (i === fetch.size - 1) {
-                    // Log.d("Timestamp", (fMsg.createdTimestamp - timeout).toString())
-                    msgid = fMsg.id
-                    break
-                }
                 if (fMsg.createdTimestamp < timeout) {
                     breakL = true
                     break
@@ -375,6 +370,11 @@ export default class Purge extends Plugin {
                         msgId:fMsg.id,
                         timestamp: fMsg.createdTimestamp
                     })
+                }
+                if (i === fetch.size - 1) {
+                    // Log.d("Timestamp", (fMsg.createdTimestamp - timeout).toString())
+                    msgid = fMsg.id
+                    break
                 }
                 i += 1
             }
