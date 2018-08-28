@@ -9,7 +9,7 @@ import * as request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE,
-    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, whitelistDig } from "./ncconstant"
+    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, naverRegex, whitelistDig } from "./ncconstant"
 import NcCredent from "./ncredent"
 import Article from "./structure/article"
 import Cafe from "./structure/cafe"
@@ -17,6 +17,11 @@ import Comment from "./structure/comment"
 import Profile from "./structure/profile"
 import NcJson from "./talk/ncjson"
 const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0"
+/**
+ * Naver fetcher class using **jQuery**
+ * 
+ * @extends NcCredent
+ */
 export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities()
     private cacheDetail = new Map<number, Cache<Cafe>>()
@@ -34,7 +39,7 @@ export default class NcFetch extends NcCredent {
         }, 60)
     }
     /**
-     * Get Cheerio(jquery) object from url
+     * Get Cheerio(jQuery) object from url
      * @returns jQuery
      * @param requrl URL request
      * @param param get parameter
@@ -45,7 +50,7 @@ export default class NcFetch extends NcCredent {
         /**
          * Check cookie status
          */
-        const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl)
+        const isNaver = naverRegex.test(requrl)
         if (option.useAuth && (!isNaver || !await this.availableAsync())) {
             Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`)
             return Promise.reject()

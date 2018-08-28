@@ -14,6 +14,11 @@ import NCaptcha from "./ncaptcha"
 
 const setTimeoutP = util.promisify(setTimeout)
 
+/**
+ * Naver authorization
+ * 
+ * A Wrapper of NCredit
+ */
 export default class NcCredent extends EventEmitter {
     protected credit:NCredit
     protected readonly cookiePath
@@ -83,16 +88,18 @@ export default class NcCredent extends EventEmitter {
         let captcha = null
         do {
             try {
-                result = await this.login(username,password, captcha)
+                result = await this.login(username, password, captcha)
             } catch (err) {
                 result = err
             }
             if (result == null) {
+                // wtf.
                 return Promise.resolve(null)
             }
             if (typeof result === "string") {
                 return Promise.resolve(result)
             }
+            // error handling
             if (result.captcha) {
                 await Log.image(result.captchaURL, "Captcha-Login",
                     "When you can't verify captcha, Please click below link.")
@@ -145,9 +152,7 @@ export default class NcCredent extends EventEmitter {
      * Send Logout to naver
      */
     public async logout() {
-        const url = `https://nid.naver.com/nidlogin.logout?returl=https://talk.cafe.naver.com/`
         await this.onLogout()
-        await this.credit.reqGet(url) // useless maybe?
         this._name.revoke()
         await this.credit.logout() // empty cookie
         return Promise.resolve()
@@ -157,7 +162,7 @@ export default class NcCredent extends EventEmitter {
      * 
      * 개꿀잼몰카
      * 
-     * @param delay Delay before login (0 ~ 60) - Blocking unexpected request
+     * @param minDelay Delay before login (0 ~ 60) - Blocking unexpected request
      * @returns Resolve when success, reject when fail
      */
     public async refresh(minDelay = 3) {

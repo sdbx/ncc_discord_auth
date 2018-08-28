@@ -24,6 +24,10 @@ import NcJoinedChannel, { parseFromJoined } from "./talk/ncjoinedchannel"
 import NcJson from "./talk/ncjson"
 import NcMessage from "./talk/ncmessage"
 
+/**
+ * Chains Naver-Cafe-Chat and JSON-API in naver cafe
+ * @extends NcFetch
+ */
 export default class Ncc extends NcFetch {
     /**
      * Joined channels

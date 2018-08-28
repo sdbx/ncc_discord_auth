@@ -220,7 +220,7 @@ export default class Login extends Plugin {
             } else {
                 if (result.captcha) {
                     const url = result.captchaURL
-                    typing.captcha = url.substring(url.indexOf("key=") + 4, url.lastIndexOf("&"))
+                    typing.captcha = result.captchaKey
                     const image:Buffer = await request.get(url, {encoding:null})
 
                     const rich = new Discord.RichEmbed()
