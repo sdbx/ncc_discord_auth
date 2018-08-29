@@ -56,7 +56,7 @@ export default class EventNotifier extends Plugin {
             }
         }).bind(this))
         this.lastWatchers = new Map()
-        this.cafeWatchT = setInterval(this.syncWatcher.bind(this), 10000)
+        this.cafeWatchT = setInterval(this.syncWatcher.bind(this), 60000)
         return Promise.resolve()
     }
     /**
@@ -100,7 +100,9 @@ export default class EventNotifier extends Plugin {
                     cafeid: cafeI.cafeId,
                     guildid: msg.guild.id,
                 })
-                await msg.channel.send("구독 완료.")
+                const rich = this.defaultRich
+                rich.addField("카페 ID", cafeI.cafeId)
+                await msg.channel.send("구독 완료.", rich)
             }
         }
         return Promise.resolve()
@@ -135,9 +137,14 @@ export default class EventNotifier extends Plugin {
     }
     protected async syncWatcher() {
         const buffer = new Map<number, ActiveUser[]>()
+        Log.d("Test", "SyncWatch")
         for (const watch of this.config.subCafes) {
             if (!buffer.has(watch.cafeid)) {
-                buffer.set(watch.cafeid, await this.ncc.fetchWatching(watch.cafeid))
+                try {
+                    buffer.set(watch.cafeid, await this.ncc.fetchWatching(watch.cafeid))
+                } catch (err) {
+                    Log.e(err)
+                }
             }
             const added:ActiveUser[] = []
             const removed:ActiveUser[] = []
@@ -172,7 +179,12 @@ export default class EventNotifier extends Plugin {
                 if (_r.length >= 1) {
                     rich.addField("끈 사람", _r, true)
                 }
-                await ch.send(rich)
+                try {
+                    await ch.send(rich)
+                } catch {
+                    // :)
+                }
+                
             }
         }
         // lastWatchers
