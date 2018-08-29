@@ -492,7 +492,15 @@ export default class NcFetch extends NcCredent {
      * @param nickname 회원의 별명
      */
     public async getMemberByNick(cafeid:number, nickname:string) {
-        const profiles = await this.queryMembersByNick(cafeid,nickname)
+        let chainNick = nickname
+        let profiles:Profile[]
+        // due to naver api bug
+        do {
+            profiles = await this.queryMembersByNick(cafeid, chainNick)
+            if (chainNick.length >= 1) {
+                chainNick = chainNick.substring(0, chainNick.length - 1)
+            }
+        } while (profiles.length <= 0 && chainNick.length  >= 1)
         const real = profiles.filter((_v) => _v.nickname === nickname)
         if (real.length === 0) {
             return Promise.reject(`${nickname} 닉의 유저는 없음`)
