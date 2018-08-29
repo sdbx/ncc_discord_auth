@@ -402,10 +402,6 @@ export default class NCredit extends EventEmitter {
         if (from != null) {
             from = from.substr(from.lastIndexOf("/") + 1)
         }
-        if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 120000 < Date.now()) {
-            Log.url("Fetch URL", _url, from)
-            this.urlTimestamp.set(_url, Date.now())
-        }
         // check post type
         const likePost = likepost.indexOf(sendType) >= 0
         let binary = false
@@ -433,11 +429,12 @@ export default class NCredit extends EventEmitter {
         if (!this.httpsAgent.has(origin)) {
             this.httpsAgent.set(origin, {
                 using: false,
-                agent: new Agent({keepAlive: true}),
+                agent: new Agent({keepAlive: true, keepAliveMsecs: 60000}),
             })
         }
-        if (this.httpsAgent) {
-            this.httpsAgent.doRefresh()
+        const agent_pair = this.httpsAgent.get(origin)
+        if (!agent_pair.using) {
+            agent_pair.using = true
         }
         const cookie = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
@@ -447,7 +444,7 @@ export default class NCredit extends EventEmitter {
             useQuerystring: true,
             form: likePost && !binary ? postD : undefined,
             formData: binary ? postD : undefined,
-            agent: this.httpsAgent.value,
+            agent: agent_pair.using ? null : agent_pair.agent,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
             strictSSL: true,
             headers: {
@@ -458,7 +455,13 @@ export default class NCredit extends EventEmitter {
             jar: cookie,
         }
         try {
+            const bf = Date.now()
             const buffer:Buffer | string = await request(options)
+            agent_pair.using = false
+            if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 120000 < Date.now()) {
+                Log.url("Fetch URL", _url, from + " - " + (Date.now() - bf))
+                this.urlTimestamp.set(_url, Date.now())
+            }
             this.saveCookie(COOKIE_SITES, cookie)
             if (typeof buffer === "string") {
                 // utf-8 encoded
@@ -474,7 +477,7 @@ export default class NCredit extends EventEmitter {
                 }
             }
         } catch (err) {
-            this.httpsAgent.doRefresh()
+            agent_pair.using = false
             Log.e(err)
             return Promise.resolve(null as string)
         }
