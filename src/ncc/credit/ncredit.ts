@@ -41,7 +41,7 @@ export default class NCredit extends EventEmitter {
     /**
      * Https keep-Alive
      */
-    private httpsAgent:Cache<Agent>
+    private httpsAgent:Map<string, BAgent>
     private urlTimestamp:Map<string, number>
     /**
      * Create NCredit with id, password
@@ -54,14 +54,7 @@ export default class NCredit extends EventEmitter {
         super()
         this.set(username, password)
         this.urlTimestamp = new Map()
-        this.httpsAgent = new Cache((old) => {
-            if (old != null) {
-                old.destroy()
-            }
-            return new Agent({
-                keepAlive: true
-            })
-        }, 60)
+        this.httpsAgent = new Map()
     }
     /**
      * Clear cookie
@@ -397,7 +390,7 @@ export default class NCredit extends EventEmitter {
         referer = CHAT_HOME_URL, encoding = "utf-8") {
         // set origin
         const originRegex = /http(s)?:\/\/.+?\//
-        let origin
+        let origin:string
         if (originRegex.test(referer)) {
             origin = referer.match(originRegex)[0]
         } else {
@@ -437,7 +430,13 @@ export default class NCredit extends EventEmitter {
             binary = deepCheck(postD)
         }
         // refresh httpsAgent
-        if (this.httpsAgent.expired) {
+        if (!this.httpsAgent.has(origin)) {
+            this.httpsAgent.set(origin, {
+                using: false,
+                agent: new Agent({keepAlive: true}),
+            })
+        }
+        if (this.httpsAgent) {
             this.httpsAgent.doRefresh()
         }
         const cookie = this.reqCookie
@@ -450,7 +449,7 @@ export default class NCredit extends EventEmitter {
             formData: binary ? postD : undefined,
             agent: this.httpsAgent.value,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
-            strictSSL: false,
+            strictSSL: true,
             headers: {
                 // "cache-control": "no-cache, no-store, max-age=0",
                 "referer": referer,
@@ -570,6 +569,10 @@ export default class NCredit extends EventEmitter {
             Log.e(err)
         }
     }
+}
+interface BAgent {
+    using:boolean;
+    agent:Agent
 }
 /**
  * Response of naver login

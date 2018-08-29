@@ -56,7 +56,7 @@ export default class EventNotifier extends Plugin {
             }
         }).bind(this))
         this.lastWatchers = new Map()
-        this.cafeWatchT = setInterval(this.syncWatcher.bind(this), 60000)
+        this.cafeWatchT = setInterval(this.syncWatcher.bind(this), 10000)
         return Promise.resolve()
     }
     /**
@@ -138,56 +138,52 @@ export default class EventNotifier extends Plugin {
     protected async syncWatcher() {
         const buffer = new Map<number, ActiveUser[]>()
         Log.d("Test", "SyncWatch")
-        for (const watch of this.config.subCafes) {
-            if (!buffer.has(watch.cafeid)) {
-                try {
-                    buffer.set(watch.cafeid, await this.ncc.fetchWatching(watch.cafeid))
-                } catch (err) {
-                    Log.e(err)
+        try {
+            for (const watch of this.config.subCafes) {
+                if (!buffer.has(watch.cafeid)) {
+                    buffer.set(watch.cafeid, await this.ncc.fetchWatching(watch.cafeid).catch(() => null))
+                }
+                const added:ActiveUser[] = []
+                const removed:ActiveUser[] = []
+                const users = buffer.get(watch.cafeid)
+                const org = this.lastWatchers.has(watch.cafeid) ? this.lastWatchers.get(watch.cafeid) : []
+                for (const u of users) {
+                    const i = this.getFirst(org.map((v, _i) => ({id:v.userid, index:_i}))
+                        .filter((v) => v.id === u.userid))
+                    if (i == null) {
+                        added.push(u)
+                    } else {
+                        org.splice(i.index, 1)
+                    }
+                }
+                removed.push(...org)
+                this.lastWatchers.set(watch.cafeid, users)
+                if (added.length + removed.length === 0) {
+                    continue
+                }
+                const sub = await this.sub(this.config, watch.guildid)
+                const ch = this.client.channels.has(sub.botCh) ?
+                    this.client.channels.get(sub.botCh) as Discord.TextChannel : null
+                if (ch != null) {
+                    const rich = this.defaultRich
+                    rich.setTitle("카페 접속자")
+                    rich.setDescription(users.map((v) => v.name).join(", "))
+                    const _n = added.map((v) => v.name).join(", ")
+                    if (_n.length >= 1) {
+                        rich.addField("새 접속자", _n, true)
+                    }
+                    const _r = removed.map((v) => v.name).join(", ")
+                    if (_r.length >= 1) {
+                        rich.addField("끈 사람", _r, true)
+                    }
+                    await ch.send(rich).catch(() => null)
                 }
             }
-            const added:ActiveUser[] = []
-            const removed:ActiveUser[] = []
-            const users = buffer.get(watch.cafeid)
-            const org = this.lastWatchers.has(watch.cafeid) ? this.lastWatchers.get(watch.cafeid) : []
-            for (const u of users) {
-                const i = this.getFirst(org.map((v, _i) => ({id:v.userid, index:_i}))
-                    .filter((v) => v.id === u.userid))
-                if (i == null) {
-                    added.push(u)
-                } else {
-                    org.splice(i.index, 1)
-                }
-            }
-            removed.push(...org)
-            this.lastWatchers.set(watch.cafeid, users)
-            if (added.length + removed.length === 0) {
-                return Promise.resolve()
-            }
-            const sub = await this.sub(this.config, watch.guildid)
-            const ch = this.client.channels.has(sub.botCh) ?
-                this.client.channels.get(sub.botCh) as Discord.TextChannel : null
-            if (ch != null) {
-                const rich = this.defaultRich
-                rich.setTitle("카페 접속자")
-                rich.setDescription(users.map((v) => v.name).join(", "))
-                const _n = added.map((v) => v.name).join(", ")
-                if (_n.length >= 1) {
-                    rich.addField("새 접속자", _n, true)
-                }
-                const _r = removed.map((v) => v.name).join(", ")
-                if (_r.length >= 1) {
-                    rich.addField("끈 사람", _r, true)
-                }
-                try {
-                    await ch.send(rich)
-                } catch {
-                    // :)
-                }
-                
-            }
+        } catch (err) {
+            Log.e(err)
         }
         // lastWatchers
+        Log.d("Test", "SyncWatch-End")
     }
 }
 enum ChainType {
