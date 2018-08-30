@@ -2,6 +2,7 @@ import * as Discord from "discord.js"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
+import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
@@ -13,7 +14,7 @@ export default class EventNotifier extends Plugin {
     private welcome:CommandHelp
     private eventR:CommandHelp
     private watchAct:CommandHelp
-    private cafeWatchT:NodeJS.Timer
+    private cafeWatchT:TimerID
     private lastWatchers:Map<number, ActiveUser[]>
     /**
      * Initialize command
@@ -56,7 +57,7 @@ export default class EventNotifier extends Plugin {
             }
         }).bind(this))
         this.lastWatchers = new Map()
-        this.cafeWatchT = setInterval(this.syncWatcher.bind(this), 10000)
+        this.cafeWatchT = WebpackTimer.setInterval(bindFn(this.syncWatcher, this), 10000)
         return Promise.resolve()
     }
     /**
@@ -109,7 +110,7 @@ export default class EventNotifier extends Plugin {
     }
     public async onDestroy() {
         await super.onDestroy()
-        clearInterval(this.cafeWatchT)
+        WebpackTimer.clearInterval(this.cafeWatchT)
         return Promise.resolve()
     }
     protected async sendContent(guild:Discord.Guild, channelID:string, text:string, rich:Discord.RichEmbed = null) {

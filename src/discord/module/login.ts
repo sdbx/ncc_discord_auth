@@ -7,6 +7,7 @@ import * as tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import { LoginError } from "../../ncc/credit/ncredit"
+import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
@@ -25,7 +26,7 @@ export default class Login extends Plugin {
     private refreshing = false
     // last logined
     private lastLogined:number = -1
-    private refreshTimer:NodeJS.Timer
+    private refreshTimer:TimerID
     /**
      * Initialize command
      */
@@ -47,12 +48,12 @@ export default class Login extends Plugin {
         this.ncc.on("login", () => {
             this.lastLogined = Date.now()
         })
-        this.refreshTimer = setInterval(this.refreshAccount.bind(this), refreshDelay)
+        this.refreshTimer = WebpackTimer.setInterval(bindFn(this.refreshAccount, this), refreshDelay)
         return Promise.resolve()
     }
     public async onDestroy() {
         await super.onDestroy()
-        clearInterval(this.refreshTimer)
+        WebpackTimer.clearInterval(this.refreshTimer)
         return Promise.resolve()
     }
     /**
