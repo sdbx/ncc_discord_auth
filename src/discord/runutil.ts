@@ -5,7 +5,18 @@ import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
 import { MainCfg } from "./runtime"
 
+/**
+ * Semi-transparent char
+ * 
+ * Works in nickname, but showing char in sublime
+ */
 export const blankChar = "\u{17B5}"
+/**
+ * Fully-transparent char
+ * 
+ * Does not work in nickname.
+ */
+export const blankChar2 = "\u{FFF5}" 
 const safeCmd = /(".+?")|('.+?')/i
 const seperator = "/"
 export enum ParamType {

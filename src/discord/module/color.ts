@@ -147,7 +147,7 @@ export default class Color extends Plugin {
                 if (colorCode.toLowerCase() === "random" || colorCode === "랜덤") {
                     const role = await msg.guild.createRole({
                         name: prefix + "Random",
-                        permissions:[],
+                        permissions:[0],
                         mentionable: true,
                         color: 0x000000,
                     })

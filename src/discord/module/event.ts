@@ -150,6 +150,9 @@ export default class EventNotifier extends Plugin {
             const removed:ActiveUser[] = []
             const users = buffer.get(watch.cafeid)
             const org = this.lastWatchers.has(watch.cafeid) ? this.lastWatchers.get(watch.cafeid) : []
+            if (users == null) { 
+                continue
+            }
             for (const u of users) {
                 const i = this.getFirst(org.map((v, _i) => ({ id: v.userid, index: _i }))
                     .filter((v) => v.id === u.userid))

@@ -1,12 +1,13 @@
 export type TimerID = NodeJS.Timer | number
+type FnType = (...args:any[]) => void
 // tslint:disable-next-line
 export class WebpackTimer {
     // tslint:disable-next-line
-    public static setTimeout<T extends Function>(fn:T, ms:number, ...args:any[]):TimerID {
+    public static setTimeout<T extends FnType>(fn:T, ms:number, ...args:any[]):TimerID {
         return setTimeout(fn, ms, ...args)
     }
     // tslint:disable-next-line
-    public static setInterval<T extends Function>(fn:T, ms:number, ...args:any[]):TimerID {
+    public static setInterval<T extends FnType>(fn:T, ms:number, ...args:any[]):TimerID {
         return setInterval(fn, ms, ...args)
     }
     // tslint:disable-next-line
