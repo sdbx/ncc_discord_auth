@@ -16,7 +16,13 @@ export const blankChar = "\u{17B5}"
  * 
  * Does not work in nickname.
  */
-export const blankChar2 = "\u{FFF5}" 
+export const blankChar2 = "\u{FFF5}"
+/**
+ * Thin space char
+ * 
+ * \> `0px` && < `1/5em`
+ */
+export const thinSpace = "\u{200A}"
 const safeCmd = /(".+?")|('.+?')/i
 const seperator = "/"
 export enum ParamType {
@@ -492,6 +498,15 @@ export class DiscordFormat {
         return `<#${channelid}>`
     }
     /**
+     * Discord RoleID -> `@Role`
+     * 
+     * check Role is mentionable.
+     * @param roleid Role's id
+     */
+    public static mentionRole(roleid:string) {
+        return `<@&${roleid}>`
+    }
+    /**
      * Format discord Emoji
      * @param emojiName Emoji Name (Ex. thinking)
      * @param emojiId Emoji ID (Ex. 53535321313)
@@ -908,6 +923,17 @@ export function getRichTemplate(global:MainCfg, client:Discord.Client) {
     // rich.setFooter(client.user.username, client.user.avatarURL)
     rich.setTimestamp(new Date(Date.now()))
     return rich
+}
+export function toLowerString(str:string) {
+    return str.split("_").map((v) => {
+        v = v.toLowerCase()
+        if (v.length >= 2) {
+            v = v.charAt(0).toUpperCase() + v.substr(1)       
+        } else if (v.length >= 1) {
+            v = v.charAt(0).toUpperCase()
+        }
+        return v
+    }).join(" ")
 }
 /**
  * Clone message
