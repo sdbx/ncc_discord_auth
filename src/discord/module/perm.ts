@@ -149,6 +149,7 @@ export default class PermManager extends Plugin {
         if (testSample.match && msg.channel instanceof Discord.GuildChannel) {
             const self = msg.guild.member(this.client.user)
             const roles = msg.guild.roles.array().sort((a,b) => a.position - b.position)
+            const channels = msg.guild.channels.array()
             const userHLv = this.getHighestLevel(msg.member, "MANAGE_ROLES")
             const botHLv = this.getHighestLevel(self, "MANAGE_ROLES")
 
@@ -158,9 +159,11 @@ export default class PermManager extends Plugin {
                 return Promise.resolve()
             }
             //
-            const block = "```md\n" + this.printRoles(roles, 3, Math.min(userHLv, botHLv)) + "\n```"
+            const block = "```md\n" + this.listRoles(roles, 3, Math.min(userHLv, botHLv)) + "\n```"
             const chInfo = this.channelPermInfo(msg.channel)
-            await msg.channel.send(block + "User: " + userHLv + " / Bot: " + botHLv, this.roleInfo(roles[1]))
+            const chList = "```md\n" + this.listChannels(channels, 2) + "```"
+            await msg.channel.send(
+                block + "User: " + userHLv + " / Bot: " + botHLv + "\n" + chList, this.roleInfo(roles[1]))
             await msg.channel.send(chInfo)
             // send Message
             // await msg.reply(this.lang.sample.hello)
@@ -170,8 +173,9 @@ export default class PermManager extends Plugin {
     /**
      * Make Channel's PermOverride RichEmbed
      * @param channel Channel
+     * @param filterU ?
      */
-    public channelPermInfo(channel:Discord.GuildChannel) {
+    public channelPermInfo(channel:Discord.GuildChannel, filterU?:string) {
         const rich = this.defaultRich
         rich.setTitle("Channel Perm")
         const overridePerms = channel.permissionOverwrites.map((po, roleOrMember) => {
@@ -183,20 +187,31 @@ export default class PermManager extends Plugin {
             const name = role != null ? role.name : DiscordFormat.getNickname(member)
             let mention:string = null
             if (role != null) {
-                if (role.mentionable && role.name !== "@everyone") {
-                    mention = DiscordFormat.mentionRole(role.id)
+                if (this.isEveryone(role)) {
+                    if (filterU != null && role.id !== filterU) {
+                        // filtered.
+                        return null
+                    }
+                    if (role.mentionable) {
+                        mention = DiscordFormat.mentionRole(role.id)
+                    }
                 }
             } else if (member != null) {
+                if (filterU != null && member.id !== filterU) {
+                    // filtered.
+                    return null
+                }
                 mention = DiscordFormat.mentionUser(member.id)
             }
             return {
+                info: role != null ? role : member,
                 key:roleOrMember,
                 value: po,
                 name,
                 position: role != null ? role.position : 0.5,
                 mention,   
             }
-        }).sort((a, b) =>  b.position - a.position)
+        }).filter((v) => v != null).sort((a, b) =>  b.position - a.position)
         // create req perm list
         let perms:Discord.PermissionString[]
         if (channel.type === "text") {
@@ -225,7 +240,7 @@ export default class PermManager extends Plugin {
                     flag = Checked.on
                 } else if (denied.indexOf(perm) >= 0) {
                     flag = Checked.off
-                } else if (name !== "@everyone") {
+                } else {
                     flag = Checked.hide
                 }
                 return flag
@@ -236,8 +251,22 @@ export default class PermManager extends Plugin {
             } else {
                 out += `\`\`\`md\n${listPerm}\`\`\``
             }
-            rich.addField(name, out)
+            rich.addField(name + "\nid: " + oPerms.info.id, out)
         }
+        let parentPerm:number = 0
+        const everyonePerm = channel.guild.roles.find(this.isEveryone).permissions
+        if (filterU != null && overridePerms.length >= 1) {
+            const pm = overridePerms[0].info.permissions
+            if (typeof pm === "number") {
+                parentPerm = pm
+            } else {
+                parentPerm = pm.bitfield
+            }
+        }
+        let add = "```md\n"
+        add += this.printPerms(new Discord.Permissions(parentPerm | everyonePerm), perms, 1)
+        add += "```"
+        rich.addField("@global", add)
         return rich
     }
     /**
@@ -312,13 +341,16 @@ export default class PermManager extends Plugin {
     }
     /**
      * Print Roles list
+     * 
+     * Also modify `roles` order.
      * @param roles Roles
      * @param selected Selected Position (highlighted)
      * @param disabled Disable Position (0...length - 1)
      * @param spaceOverride ?
      */
-    public printRoles(roles:Discord.Role[], selected = -1, disabled = -1, spaceOverride = -1) {
-        const names = roles.map((v) => v.name).reverse()
+    public listRoles(roles:Discord.Role[], selected = -1, disabled = -1, spaceOverride = -1) {
+        roles.sort((a, b) => a.position - b.position).reverse()
+        const names = roles.map((v) => v.name)
         let out = ""
         let disabledNames = []
         const rSpace = 3 + Math.floor(Math.log10(names.length))
@@ -329,6 +361,75 @@ export default class PermManager extends Plugin {
             out += this.listDisabledStr(disabledNames, rSpace) + "\n"
         }
         out += this.listStr(names, selected - 1)
+        return out
+    }
+    /**
+     * Print Channel's list
+     * 
+     * Also modify `channels` order.
+     * @param channels Channels
+     * @param selected Selected Position (highlighted)
+     */
+    public listChannels(channels:Discord.GuildChannel[], selected = -1) {
+        channels.sort((a, b) =>  a.position - b.position)
+        const sorts:string[] = [] // sorting infomation
+        const roots:Discord.GuildChannel[] = [] // uncategories
+        const goryMap = new Map<string, Discord.GuildChannel[]>() // categoried maps
+        // tslint:disable-next-line:semicolon
+        const categories:Discord.CategoryChannel[] = []; // the categories
+        for (const ch of channels) {
+            if (ch.type === "category" && ch instanceof Discord.CategoryChannel) {
+                categories.push(ch)
+                continue
+            }
+            if (ch.parentID == null) {
+                roots.push(ch)
+                continue
+            }
+            if (!goryMap.has(ch.parentID)) {
+                goryMap.set(ch.parentID, [ch])
+            } else {
+                goryMap.get(ch.parentID).push(ch)
+            }
+        }
+        let out = ""
+        let index = 1
+        const toName = (v:Discord.GuildChannel) => v.name
+        const push = (ch:Discord.GuildChannel, prefix?:string) => {
+            sorts.push(ch.id)
+            out += this.listStr([(prefix != null ? prefix : "") + ch.name], selected - index, index) + "\n"
+            index += 1
+        }
+        for (const _root of roots) {
+            push(_root)
+        }
+        for (const _category of categories) {
+            const label = "\u{1F3F7}"
+            push(_category, label)
+            const uni = _category.name.match(/[ -~]/ig)
+            out += "\n".padStart(_category.name.length * 2 - (uni == null ? 0 : uni.length), "=")
+            if (goryMap.has(_category.id)) {
+                const groups = goryMap.get(_category.id)
+                groups.sort((a, b) => {
+                    const aI = a.type === "voice" ? a.position + 65536 : a.position
+                    const bI = b.type === "voice" ? b.position + 65536 : b.position
+                    return aI - bI
+                })
+                sorts.push(...groups.map((v) => v.id))
+                out += this.listStr(groups.map((v) => {
+                    if (v.type === "voice") {
+                        const mic = "\u{1F3A4}"
+                        return mic + v.name
+                    } else {
+                        return v.name
+                    }
+                }), selected - index, index)
+                index += groups.length
+                out += "\n"
+            }
+        }
+        channels.sort((a, b) => sorts.indexOf(a.id) - sorts.indexOf(b.id))
+        Log.d("Channels", channels.map((v) => v.name).join("\n"))
         return out
     }
     /**
@@ -394,19 +495,20 @@ export default class PermManager extends Plugin {
      * @param name List strings
      * @param selected Selected at?
      */
-    public listStr(name:string[], selected = -1) {
+    public listStr(name:string[], selected = -1, startIndex = 1) {
         let str = ""
-        let maxl = 1 + Math.floor(Math.log10(name.length))
+        let maxl = Math.floor(Math.log10(startIndex + name.length))
         maxl += 2
         for (let i = 0; i < name.length; i += 1) {
-            let bf = ((i + 1).toString() + ".").padEnd(maxl)
+            let bf = ((i + startIndex).toString() + ".").padEnd(maxl)
+            bf += thinSpace
             if (i === selected) {
                 bf += `✅[${name[i]}](${this.lang.perm.selected})`
             } else {
                 bf += name[i]
             }
             if (i < name.length - 1) {
-                bf += blankChar + "\n"
+                bf += "\n"
             }
             str += bf
         }
@@ -434,6 +536,9 @@ export default class PermManager extends Plugin {
             }
         }
         return false
+    }
+    public isEveryone(role:Discord.Role) {
+        return role.position <= 0
     }
     public sortByLevel(arr:Discord.Role[]) {
         return arr.sort((a, b) => a.position - b.position)
