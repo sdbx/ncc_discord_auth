@@ -837,7 +837,7 @@ export class CommandStatus {
 }
 export interface ChainData {
     type:number;
-    data:object;
+    data:unknown;
     time:number;
 }
 export interface CmdParam {
@@ -855,7 +855,10 @@ interface FieldBlock {
  * Get first element in Array
  * @param arr Array
  */
-export function getFirst<T>(arr:T[]):T {
+export function getFirst<T>(arr:T[] | T):T {
+    if (!Array.isArray(arr)) {
+        return arr
+    }
     if (arr != null && arr.length >= 1) {
         return arr[0]
     } else {

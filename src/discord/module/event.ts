@@ -121,12 +121,12 @@ export default class EventNotifier extends Plugin {
         return Promise.resolve()
     }
     protected async onChainMessage(message:Discord.Message, type:number, data:ChainData):Promise<ChainData> {
-        data.data["msg"] = message.content
+        (data.data as object)["msg"] = message.content
         return this.endChain(message, type, data)
     }
     protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
         const cfg = await this.sub(this.config, message.guild.id)
-        cfg.welcomeMsg = data.data["msg"]
+        cfg.welcomeMsg = (data.data as object)["msg"]
         cfg.welcomeCh = message.channel.id
         await cfg.export()
         await message.channel.send(sprintf(

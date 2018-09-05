@@ -378,12 +378,12 @@ export default abstract class Plugin {
      * @param type 체인 타입
      * @param data 값
      */
-    protected startChain(channel:string, user:string, type:number, data:object = {}):void {
+    protected startChain<T extends unknown>(channel:string, user:string, type:number, data?:T):void {
         const id = `${channel}$${user}`
         if (!this.chains.has(id)) {
             this.chains.set(id,{
                 type,
-                data,
+                data: (data == null ? {} : data),
                 time: Date.now(),
             } as ChainData)
         } else {
@@ -578,7 +578,7 @@ export default abstract class Plugin {
      * @deprecated use runutil export
      * @param arr Array
      */
-    protected getFirst<T>(arr:T[]):T {
+    protected getFirst<T>(arr:T[] | T):T {
         return getFirst(arr)
     }
     /**
