@@ -148,6 +148,8 @@ export default class Lang extends Config {
     public adminGranted = "%(mention)s님 인증완료."
     // notlogin
     public noNaver = "네이버 계정으로 로그인 안되어 있습니다."
+    // chain end
+    public chainEnd = "기존 실행중인 명령어가 취소되었습니다."
 
     constructor() {
         super("lang")

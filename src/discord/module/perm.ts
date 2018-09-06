@@ -6,7 +6,8 @@ import Log from "../../log"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { blankChar, blankChar2, ChainData, CmdParam, CommandHelp,
-    CommandStatus, DiscordFormat, ParamType, thinSpace, toLowerString, } from "../runutil"
+    CommandStatus, decodeCmdInput, DiscordFormat, encodeCmdInput,
+    ParamType, thinSpace, toLowerString, } from "../runutil"
 const checkAdmin = false
 const icecream = "\u{1F368}"
 /**
@@ -155,12 +156,13 @@ export default class PermManager extends Plugin {
             const userHLv = this.getHighestLevel(msg.member, "MANAGE_ROLES")
             const botHLv = this.getHighestLevel(self, "MANAGE_ROLES")
 
-            if (userHLv < 0) {
+            if (userHLv < 0 || botHLv < 0) {
                 // No perm to manage role
                 await channel.send(this.lang.perm.noPermMangeRole)
                 return Promise.resolve()
             }
-            const limitation = roles.length - Math.min(userHLv, botHLv) - 1
+            // array's index
+            const limitation = roles.length - Math.max(userHLv, botHLv) - 1
             let startI = -1
             if (testERole.has(ParamType.dest)) {
                 const v = testERole.get(ParamType.dest)
@@ -172,17 +174,15 @@ export default class PermManager extends Plugin {
                     }
                 }
             }
-            startI -= limitation
-            const rolesBlock = this.makeBlock(this.listRoles(roles, startI, limitation), icecream)
-            const cmdHelp = this.helpRoleEdit(ChainType.LIST_ROLE)
-            const cmdMsg = this.getFirst(await msg.channel.send(rolesBlock, cmdHelp))
+            roles.reverse()
             this.startChain<ChainRole>(channel.id, msg.author.id, ChainType.LIST_ROLE, {
                 select: startI,
                 roles,
                 commands: [],
                 offset: limitation,
-                messageID: cmdMsg.id,
+                messageID: null,
             })
+            await this.callChain(msg)
             /*
             const block = "```md\n" + this.listRoles(roles, 3, Math.min(userHLv, botHLv)) + "\n```"
             const chInfo = this.channelPermInfo(msg.channel as Discord.GuildChannel)
@@ -203,7 +203,7 @@ export default class PermManager extends Plugin {
          * @param _content Send Content
          * @param mid Message ID (nullable)
          */
-        const send = async (_content:string, mid?:string) => {
+        const send = async (_content:string | Discord.RichEmbed, mid?:string) => {
             let msg:Discord.Message
             if (mid != null) {
                 msg = message.channel.messages.find((v) => v.id === mid)
@@ -215,12 +215,19 @@ export default class PermManager extends Plugin {
             if (message.deletable) {
                 message.delete()
             }
+            const isString = typeof _content === "string"
             if (msg == null) {
-                msg = await message.channel.send(_content, cmdHelp) as Discord.Message
-                mid = msg.id
+                msg = await message.channel.send(_content, isString ? null : cmdHelp) as Discord.Message
             } else {
-                await msg.edit(_content, cmdHelp)
+                await msg.edit(_content, isString ? null : cmdHelp)
             }
+            return msg
+        }
+        /**
+         * End Filter
+         */
+        if (content.indexOf("end") >= 0) {
+            return this.endChain(message, type, rawData)
         }
         /**
          * Command List
@@ -229,51 +236,74 @@ export default class PermManager extends Plugin {
          * 
          * u(p) [number] : move Role to up of role
          */
-        if (type === ChainType.LIST_ROLE || type === ChainType.EDIT_ROLE) {
+        if (type === ChainType.LIST_ROLE) {
             const data = rawData.data as ChainRole
-            const role = this.getSelected(data.roles, data.select, data.offset)
-            let title = icecream
+            const roles = data.roles
+            const role = this.safeGet(roles, data.select)
+            let title = icecream + " "
             /**
              * index **+1** value.
              */
             const matchSelect = this.getFirst(this.matchNumber(content, /^(s|select)\s*?\d+/i))
             const matchUp = this.getFirst(this.matchNumber(content, /^(u|up)\s*?\d+/i))
             const matchDown = this.getFirst(this.matchNumber(content, /^(d|down)\s*?\d+/i))
+            const matchEdit = (/^(p|perm|permission)/i).test(content)
             if (matchSelect != null) {
-                data.select = matchSelect
+                /**
+                 * Select role
+                 */
+                // matchSelect -> index (+offset's length)
+                data.select = (matchSelect - 1) + data.offset + 1
             } else if (matchUp != null || matchDown != null) {
+                /**
+                 * Move role order
+                 */
                 if (role == null) {
                     title += "선택된 그룹이 없습니다."
                 } else {
                     let position:number
                     if (matchUp != null) {
-                        position = matchUp - 1
+                        // index(matchUp - 1) + length(data.offset + 1) - 1
+                        position = matchUp + data.offset
                     } else {
-                        position = matchDown
+                        // index(matchDown - 1) + length(data.offset + 1) + 1
+                        position = matchDown + data.offset + 1
                     }
-                    position += data.offset
-                    if (position <= data.offset || position >= data.roles.length) {
+                    if (role.permissions <= 0) {
+                        title += "everyone 그룹은 위치를 바꿀 수 없습니다."
+                    } else if (role.position < data.offset || position >= roles.length) {
                         title += "잘못된 번호 입니다."
                     } else {
-                        const orgP = this.getPosition(data.select, data.offset)
-                        data.roles.splice(orgP, 1)
-                        if (orgP < position) {
-                            data.roles.splice(position - 1, 0, role)
-                        } else {
-                            data.roles.splice(position, 0, role)
+                        Log.d("Move", `Move from ${data.select} to ${position}`)
+                        this.moveArr(data.roles, data.select, position)
+                        if (data.select < position) {
+                            position -= 1
                         }
-                        data.select = position - data.offset
+                        data.select = position
                     }
+                }
+            } else if (matchEdit) {
+                if (role != null) {
+                    rawData.type = ChainType.EDIT_ROLE
+                    return this.onChainMessage(message, type, rawData)
+                } else {
+                    title += "그룹을 선택하지 않았습니다."
                 }
             }
             const sendMsg = this.makeBlock(
                 this.listRoles(data.roles, data.select, data.offset, false), title)
-            send(sendMsg, data.messageID)
-            if (content.indexOf("end") >= 0) {
+            data.messageID = (await send(sendMsg, data.messageID)).id
+        } else if (type === ChainType.EDIT_ROLE) {
+            const data = rawData.data as ChainRole
+            const role = this.safeGet(data.roles, data.select)
+            let title = icecream
+            if (role == null) {
                 return this.endChain(message, type, rawData)
-            } else {
-                return rawData
             }
+            title += ""
+            // const perms = new Discord.Permissions(role.permissions)
+            const sendMsg = this.roleInfo(role)
+            data.messageID = (await send(sendMsg, data.messageID)).id
         }
         return rawData
     }
@@ -309,6 +339,12 @@ export default class PermManager extends Plugin {
             return null
         }
         return roles[i]
+    }
+    protected safeGet<T>(arr:T[], index:number) {
+        if (index < 0 || index >= arr.length) {
+            return null
+        }
+        return arr[index]
     }
     protected getPosition(index:number, offset:number) {
         return index + offset - 1
@@ -487,7 +523,7 @@ export default class PermManager extends Plugin {
      * 
      * Also modify `roles` order.
      * @param roles Roles
-     * @param selected Selected Position - Exclude Disabled, index**+1** 
+     * @param selected Selected Position - Exclude Disabled, index
      * @param disabled Disabled Position - Include ALL, reverse-aligned index, Include Param.
      * @param spaceOverride ?
      */
@@ -500,12 +536,13 @@ export default class PermManager extends Plugin {
         let disabledNames = []
         const rSpace = 3 + Math.floor(Math.log10(names.length))
         if (disabled >= 0) {
-            disabledNames = names.splice(0, Math.min(names.length, disabled))
+            disabledNames = names.splice(0, Math.min(names.length, disabled + 1))
+            selected -= (disabled + 1)
         }
         if (disabledNames.length >= 1) {
             out += this.listDisabledStr(disabledNames, rSpace) + "\n"
         }
-        out += this.listStr(names, selected - 1)
+        out += this.listStr(names, selected)
         return out
     }
     /**
@@ -682,6 +719,43 @@ export default class PermManager extends Plugin {
         }
         return false
     }
+    /**
+     * 
+     * @param input The command string
+     * @param commands List of accept commands
+     * @param arr Role or Channel Array
+     * @param offset that offset.
+     */
+    protected filterCommand<T extends Discord.Role | Discord.GuildChannel>(
+        input:string, commands:string[], arr:T[], offset = 0) {
+        const regex = new RegExp(`/^(${commands.join("|")})`, "i")
+        if (!regex.test(input)) {
+            return null
+        }
+        const encode = encodeCmdInput(input.replace(regex, "").trim())
+        const params = encode.encoded.split(/\s+/ig).map((v) => {
+            let result:T
+            const decoded = decodeCmdInput(v, encode.key)
+            const n = Number.parseInt(decoded)
+            if (Number.isNaN(n)) {
+                // name search
+                result = this.getFirst(arr.filter((_v) => _v.name === decoded))
+            } else if (!Number.isSafeInteger(n)) {
+                // id search
+                result = this.getFirst(arr.filter((_v) => _v.id === decoded))
+            } else {
+                // index search
+                result = this.safeGet(arr, n + offset - 1)
+            }
+            return result
+        }).filter((v) => v != null)
+        if (params.length <= 0) {
+            return null
+        } else {
+            return params
+        }
+        //             const matchUp = this.getFirst(this.matchNumber(content, /^(u|up)\s*?\d+/i))
+    }
     private matchNumber(str:string, regex:RegExp) {
         const match = str.match(regex)
         if (match != null) {
@@ -703,6 +777,18 @@ export default class PermManager extends Plugin {
     }
     private makeBlock(str:string, title?:string) {
         return `\`\`\`md\n${str}\`\`\`${title != null ? title : ""}`
+    }
+    private moveArr<T>(arr:T[], fromIndex:number, toIndex:number) {
+        if (fromIndex === toIndex) {
+            return arr
+        }
+        const org = this.getFirst(arr.splice(fromIndex, 1))
+        if (fromIndex < toIndex) {
+            // modify toIndex -> -1
+            toIndex -= 1
+        }
+        arr.splice(toIndex, 0, org)
+        return arr
     }
 }
 /**

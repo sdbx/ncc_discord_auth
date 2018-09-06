@@ -394,25 +394,11 @@ export class CommandHelp {
         }
         return echo
     }
-    private encode(source:string) {
-        let chain = source
-        const safeList:string[] = []
-        while (safeCmd.test(chain)) {
-            const value = source.match(safeCmd)[0]
-            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")))
-            chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}")
-        }
-        return {
-            encoded: chain,
-            key: safeList,
-        }
+    private encode(str:string) {
+        return encodeCmdInput(str)
     }
     private decode(encoded:string, key:string[]) {
-        let chain = encoded
-        key.forEach((value, index) => {
-            chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value)
-        })
-        return chain
+        return decodeCmdInput(encoded, key)
     }
     private safeGet<T>(obj:T | undefined, defaultV:T | null):T | null {
         return obj == null ? defaultV : obj
@@ -937,6 +923,26 @@ export function toLowerString(str:string) {
         }
         return v
     }).join(" ")
+}
+export function encodeCmdInput(source:string) {
+    let chain = source
+    const safeList:string[] = []
+    while (safeCmd.test(chain)) {
+        const value = source.match(safeCmd)[0]
+        safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")))
+        chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}")
+    }
+    return {
+        encoded: chain,
+        key: safeList,
+    }
+}
+export function decodeCmdInput(encoded:string, key:string[]) {
+    let chain = encoded
+    key.forEach((value, index) => {
+        chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value)
+    })
+    return chain
 }
 /**
  * Clone message

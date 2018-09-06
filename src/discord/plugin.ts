@@ -43,7 +43,7 @@ export default abstract class Plugin {
     /**
      * Chaining timeout. (**ms**)
      */
-    protected timeout = 1 * 60 * 1000 // 1 is minutes
+    protected timeout = 10 * 60 * 1000 // 1 is minutes
     /**
      * Chaining cache
      */
@@ -308,6 +308,8 @@ export default abstract class Plugin {
             const chainData = this.chains.get(id)
             if (Date.now() - chainData.time >= this.timeout) {
                 this.chains.delete(id)
+                await message.channel.send(this.lang.chainEnd)
+                chainData.time = Date.now()
                 return Promise.resolve(false)
             }
             const chained = await this.onChainMessage(message, chainData.type, chainData)
