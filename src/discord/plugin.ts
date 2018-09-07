@@ -291,6 +291,18 @@ export default abstract class Plugin {
         return this.chains.has(`${channel}$${user}`)
     }
     /**
+     * Get Chained data (null if no exists)
+     * @param channel 채널
+     * @param user 유저
+     */
+    public getChainedData<T extends object>(channel:string, user:string) {
+        if (this.chaining(channel, user)) {
+            return this.chains.get(`${channel}$${user}`).data as T
+        } else {
+            return null
+        }
+    }
+    /**
      * Calling chain for receive message
      * @param message received id (uses channelid, userid)
      * @param channel manual channel id (useless for now)
@@ -309,10 +321,10 @@ export default abstract class Plugin {
             if (Date.now() - chainData.time >= this.timeout) {
                 this.chains.delete(id)
                 await message.channel.send(this.lang.chainEnd)
-                chainData.time = Date.now()
                 return Promise.resolve(false)
             }
             const chained = await this.onChainMessage(message, chainData.type, chainData)
+            chainData.time = Date.now()
             if (chained.type === -1) {
                 // chain end.
                 Log.d("Chain", "chain end.")

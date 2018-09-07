@@ -10,6 +10,9 @@ import { blankChar, blankChar2, ChainData, CmdParam, CommandHelp,
     ParamType, thinSpace, toLowerString, } from "../runutil"
 const checkAdmin = false
 const icecream = "\u{1F368}"
+const mic = "\u{1F3A4}"
+const textChat = "\u{1F4AC}"
+const generalChat = "\u{2699}"
 /**
  * General permissions
  */
@@ -181,6 +184,7 @@ export default class PermManager extends Plugin {
                 commands: [],
                 offset: limitation,
                 messageID: null,
+                permShow: PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE,
             })
             await this.callChain(msg)
             /*
@@ -203,7 +207,7 @@ export default class PermManager extends Plugin {
          * @param _content Send Content
          * @param mid Message ID (nullable)
          */
-        const send = async (_content:string | Discord.RichEmbed, mid?:string) => {
+        const send = async (_content:string | Discord.RichEmbed, mid?:string, cleanReact = false) => {
             let msg:Discord.Message
             if (mid != null) {
                 msg = message.channel.messages.find((v) => v.id === mid)
@@ -217,9 +221,12 @@ export default class PermManager extends Plugin {
             }
             const isString = typeof _content === "string"
             if (msg == null) {
-                msg = await message.channel.send(_content, isString ? null : cmdHelp) as Discord.Message
+                msg = await message.channel.send(_content, isString ? cmdHelp : null) as Discord.Message
             } else {
-                await msg.edit(_content, isString ? null : cmdHelp)
+                await msg.edit(_content, isString ? cmdHelp : null)
+                if (cleanReact && msg.reactions.size >= 1) {
+                    await msg.clearReactions()
+                }
             }
             return msg
         }
@@ -285,7 +292,7 @@ export default class PermManager extends Plugin {
             } else if (matchEdit) {
                 if (role != null) {
                     rawData.type = ChainType.EDIT_ROLE
-                    return this.onChainMessage(message, type, rawData)
+                    return this.onChainMessage(message, rawData.type, rawData)
                 } else {
                     title += "그룹을 선택하지 않았습니다."
                 }
@@ -302,8 +309,37 @@ export default class PermManager extends Plugin {
             }
             title += ""
             // const perms = new Discord.Permissions(role.permissions)
-            const sendMsg = this.roleInfo(role)
-            data.messageID = (await send(sendMsg, data.messageID)).id
+            const sendMsg = this.roleInfo(role, data.permShow)
+            sendMsg.description = this.makeBlock(
+                this.listRoles(data.roles, data.select, data.offset, false), title)
+            const roleMsg = await send(sendMsg, data.messageID)
+            const emotes = [generalChat, textChat, mic]
+            const waitEmoji = async (emojis:string[], _message:Discord.Message, uid:string) => {
+                /**
+                 * @todo 중복 call처리 막기, chain의 permShow 바꿔주기.
+                 * 
+                 * onChainedMessage call로는 중복 명령이 일어나고,
+                 * 
+                 * 이쪽 editRole을 분리해야 하나?
+                 */
+                // const emojis = [generalChat, textChat, mic]
+                const stamp = _message.editedTimestamp
+                for (const emoji of emojis) {
+                    await _message.react(emoji)
+                }
+                const filter = (reaction, user:Discord.User) => 
+                    uid === user.id && emojis.indexOf(reaction.emoji.name) >= 0
+                try {
+                    const collected = (await _message.awaitReactions(filter, {time: this.timeout, max: 1})).array()
+                    if (stamp === _message.editedTimestamp) {
+                        await _message.channel.send("Test: " + collected.length)
+                    }
+                } catch (err) {
+                    Log.e(err)
+                }
+            }
+            data.messageID = roleMsg.id
+            waitEmoji(emotes, roleMsg, message.author.id)
         }
         return rawData
     }
@@ -451,8 +487,9 @@ export default class PermManager extends Plugin {
     /**
      * Make Permissions' RichEmbed from Role
      * @param role Role
+     * @param filter PermShow[GENERAL, TEXT, VOICE]'s bit. (OR) 
      */
-    protected roleInfo(role:Discord.Role) {
+    protected roleInfo(role:Discord.Role, filter = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE) {
         const rich = this.defaultRich
         if (role.color > 0) {
             rich.setColor(role.color)
@@ -462,11 +499,16 @@ export default class PermManager extends Plugin {
         rich.setTitle(role.name)
         const perms = new Discord.Permissions(role.permissions)
         // General Permission
-        const pairs = [
-            ["일반 권한", generalPerms],
-            ["채팅 권한", textPerms],
-            ["음성 권한", voicePerms],
-        ]
+        const pairs:Array<[string, {[key in string]:string}]> = []
+        if ((filter & PermShow.GENERAL) > 0) {
+            pairs.push(["일반 권한", generalPerms])
+        }
+        if ((filter & PermShow.TEXT) > 0) {
+            pairs.push(["채팅 권한", textPerms])
+        }
+        if ((filter & PermShow.VOICE) > 0) {
+            pairs.push(["음성 권한", voicePerms])
+        }
         let offset = 1
         // let rolePermInfo = "```md\n"
         if (perms.has("ADMINISTRATOR")) {
@@ -600,7 +642,6 @@ export default class PermManager extends Plugin {
                 sorts.push(...groups.map((v) => v.id))
                 out += this.listStr(groups.map((v) => {
                     if (v.type === "voice") {
-                        const mic = "\u{1F3A4}"
                         return mic + v.name
                     } else {
                         return v.name
@@ -812,6 +853,7 @@ interface ChainRole {
     commands:Command[];
     offset:number;
     messageID:string;
+    permShow:number;
 }
 interface Command {
     roleID:string;
@@ -825,4 +867,9 @@ enum CommandType {
 enum ChainType {
     LIST_ROLE,
     EDIT_ROLE,
+}
+enum PermShow {
+    GENERAL = 1,
+    TEXT = 2,
+    VOICE = 4,
 }
