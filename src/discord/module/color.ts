@@ -10,6 +10,7 @@ import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamTy
 
 // tslint:disable-next-line
 const mdnPicker = `https://mdn.mozillademos.org/en-US/docs/Web/CSS/CSS_Colors/Color_picker_tool$samples/ColorPicker_Tool`
+export const coolors = `https://coolors.co/app`
 export default class Color extends Plugin {
     // declare config file: use save data
     protected config = new ColorConfig()

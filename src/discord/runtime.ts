@@ -130,7 +130,12 @@ export default class Runtime extends EventEmitter {
             }
         }
         // client login (ignore)
-        await this.client.login(this.global.token)
+        try {
+            await this.client.login(this.global.token)
+        } catch (err) {
+            Log.e(err)
+            return Promise.reject(err)
+        }
         return Promise.resolve("")
     }
     /**

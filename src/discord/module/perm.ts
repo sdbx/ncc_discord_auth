@@ -8,6 +8,7 @@ import { MainCfg } from "../runtime"
 import { blankChar, blankChar2, ChainData, CmdParam, CommandHelp,
     CommandStatus, decodeCmdInput, DiscordFormat, encodeCmdInput,
     ParamType, thinSpace, toLowerString, } from "../runutil"
+import { coolors } from "./color"
 const checkAdmin = false
 const icecream = "\u{1F368}"
 const mic = "\u{1F3A4}"
@@ -177,11 +178,14 @@ export default class PermManager extends Plugin {
                     }
                 }
             }
-            roles.reverse()
+            const rData = roles.map((v) => ({
+                ...v,
+                guild:guild.id,
+            } as RoleData)).reverse()
             this.startChain<ChainRole>(channel.id, msg.author.id, ChainType.LIST_ROLE, {
                 select: startI,
-                roles,
-                commands: [],
+                roles: rData,
+                // commands: new Map(),
                 offset: limitation,
                 messageID: null,
                 permShow: PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE,
@@ -210,9 +214,9 @@ export default class PermManager extends Plugin {
          * @param _content Send Content
          * @param mid Message ID (nullable)
          */
-        const send = async (_content:string, _rich?:Discord.RichEmbed, mid?:string) => {
+        const send = async (_content:string, _rich?:Discord.RichEmbed, mid?:string, addHelp?:string) => {
             return this.updateState(message.channel as Discord.TextChannel,  type as ChainType, 
-                _content, _rich, mid)
+                _content, _rich, mid, addHelp)
         }
         /**
          * End Filter
@@ -238,13 +242,26 @@ export default class PermManager extends Plugin {
             const parseCmd = (commands:string[]) => this.getIndexID(roles, this.getFirst(this.filterCommand(
                 content, commands, roles, data.offset + 1
             )))
+            // selector
             const matchSelect = parseCmd(["s", "select", "선택"])
-            // const matchSelect = this.getFirst(this.matchNumber(content, /^(s|select)\s*?\d+/i))
+            // position
             const matchUp = parseCmd(["u", "up"])
-            const matchDown = parseCmd(["d", "down"])
+            const matchDown = parseCmd(type === ChainType.LIST_ROLE ? ["d", "down"] : ["down"])
+            // switch mode
             const matchEdit = (/^(p|perm|permission)/i).test(content)
             const matchList = (/^(l|list)/i).test(content)
+            // permission manage
+            const matchToggle = this.matchNumber(content, ["t", "toggle"])
+            const matchLink = content.startsWith("https://discordapi.com/permissions.html#") ||
+                content.startsWith("https://discordapp.com/oauth2/authorize")
+            const matchColor = (/^(c|color)\s*(0x|)[0-9A-Fa-f]{6}/i).test(content)
+            const matchMention = (/^(m|mention)\s*(1|0|on|off|true|false)$/i).test(content)
+            const matchHoist = (/^(h|hoist)\s*(1|0|on|off|true|false)$/i).test(content)
+            const matchName = (/^(n|name)/i).test(content)
             if (matchSelect >= 0) {
+                /**
+                 * Select Role
+                 */
                 data.select = matchSelect
                 // data.select = roles.length - matchSelect.position - 2
             } else if (matchUp >= 0 || matchDown >= 0) {
@@ -262,7 +279,7 @@ export default class PermManager extends Plugin {
                         // index(matchDown - 1) + length(data.offset + 1) + 1
                         position = matchDown + 1 // + data.offset + 1
                     }
-                    if (role.permissions <= 0) {
+                    if (role.position <= 0) {
                         title += "everyone 그룹은 위치를 바꿀 수 없습니다."
                     } else if (role.position < data.offset || position >= roles.length) {
                         title += "잘못된 번호 입니다."
@@ -276,9 +293,12 @@ export default class PermManager extends Plugin {
                     }
                 }
             } else if (matchEdit) {
+                /**
+                 * Toggle Permission edit Mode.
+                 */
                 if (role != null) {
                     const selectType = this.getFirst(content.match(/\d+/i))
-                    if (selectType == null && rawData.type !== ChainType.EDIT_ROLE) {
+                    if (selectType == null && type !== ChainType.EDIT_ROLE) {
                         rawData.type = ChainType.EDIT_ROLE
                         data.permShow = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE
                         return this.onChainMessage(message, rawData.type, rawData)
@@ -291,7 +311,7 @@ export default class PermManager extends Plugin {
                             case 3: flag = PermShow.VOICE; break
                             default: flag = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE; break
                         }
-                        if (rawData.type !== ChainType.EDIT_ROLE || data.permShow !== flag) {
+                        if (type !== ChainType.EDIT_ROLE || data.permShow !== flag) {
                             rawData.type = ChainType.EDIT_ROLE
                             data.permShow = flag
                             return this.onChainMessage(message, rawData.type, rawData)
@@ -301,9 +321,56 @@ export default class PermManager extends Plugin {
                     title += "그룹을 선택하지 않았습니다."
                 }
             } else if (matchList) {
-                if (rawData.type === ChainType.EDIT_ROLE) {
+                /**
+                 * Switch to List Permission mode.
+                 */
+                if (type === ChainType.EDIT_ROLE) {
                     rawData.type = ChainType.LIST_ROLE
                     return this.onChainMessage(message, rawData.type, rawData)
+                }
+            } else if (role != null) {
+                const use = /(1|on|true)/i.test(content)
+                const nouse = /(0|off|false)/i.test(content)
+                if (matchToggle.length >= 1) {
+                    const rolePerm = new Discord.Permissions(role.permissions)
+                    const mapPerm = this.getPermsByFilter(data.permShow)
+                    for (const index of matchToggle) {
+                        const pm = this.safeGet(mapPerm, index - 1)
+                        if (pm == null) {
+                            continue
+                        }
+                        if (rolePerm.has(pm, false)) {
+                            rolePerm.remove(pm)
+                        } else {
+                            rolePerm.add(pm)
+                        }
+                    }
+                    role.permissions = rolePerm.bitfield
+                } else if (matchLink) {
+                    const indexPM = content.lastIndexOf("permissions")
+                    if (indexPM >= 0) {
+                        const pn = this.getFirst(content.substr(indexPM).match(/\d+/i))
+                        if (pn != null) {
+                            role.permissions = new Discord.Permissions(Number.parseInt(pn)).bitfield
+                        }
+                    }
+                } else if (matchColor) {
+                    const color = this.getFirst(content.match(/[0-9A-Fa-f]{6}/i)).toUpperCase()
+                    role.color = Number.parseInt(color, 16)
+                } else if (matchMention) {
+                    if (use) {
+                        role.mentionable = true
+                    } else if (nouse) {
+                        role.mentionable = false
+                    }
+                } else if (matchHoist) {
+                    if (use) {
+                        role.hoist = true
+                    } else if (nouse) {
+                        role.hoist = false
+                    }
+                } else if (matchName) {
+                    role.name = content.replace(/^(name|n)\s*/i, "").trim().replace(/\s/i, " " + blankChar2)
                 }
             }
             if (type === ChainType.LIST_ROLE) {
@@ -314,12 +381,16 @@ export default class PermManager extends Plugin {
                 if (role == null) {
                     return this.endChain(message, type, rawData)
                 }
-                title += ""
                 // const perms = new Discord.Permissions(role.permissions)
                 const sendMsg = this.roleInfo(role, data.permShow)
+                sendMsg.setFooter(title)
+                const pmURL = "https://discordapi.com/permissions.html#" + role.permissions
+                const crystalBall = "\u{1F52E}"
+                const pmLink = `${crystalBall} [GUI 계산기](${pmURL}) 수정한 링크를 입력하면 적용`
+                sendMsg.setURL(pmURL)
                 const roleList = this.makeBlock(
-                    this.listRoles(data.roles, data.select, data.offset, false), title)
-                const roleMsg = await send(roleList, sendMsg, data.messageID)
+                    this.listRoles(data.roles, data.select, data.offset, false))
+                const roleMsg = await send(roleList, sendMsg, data.messageID, pmLink)
                 data.messageID = roleMsg.id
             }
         }
@@ -342,7 +413,7 @@ export default class PermManager extends Plugin {
      * @param mid Message ID(for Edit.)
      */
     protected async updateState(channel:Discord.TextChannel,
-        type:ChainType, content:string, rich?:Discord.RichEmbed, mid?:string) {
+        type:ChainType, content:string, rich?:Discord.RichEmbed, mid?:string, addHelp?:string) {
         let msg:Discord.Message
         if (mid != null) {
             msg = channel.messages.find((v) => v.id === mid)
@@ -351,6 +422,9 @@ export default class PermManager extends Plugin {
             }
         }
         const cmdHelp = this.helpRoleEdit(type as ChainType)
+        if (addHelp != null) {
+            cmdHelp.desc += addHelp + "\n"
+        }
         const isVaild = content != null && content.length >= 1
         const isRichOnly = (!isVaild) && rich != null
         const isString = typeof content === "string"
@@ -387,14 +461,22 @@ export default class PermManager extends Plugin {
         if (mode === ChainType.LIST_ROLE || mode === ChainType.EDIT_ROLE) {
             const dango = "\u{1F361}"
             const flagEmoji = "\u{1F3C1}"
+            const palatte = "\u{1F3A8}"
             // :dango: `d[n]`  n번째의 그룹 아래로 배치합니다.
-            desc += `${dango} select \`[번호]\` : n번 그룹을 선택합니다.\n`
-            desc += `${dango} up \`[번호|이름]\` : 선택한 그룹을 지정한 그룹 \u{2B06}다가 배치합니다.\n`
-            desc += `${dango} down \`[번호|이름]\` : 선택한 그룹을 지정한 그룹 \u{2B07}다가 배치합니다.\n`
-            desc += `${dango} perm \`[1|2|3]\` : 권한을 보여주고 편집합니다.` +
+            if (mode === ChainType.LIST_ROLE) {
+                desc += `${dango} select \`<번호>\` : n번 그룹을 선택합니다.\n`
+                desc += `${dango} up \`<번호|이름>\` : 선택한 그룹을 지정한 그룹 \u{2B06}다가 배치합니다.\n`
+                desc += `${dango} down \`<번호|이름>\` : 선택한 그룹을 지정한 그룹 \u{2B07}다가 배치합니다.\n`
+            }
+            desc += `${dango} perm \`<1|2|3>\` : 권한을 보여주고 편집합니다.` +
                 `\n${flagEmoji} :one: 일반 :two: 문자, :three: 음성 :asterisk: 전체\n`
             if (mode === ChainType.EDIT_ROLE) {
-                desc += `${dango} list : 그룹 목록을 보여줍니다.`
+                desc += `${dango} list : 그룹 목록을 보여줍니다.\n`
+                desc += `${dango} toggle \`<...권한 번호>\` : 선택한 권한을 전환합니다.\n`
+                desc += `${palatte} [color](${coolors}) \`<16진수 색상>\` : 색상을 적용합니다. 0은 기본입니다.\n`
+                desc += `${dango} mention \`<on|off>\` : 멘션을 가능하게/불가능하게 정합니다.\n`
+                desc += `${dango} hoist \`<on|off>\` : 목록에서 따로 표시하게 할지 정합니다.\n`
+                desc += `${dango} name \`<이름>\` : 이름을 바꿔줍니다.\n`
             }
         }
         return {
@@ -533,11 +615,28 @@ export default class PermManager extends Plugin {
         return rich
     }
     /**
+     * Get Permissions from filter.
+     * @param filter PermShow's bits
+     */
+    protected getPermsByFilter(filter = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE) {
+        const perms:Discord.PermissionString[] = []
+        if ((filter & PermShow.GENERAL) > 0) {
+            perms.push(...Object.keys(generalPerms) as Discord.PermissionString[])
+        }
+        if ((filter & PermShow.TEXT) > 0) {
+            perms.push(...Object.keys(textPerms) as Discord.PermissionString[])
+        }
+        if ((filter & PermShow.VOICE) > 0) {
+            perms.push(...Object.keys(voicePerms) as Discord.PermissionString[])
+        }
+        return perms
+    }
+    /**
      * Make Permissions' RichEmbed from Role
      * @param role Role
      * @param filter PermShow[GENERAL, TEXT, VOICE]'s bit. (OR) 
      */
-    protected roleInfo(role:Discord.Role, filter = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE) {
+    protected roleInfo(role:RoleData, filter = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE) {
         const rich = this.defaultRich
         if (role.color > 0) {
             rich.setColor(role.color)
@@ -617,7 +716,7 @@ export default class PermManager extends Plugin {
      * @param disabled Disabled Position - Include ALL, reverse-aligned index, Include Param.
      * @param spaceOverride ?
      */
-    protected listRoles(roles:Discord.Role[], selected = -1, disabled = -1, autoSort = true) {
+    protected listRoles(roles:RoleData[], selected = -1, disabled = -1, autoSort = true) {
         if (autoSort) {
             roles.sort((a, b) => a.position - b.position).reverse()
         }
@@ -815,7 +914,7 @@ export default class PermManager extends Plugin {
      * @param arr Role or Channel Array
      * @param offset that offset.
      */
-    protected filterCommand<T extends Discord.Role | Discord.GuildChannel>(
+    protected filterCommand<T extends RoleData | Discord.GuildChannel>(
         input:string, commands:string[], arr:T[], offset = 0) {
         const regex = new RegExp(`^(${commands.join("|")})`, "i")
         if (!regex.test(input)) {
@@ -856,14 +955,28 @@ export default class PermManager extends Plugin {
         }
         return -1
     }
-    private matchNumber(str:string, regex:RegExp) {
+    /**
+     * Match Command with numbers
+     * @param str String
+     * @param cmd Command string
+     * @returns Numbers or []
+     */
+    private matchNumber(str:string, cmd:string[]) {
+        const regex = new RegExp(`(^|\\s+)(${cmd.join("|")})[\\s\\d!-/:-@\\[-\`]+`, "i")
         const match = str.match(regex)
         if (match != null) {
             const n = match[0].match(/\d+/g)
             if (n == null) {
                 return []
             } else {
-                return n.map((v) => Number.parseInt(v))
+                return n.map((v) => {
+                    const num = Number.parseInt(v)
+                    if (Number.isNaN(num)) {
+                        return null
+                    } else {
+                        return num
+                    }
+                }).filter((v) => v != null)
             }
         } else {
             return []
@@ -908,8 +1021,7 @@ export enum Checked {
 }
 interface ChainRole {
     select:number;
-    roles:Discord.Role[];
-    commands:Command[];
+    roles:RoleData[];
     offset:number;
     messageID:string;
     permShow:number;
@@ -931,4 +1043,12 @@ enum PermShow {
     GENERAL = 1,
     TEXT = 2,
     VOICE = 4,
+}
+/**
+ * Include RoleID
+ * 
+ * @extends Discord.RoleData
+ */
+interface RoleData extends Discord.RoleData {
+    id:string;
 }
