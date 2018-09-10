@@ -202,33 +202,17 @@ export default class PermManager extends Plugin {
     }
     protected async onChainMessage(message:Discord.Message, type:number, rawData:ChainData):Promise<ChainData> {
         const content = message.content
+        if (!(message.channel instanceof Discord.TextChannel)) {
+            return rawData
+        }
         /**
          * Edit or send message
          * @param _content Send Content
          * @param mid Message ID (nullable)
          */
-        const send = async (_content:string | Discord.RichEmbed, mid?:string, cleanReact = false) => {
-            let msg:Discord.Message
-            if (mid != null) {
-                msg = message.channel.messages.find((v) => v.id === mid)
-                if (msg == null) {
-                    msg = await message.channel.fetchMessage(mid)
-                }
-            }
-            const cmdHelp = this.helpRoleEdit(type as ChainType)
-            if (message.deletable) {
-                message.delete()
-            }
-            const isString = typeof _content === "string"
-            if (msg == null) {
-                msg = await message.channel.send(_content, isString ? cmdHelp : null) as Discord.Message
-            } else {
-                await msg.edit(_content, isString ? cmdHelp : null)
-                if (cleanReact && msg.reactions.size >= 1) {
-                    await msg.clearReactions()
-                }
-            }
-            return msg
+        const send = async (_content:string, _rich?:Discord.RichEmbed, mid?:string) => {
+            return this.updateState(message.channel as Discord.TextChannel,  type as ChainType, 
+                _content, _rich, mid)
         }
         /**
          * End Filter
@@ -243,7 +227,7 @@ export default class PermManager extends Plugin {
          * 
          * u(p) [number] : move Role to up of role
          */
-        if (type === ChainType.LIST_ROLE) {
+        if (type === ChainType.LIST_ROLE || type === ChainType.EDIT_ROLE) {
             const data = rawData.data as ChainRole
             const roles = data.roles
             const role = this.safeGet(roles, data.select)
@@ -251,17 +235,19 @@ export default class PermManager extends Plugin {
             /**
              * index **+1** value.
              */
-            const matchSelect = this.getFirst(this.matchNumber(content, /^(s|select)\s*?\d+/i))
-            const matchUp = this.getFirst(this.matchNumber(content, /^(u|up)\s*?\d+/i))
-            const matchDown = this.getFirst(this.matchNumber(content, /^(d|down)\s*?\d+/i))
+            const parseCmd = (commands:string[]) => this.getIndexID(roles, this.getFirst(this.filterCommand(
+                content, commands, roles, data.offset + 1
+            )))
+            const matchSelect = parseCmd(["s", "select", "선택"])
+            // const matchSelect = this.getFirst(this.matchNumber(content, /^(s|select)\s*?\d+/i))
+            const matchUp = parseCmd(["u", "up"])
+            const matchDown = parseCmd(["d", "down"])
             const matchEdit = (/^(p|perm|permission)/i).test(content)
-            if (matchSelect != null) {
-                /**
-                 * Select role
-                 */
-                // matchSelect -> index (+offset's length)
-                data.select = (matchSelect - 1) + data.offset + 1
-            } else if (matchUp != null || matchDown != null) {
+            const matchList = (/^(l|list)/i).test(content)
+            if (matchSelect >= 0) {
+                data.select = matchSelect
+                // data.select = roles.length - matchSelect.position - 2
+            } else if (matchUp >= 0 || matchDown >= 0) {
                 /**
                  * Move role order
                  */
@@ -269,12 +255,12 @@ export default class PermManager extends Plugin {
                     title += "선택된 그룹이 없습니다."
                 } else {
                     let position:number
-                    if (matchUp != null) {
+                    if (matchUp >= 0) {
                         // index(matchUp - 1) + length(data.offset + 1) - 1
-                        position = matchUp + data.offset
+                        position = matchUp // + data.offset
                     } else {
                         // index(matchDown - 1) + length(data.offset + 1) + 1
-                        position = matchDown + data.offset + 1
+                        position = matchDown + 1 // + data.offset + 1
                     }
                     if (role.permissions <= 0) {
                         title += "everyone 그룹은 위치를 바꿀 수 없습니다."
@@ -291,55 +277,55 @@ export default class PermManager extends Plugin {
                 }
             } else if (matchEdit) {
                 if (role != null) {
-                    rawData.type = ChainType.EDIT_ROLE
-                    return this.onChainMessage(message, rawData.type, rawData)
+                    const selectType = this.getFirst(content.match(/\d+/i))
+                    if (selectType == null && rawData.type !== ChainType.EDIT_ROLE) {
+                        rawData.type = ChainType.EDIT_ROLE
+                        data.permShow = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE
+                        return this.onChainMessage(message, rawData.type, rawData)
+                    } else if (selectType != null) {
+                        const n = Number.parseInt(selectType)
+                        let flag:number
+                        switch (n) {
+                            case 1: flag = PermShow.GENERAL; break
+                            case 2: flag = PermShow.TEXT; break
+                            case 3: flag = PermShow.VOICE; break
+                            default: flag = PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE; break
+                        }
+                        if (rawData.type !== ChainType.EDIT_ROLE || data.permShow !== flag) {
+                            rawData.type = ChainType.EDIT_ROLE
+                            data.permShow = flag
+                            return this.onChainMessage(message, rawData.type, rawData)
+                        }
+                    }
                 } else {
                     title += "그룹을 선택하지 않았습니다."
                 }
-            }
-            const sendMsg = this.makeBlock(
-                this.listRoles(data.roles, data.select, data.offset, false), title)
-            data.messageID = (await send(sendMsg, data.messageID)).id
-        } else if (type === ChainType.EDIT_ROLE) {
-            const data = rawData.data as ChainRole
-            const role = this.safeGet(data.roles, data.select)
-            let title = icecream
-            if (role == null) {
-                return this.endChain(message, type, rawData)
-            }
-            title += ""
-            // const perms = new Discord.Permissions(role.permissions)
-            const sendMsg = this.roleInfo(role, data.permShow)
-            sendMsg.description = this.makeBlock(
-                this.listRoles(data.roles, data.select, data.offset, false), title)
-            const roleMsg = await send(sendMsg, data.messageID)
-            const emotes = [generalChat, textChat, mic]
-            const waitEmoji = async (emojis:string[], _message:Discord.Message, uid:string) => {
-                /**
-                 * @todo 중복 call처리 막기, chain의 permShow 바꿔주기.
-                 * 
-                 * onChainedMessage call로는 중복 명령이 일어나고,
-                 * 
-                 * 이쪽 editRole을 분리해야 하나?
-                 */
-                // const emojis = [generalChat, textChat, mic]
-                const stamp = _message.editedTimestamp
-                for (const emoji of emojis) {
-                    await _message.react(emoji)
-                }
-                const filter = (reaction, user:Discord.User) => 
-                    uid === user.id && emojis.indexOf(reaction.emoji.name) >= 0
-                try {
-                    const collected = (await _message.awaitReactions(filter, {time: this.timeout, max: 1})).array()
-                    if (stamp === _message.editedTimestamp) {
-                        await _message.channel.send("Test: " + collected.length)
-                    }
-                } catch (err) {
-                    Log.e(err)
+            } else if (matchList) {
+                if (rawData.type === ChainType.EDIT_ROLE) {
+                    rawData.type = ChainType.LIST_ROLE
+                    return this.onChainMessage(message, rawData.type, rawData)
                 }
             }
-            data.messageID = roleMsg.id
-            waitEmoji(emotes, roleMsg, message.author.id)
+            if (type === ChainType.LIST_ROLE) {
+                const sendMsg = this.makeBlock(
+                    this.listRoles(data.roles, data.select, data.offset, false), title)
+                data.messageID = (await send(sendMsg, null, data.messageID)).id
+            } else if (type === ChainType.EDIT_ROLE) {
+                if (role == null) {
+                    return this.endChain(message, type, rawData)
+                }
+                title += ""
+                // const perms = new Discord.Permissions(role.permissions)
+                const sendMsg = this.roleInfo(role, data.permShow)
+                const roleList = this.makeBlock(
+                    this.listRoles(data.roles, data.select, data.offset, false), title)
+                const roleMsg = await send(roleList, sendMsg, data.messageID)
+                data.messageID = roleMsg.id
+            }
+        }
+        if (message.deletable) {
+            // async.
+            message.delete()
         }
         return rawData
     }
@@ -347,18 +333,74 @@ export default class PermManager extends Plugin {
         // on receive all data
         return Promise.resolve()
     }
-    protected helpRoleEdit(mode:ChainType) {
-        const rich = this.defaultRich
-        if (mode === ChainType.LIST_ROLE) {
-            const dango = "\u{1F361}"
-            // :dango: `d[n]`  n번째의 그룹 아래로 배치합니다.
-            rich.setTitle("도움말")
-            let desc = ""
-            desc += `${dango} select \`[번호]\` : n번 그룹을 선택합니다.\n`
-            desc += `${dango} up \`[번호]\` : 선택한 그룹을 n번 그룹 위에다가 배치합니다..\n`
-            rich.setDescription(desc)
+    /**
+     * Update state message
+     * @param channel TextChannel
+     * @param type Chain's Type
+     * @param content String of message
+     * @param rich RichEmbed message
+     * @param mid Message ID(for Edit.)
+     */
+    protected async updateState(channel:Discord.TextChannel,
+        type:ChainType, content:string, rich?:Discord.RichEmbed, mid?:string) {
+        let msg:Discord.Message
+        if (mid != null) {
+            msg = channel.messages.find((v) => v.id === mid)
+            if (msg == null) {
+                msg = await channel.fetchMessage(mid)
+            }
         }
-        return rich
+        const cmdHelp = this.helpRoleEdit(type as ChainType)
+        const isVaild = content != null && content.length >= 1
+        const isRichOnly = (!isVaild) && rich != null
+        const isString = typeof content === "string"
+        if (isRichOnly) {
+            rich.addField(cmdHelp.title, cmdHelp.desc)
+            if (msg == null) {
+                msg = await channel.send(rich) as Discord.Message
+            } else {
+                await msg.edit(rich)
+            }
+        } else if (isVaild) {
+            if (rich != null) {
+                rich.addField(cmdHelp.title, cmdHelp.desc)
+            } else {
+                rich = this.defaultRich
+                rich.setTitle(cmdHelp.title)
+                rich.setDescription(cmdHelp.desc)
+            }
+            if (msg == null) {
+                msg = await channel.send(content, rich) as Discord.Message
+            } else {
+                await msg.edit(content, rich)
+            }
+        }
+        return msg
+    }
+    /**
+     * Generate Help from Type
+     * @param mode Command Type
+     */
+    protected helpRoleEdit(mode:ChainType) {
+        const title:string = "도움말"
+        let desc:string = ""
+        if (mode === ChainType.LIST_ROLE || mode === ChainType.EDIT_ROLE) {
+            const dango = "\u{1F361}"
+            const flagEmoji = "\u{1F3C1}"
+            // :dango: `d[n]`  n번째의 그룹 아래로 배치합니다.
+            desc += `${dango} select \`[번호]\` : n번 그룹을 선택합니다.\n`
+            desc += `${dango} up \`[번호|이름]\` : 선택한 그룹을 지정한 그룹 \u{2B06}다가 배치합니다.\n`
+            desc += `${dango} down \`[번호|이름]\` : 선택한 그룹을 지정한 그룹 \u{2B07}다가 배치합니다.\n`
+            desc += `${dango} perm \`[1|2|3]\` : 권한을 보여주고 편집합니다.` +
+                `\n${flagEmoji} :one: 일반 :two: 문자, :three: 음성 :asterisk: 전체\n`
+            if (mode === ChainType.EDIT_ROLE) {
+                desc += `${dango} list : 그룹 목록을 보여줍니다.`
+            }
+        }
+        return {
+            title,
+            desc,
+        }
     }
     /**
      * Get role from selector code
@@ -376,6 +418,12 @@ export default class PermManager extends Plugin {
         }
         return roles[i]
     }
+    /**
+     * Get Element in array safe.
+     * @param arr Array
+     * @param index Index
+     * @returns Element, null if Out-Of-Array
+     */
     protected safeGet<T>(arr:T[], index:number) {
         if (index < 0 || index >= arr.length) {
             return null
@@ -513,7 +561,7 @@ export default class PermManager extends Plugin {
         // let rolePermInfo = "```md\n"
         if (perms.has("ADMINISTRATOR")) {
             const joker = "\u{1F0CF}"
-            rich.addField("주의", joker + "**관리자**는 밑의 규칙을 무시하고 **모든** 권한을 갖습니다.")
+            rich.addField("주의", joker + "\n**관리자 권한**을 가지고 있습니다. 밑의 규칙을 무시하고 **모든** 권한을 갖습니다.")
         }
         for (const [field, perm] of pairs) {
             const keys = Object.keys(perm) as Discord.PermissionString[]
@@ -769,7 +817,7 @@ export default class PermManager extends Plugin {
      */
     protected filterCommand<T extends Discord.Role | Discord.GuildChannel>(
         input:string, commands:string[], arr:T[], offset = 0) {
-        const regex = new RegExp(`/^(${commands.join("|")})`, "i")
+        const regex = new RegExp(`^(${commands.join("|")})`, "i")
         if (!regex.test(input)) {
             return null
         }
@@ -796,6 +844,17 @@ export default class PermManager extends Plugin {
             return params
         }
         //             const matchUp = this.getFirst(this.matchNumber(content, /^(u|up)\s*?\d+/i))
+    }
+    private getIndexID<T extends {id:string}>(arr:T[], obj:T) {
+        if (arr == null || obj == null) {
+            return -1
+        }
+        for (let i = 0; i < arr.length; i += 1) {
+            if (arr[i].id === obj.id) {
+                return i
+            }
+        }
+        return -1
     }
     private matchNumber(str:string, regex:RegExp) {
         const match = str.match(regex)
