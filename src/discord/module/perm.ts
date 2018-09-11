@@ -13,6 +13,7 @@ const checkAdmin = false
 /**
  * Emojis
  */
+const disk = "\u{1F4BE}"
 const icecream = "\u{1F368}"
 const mic = "\u{1F3A4}"
 const textChat = "\u{1F4AC}"
@@ -20,6 +21,7 @@ const generalChat = "\u{2699}"
 const dango = "\u{1F361}"
 const flagEmoji = "\u{1F3C1}"
 const palatte = "\u{1F3A8}"
+const trash = "\u{1F5D1}"
 /**
  * General permissions
  */
@@ -172,7 +174,7 @@ export default class PermManager extends Plugin {
                 return Promise.resolve()
             }
             // array's index
-            const limitation = roles.length - Math.max(userHLv, botHLv) - 1
+            const limitation = roles.length - Math.min(userHLv, botHLv) - 1
             let startI = -1
             if (testERole.has(ParamType.dest)) {
                 const v = testERole.get(ParamType.dest)
@@ -195,6 +197,8 @@ export default class PermManager extends Plugin {
                 offset: limitation,
                 messageID: null,
                 permShow: PermShow.GENERAL | PermShow.TEXT | PermShow.VOICE,
+                apply: false,
+                moveCommands: [],
             })
             await this.callChain(msg)
             /*
@@ -266,10 +270,13 @@ export default class PermManager extends Plugin {
             const matchName = (/^(n|name)/i).test(content)
             const matchFlag = this.matchNumber(content, ["f", "flag"])
             const matchApply = /^(a|apply)$/i.test(content)
-            if (matchApply) {
+            const matchDiscard = /^(discard)$/i.test(content)
+            if (matchApply || matchDiscard) {
                 /**
                  * @todo Apply.
                  */
+                data.apply = matchApply
+                return this.endChain(message, type, rawData)
             } else if (matchSelect >= 0) {
                 /**
                  * Select Role
@@ -297,9 +304,24 @@ export default class PermManager extends Plugin {
                         title += "잘못된 번호 입니다."
                     } else {
                         Log.d("Move", `Move from ${data.select} to ${position}`)
+                        let added = false
                         this.moveArr(data.roles, data.select, position)
                         if (data.select < position) {
                             position -= 1
+                        }
+                        // add tracker.
+                        for (const mv of data.moveCommands) {
+                            if (mv.roleID === role.id) {
+                                mv.toPosition = position
+                                added = true
+                                break
+                            }
+                        }
+                        if (!added) {
+                            data.moveCommands.push({
+                                roleID: role.id,
+                                toPosition: position,
+                            })
                         }
                         data.select = position
                     }
@@ -384,9 +406,12 @@ export default class PermManager extends Plugin {
                 } else if (matchName) {
                     role.name = content.replace(/^(name|n)\s*/i, "").trim().replace(/\s/i, " " + blankChar2)
                 } else if (matchFlag.length >= 1) {
-                    const selectedRole = this.filterCommand(
+                    let selectedRole = this.filterCommand(
                         content, ["f", "flag"], roles, data.offset + 1, true
                     )
+                    if (selectedRole == null) {
+                        selectedRole = []
+                    }
                     let flagOR = 0
                     for (const mFlag of matchFlag) {
                         if (mFlag <= 0x7FFFFFFF) {
@@ -437,12 +462,104 @@ export default class PermManager extends Plugin {
         }
         if (message.deletable) {
             // async.
-            message.delete()
+            await message.delete()
         }
         return rawData
     }
     protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
-        // on receive all data
+        if (type === ChainType.LIST_ROLE || type === ChainType.EDIT_ROLE) {
+            const result = data.data as ChainRole
+            const channel = message.channel
+            const guild = message.guild
+            const selfPerm = guild.member(this.client.user).permissions
+            let msg:Discord.Message
+            if (result.messageID != null) {
+                msg = channel.messages.find((v) => v.id === result.messageID)
+                if (msg == null) {
+                    msg = await channel.fetchMessage(result.messageID)
+                }
+            }
+            await message.delete()
+            if (guild == null || !guild.available) {
+                return Promise.resolve()
+            }
+            if (!result.apply) {
+                if (msg != null) {
+                    msg.edit("그룹 편집을 취소했습니다.").then((v) => v.delete(5000))
+                }
+                return Promise.resolve()
+            }
+            result.roles.reverse()
+            const roles = guild.roles
+            const author = DiscordFormat.getNickname(message.member) + `(${message.author.id})`
+            const spliceList:number[] = []
+            let reqPerms = 0
+            for (const [id,role] of roles) {
+                const target = this.getFirst(result.roles.map((v, i) => ({index:i, ...v})).filter((v) => v.id === id))
+                const delta:RoleData = {
+                    id: role.id
+                }
+                let modified = false
+                if (target == null) {
+                    // removed.
+                    await role.delete("Removed by " + author)
+                    continue
+                }
+                if (target.color !== role.color) {
+                    Log.d("Color", role.name + " / " + target.color + " / " + role.color)
+                    modified = true
+                    delta.color = target.color
+                }
+                if (target.hoist !== role.hoist) {
+                    modified = true
+                    delta.hoist = target.hoist
+                }
+                if (target.mentionable !== role.mentionable) {
+                    modified = true
+                    delta.mentionable = target.mentionable
+                }
+                if (target.name !== role.name) {
+                    modified = true
+                    delta.name = target.name
+                }
+                if (target.permissions !== role.permissions) {
+                    modified = true
+                    reqPerms |= target.permissions as number
+                    delta.permissions = ((target.permissions as number) & selfPerm.bitfield)
+                }
+                const calcP = target.index
+                if (calcP !== role.position) {
+                    await role.setPosition(calcP, false)
+                    // delta.position = calcP
+                }
+                if (modified) {
+                    await role.edit(delta, "Edited by " + author)
+                }
+                spliceList.push(target.index)
+            }
+            spliceList.sort((a, b) => a - b)
+            result.roles = result.roles.filter((v, i) => spliceList.indexOf(i) < 0)
+            for (const leftRoles of result.roles) {
+                await guild.createRole(leftRoles, "Created by " + author)
+            }
+            const rich = this.defaultRich
+            rich.setTitle("그룹 편집을 완료했습니다.")
+            if (!selfPerm.has("ADMINISTRATOR")) {
+                const reqPerm = new Discord.Permissions(reqPerms)
+                let notify = false
+                let perms = ""
+                for (const [pm, korDesc] of Object.entries(allPerms)) {
+                    if (!selfPerm.has(pm as Discord.PermissionString) && reqPerm.has(pm as Discord.PermissionString)) {
+                        notify = true
+                        perms += `${korDesc} ( *${pm}* )\n`
+                    }
+                }
+                if (notify) {
+                    rich.addField("경고", perms + "\n\u{26A0} 봇에 권한이 없어 위 권한들은 적용이 불가능합니다.")
+                }
+            }
+            await msg.edit(rich)
+        }
         return Promise.resolve()
     }
     /**
@@ -516,6 +633,8 @@ export default class PermManager extends Plugin {
                 desc += `${dango} hoist \`<on|off>\` : 목록에서 따로 표시하게 할지 정합니다.\n`
                 desc += `${dango} name \`<이름>\` : 이름을 바꿔줍니다.\n`
             }
+            desc += `${disk} apply : 현재 편집한 내용들을 적용합니다.\n`
+            desc += `${trash} discard : 편집 내용들을 무시하고 끝냅니다.\n`
         }
         return {
             title,
@@ -1067,12 +1186,18 @@ interface ChainRole {
     offset:number;
     messageID:string;
     permShow:number;
+    apply:boolean;
+    moveCommands:MoveCommand[];
 }
 interface Command {
     roleID:string;
     type:CommandType;
     data_s?:string;
     data_n?:number;
+}
+interface MoveCommand {
+    roleID:string;
+    toPosition:number;
 }
 enum CommandType {
     Position_Update,
