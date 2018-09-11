@@ -9,8 +9,8 @@ import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
 
 // tslint:disable-next-line
-const mdnPicker = `https://mdn.mozillademos.org/en-US/docs/Web/CSS/CSS_Colors/Color_picker_tool$samples/ColorPicker_Tool`
-export const coolors = `https://coolors.co/app`
+const mdnPicker = `https://htmlcolorcodes.com/color-picker/`
+export const coolors = mdnPicker
 export default class Color extends Plugin {
     // declare config file: use save data
     protected config = new ColorConfig()

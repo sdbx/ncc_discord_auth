@@ -10,10 +10,16 @@ import { blankChar, blankChar2, ChainData, CmdParam, CommandHelp,
     ParamType, thinSpace, toLowerString, } from "../runutil"
 import { coolors } from "./color"
 const checkAdmin = false
+/**
+ * Emojis
+ */
 const icecream = "\u{1F368}"
 const mic = "\u{1F3A4}"
 const textChat = "\u{1F4AC}"
 const generalChat = "\u{2699}"
+const dango = "\u{1F361}"
+const flagEmoji = "\u{1F3C1}"
+const palatte = "\u{1F3A8}"
 /**
  * General permissions
  */
@@ -258,7 +264,13 @@ export default class PermManager extends Plugin {
             const matchMention = (/^(m|mention)\s*(1|0|on|off|true|false)$/i).test(content)
             const matchHoist = (/^(h|hoist)\s*(1|0|on|off|true|false)$/i).test(content)
             const matchName = (/^(n|name)/i).test(content)
-            if (matchSelect >= 0) {
+            const matchFlag = this.matchNumber(content, ["f", "flag"])
+            const matchApply = /^(a|apply)$/i.test(content)
+            if (matchApply) {
+                /**
+                 * @todo Apply.
+                 */
+            } else if (matchSelect >= 0) {
                 /**
                  * Select Role
                  */
@@ -371,6 +383,22 @@ export default class PermManager extends Plugin {
                     }
                 } else if (matchName) {
                     role.name = content.replace(/^(name|n)\s*/i, "").trim().replace(/\s/i, " " + blankChar2)
+                } else if (matchFlag.length >= 1) {
+                    const selectedRole = this.filterCommand(
+                        content, ["f", "flag"], roles, data.offset + 1, true
+                    )
+                    let flagOR = 0
+                    for (const mFlag of matchFlag) {
+                        if (mFlag <= 0x7FFFFFFF) {
+                            flagOR |= mFlag
+                        }
+                    }
+                    if (selectedRole.filter((v) => v.id === role.id).length === 0) {
+                        selectedRole.push(role)
+                    }
+                    for (const r of selectedRole) {
+                        r.permissions = flagOR & 0x7FF7FDFF
+                    }
                 }
             }
             if (type === ChainType.LIST_ROLE) {
@@ -386,11 +414,24 @@ export default class PermManager extends Plugin {
                 sendMsg.setFooter(title)
                 const pmURL = "https://discordapi.com/permissions.html#" + role.permissions
                 const crystalBall = "\u{1F52E}"
-                const pmLink = `${crystalBall} [GUI 계산기](${pmURL}) 수정한 링크를 입력하면 적용`
-                sendMsg.setURL(pmURL)
+                const additionInfo = `${crystalBall} [GUI 계산기](${pmURL}) 수정한 링크를 입력하면 적용\n`
+                // add info
+                const checkicon = (bool:boolean) => bool ? "\u{2705}" : "\u{274E}"
+                let infoCheck = ""
+                infoCheck += `${checkicon(role.mentionable)} ${DiscordFormat.mentionRole(role.id)}\n`
+                infoCheck += `${checkicon(role.hoist)} 목록에서 따로 표시`
+                sendMsg.addField("그룹 설정", infoCheck, true)
+                let roleetcInfo = ""
+                if (role.color === 0) {
+                    roleetcInfo += `${palatte} 기본`
+                } else {
+                    roleetcInfo += `${palatte} ${"0x" + (role.color as number).toString(16).toUpperCase()}`
+                }
+                roleetcInfo += `\n\u{1F530} ${role.id}`
+                sendMsg.addField(`기타 (${role.name})`, roleetcInfo, true)
                 const roleList = this.makeBlock(
                     this.listRoles(data.roles, data.select, data.offset, false))
-                const roleMsg = await send(roleList, sendMsg, data.messageID, pmLink)
+                const roleMsg = await send(roleList, sendMsg, data.messageID, additionInfo)
                 data.messageID = roleMsg.id
             }
         }
@@ -459,9 +500,6 @@ export default class PermManager extends Plugin {
         const title:string = "도움말"
         let desc:string = ""
         if (mode === ChainType.LIST_ROLE || mode === ChainType.EDIT_ROLE) {
-            const dango = "\u{1F361}"
-            const flagEmoji = "\u{1F3C1}"
-            const palatte = "\u{1F3A8}"
             // :dango: `d[n]`  n번째의 그룹 아래로 배치합니다.
             if (mode === ChainType.LIST_ROLE) {
                 desc += `${dango} select \`<번호>\` : n번 그룹을 선택합니다.\n`
@@ -915,7 +953,7 @@ export default class PermManager extends Plugin {
      * @param offset that offset.
      */
     protected filterCommand<T extends RoleData | Discord.GuildChannel>(
-        input:string, commands:string[], arr:T[], offset = 0) {
+        input:string, commands:string[], arr:T[], offset = 0, ignoreI = false) {
         const regex = new RegExp(`^(${commands.join("|")})`, "i")
         if (!regex.test(input)) {
             return null
@@ -933,7 +971,9 @@ export default class PermManager extends Plugin {
                 result = this.getFirst(arr.filter((_v) => _v.id === decoded))
             } else {
                 // index search
-                result = this.safeGet(arr, n + offset - 1)
+                if (!ignoreI) {
+                    result = this.safeGet(arr, n + offset - 1)
+                }
             }
             return result
         }).filter((v) => v != null)
@@ -970,12 +1010,14 @@ export default class PermManager extends Plugin {
                 return []
             } else {
                 return n.map((v) => {
-                    const num = Number.parseInt(v)
+                    let num = Number.parseInt(v, 10)
                     if (Number.isNaN(num)) {
-                        return null
-                    } else {
-                        return num
+                        num = Number.parseInt(v, 16)
+                        if (Number.isNaN(num)) {
+                            return null
+                        }                        
                     }
+                    return num
                 }).filter((v) => v != null)
             }
         } else {
