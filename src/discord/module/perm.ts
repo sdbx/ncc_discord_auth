@@ -22,6 +22,7 @@ const dango = "\u{1F361}"
 const flagEmoji = "\u{1F3C1}"
 const palatte = "\u{1F3A8}"
 const trash = "\u{1F5D1}"
+const sushi = "\u{1F363}"
 /**
  * General permissions
  */
@@ -176,12 +177,14 @@ export default class PermManager extends Plugin {
             // array's index
             const limitation = roles.length - Math.min(userHLv, botHLv) - 1
             let startI = -1
+            let cType = ChainType.LIST_ROLE
             if (testERole.has(ParamType.dest)) {
                 const v = testERole.get(ParamType.dest)
                 for (const role of roles) {
                     if (role.name === v) {
                         // reverse aligned position.
                         startI = roles.length - role.position - 1
+                        cType = ChainType.EDIT_ROLE
                         break
                     }
                 }
@@ -190,7 +193,7 @@ export default class PermManager extends Plugin {
                 ...v,
                 guild:guild.id,
             } as RoleData)).reverse()
-            this.startChain<ChainRole>(channel.id, msg.author.id, ChainType.LIST_ROLE, {
+            this.startChain<ChainRole>(channel.id, msg.author.id, cType, {
                 select: startI,
                 roles: rData,
                 // commands: new Map(),
@@ -229,9 +232,9 @@ export default class PermManager extends Plugin {
                 _content, _rich, mid, addHelp)
         }
         /**
-         * End Filter
+         * End Filter (for debug)
          */
-        if (content.indexOf("end") >= 0) {
+        if (content === "end") {
             return this.endChain(message, type, rawData)
         }
         /**
@@ -303,25 +306,9 @@ export default class PermManager extends Plugin {
                     } else if (role.position < data.offset || position >= roles.length) {
                         title += "잘못된 번호 입니다."
                     } else {
-                        Log.d("Move", `Move from ${data.select} to ${position}`)
-                        let added = false
                         this.moveArr(data.roles, data.select, position)
                         if (data.select < position) {
                             position -= 1
-                        }
-                        // add tracker.
-                        for (const mv of data.moveCommands) {
-                            if (mv.roleID === role.id) {
-                                mv.toPosition = position
-                                added = true
-                                break
-                            }
-                        }
-                        if (!added) {
-                            data.moveCommands.push({
-                                roleID: role.id,
-                                toPosition: position,
-                            })
                         }
                         data.select = position
                     }
@@ -485,7 +472,7 @@ export default class PermManager extends Plugin {
             }
             if (!result.apply) {
                 if (msg != null) {
-                    msg.edit("그룹 편집을 취소했습니다.").then((v) => v.delete(5000))
+                    msg.edit("그룹 편집을 취소했습니다.", {embed:null}).then((v) => v.delete(3000))
                 }
                 return Promise.resolve()
             }
@@ -493,8 +480,23 @@ export default class PermManager extends Plugin {
             const roles = guild.roles
             const author = DiscordFormat.getNickname(message.member) + `(${message.author.id})`
             const spliceList:number[] = []
+            const changelog:Map<string, string> = new Map()
             let reqPerms = 0
+            const printDelta = (title:string, before:string | number | boolean,
+                after:string | number | boolean, hex = true) => {
+                let bf:string = before.toString()
+                let af:string = after.toString()
+                if (hex && typeof before === "number" && typeof after === "number") {
+                    bf = "0x" + before.toString(16)
+                    af = "0x" + after.toString(16)
+                } else {
+                    bf = before.toString()
+                    af = after.toString()
+                }
+                return `${title}: ${bf}\t \u{27A1} ${af}\n`
+            }
             for (const [id,role] of roles) {
+                let changed = ""
                 const target = this.getFirst(result.roles.map((v, i) => ({index:i, ...v})).filter((v) => v.id === id))
                 const delta:RoleData = {
                     id: role.id
@@ -506,26 +508,31 @@ export default class PermManager extends Plugin {
                     continue
                 }
                 if (target.color !== role.color) {
-                    Log.d("Color", role.name + " / " + target.color + " / " + role.color)
                     modified = true
+                    changed += printDelta("색상", role.color, target.color as number, true)
                     delta.color = target.color
                 }
                 if (target.hoist !== role.hoist) {
                     modified = true
+                    changed += printDelta("개별 표시", role.hoist, target.hoist)
                     delta.hoist = target.hoist
                 }
                 if (target.mentionable !== role.mentionable) {
                     modified = true
+                    changed += printDelta("멘션 가능", role.mentionable, target.mentionable)
                     delta.mentionable = target.mentionable
                 }
                 if (target.name !== role.name) {
                     modified = true
+                    changed += printDelta("이름", role.name, target.name)
                     delta.name = target.name
                 }
                 if (target.permissions !== role.permissions) {
                     modified = true
+                    const filteredPm = (target.permissions as number) & selfPerm.bitfield
+                    changed += printDelta("권한", role.permissions, filteredPm, true)
                     reqPerms |= target.permissions as number
-                    delta.permissions = ((target.permissions as number) & selfPerm.bitfield)
+                    delta.permissions = filteredPm
                 }
                 const calcP = target.index
                 if (calcP !== role.position) {
@@ -534,6 +541,11 @@ export default class PermManager extends Plugin {
                 }
                 if (modified) {
                     await role.edit(delta, "Edited by " + author)
+                    let n = role.name
+                    if (changelog.has(n)) {
+                        n = n + " (" + role.position + ")"
+                    }
+                    changelog.set(n, changed)
                 }
                 spliceList.push(target.index)
             }
@@ -543,7 +555,20 @@ export default class PermManager extends Plugin {
                 await guild.createRole(leftRoles, "Created by " + author)
             }
             const rich = this.defaultRich
-            rich.setTitle("그룹 편집을 완료했습니다.")
+            // rich.setTitle()
+            const [unick, uimage] = DiscordFormat.getUserProfile(message.member)
+            rich.setAuthor(unick, uimage)
+            rich.setDescription(DiscordFormat.mentionUser(message.author.id))
+            if (changelog.size >= 1) {
+                let i = 0
+                for (const [name, desc] of changelog) {
+                    if (i >= 24) {
+                        break
+                    }
+                    rich.addField(name, desc, true)
+                    i += 1
+                }
+            }
             if (!selfPerm.has("ADMINISTRATOR")) {
                 const reqPerm = new Discord.Permissions(reqPerms)
                 let notify = false
@@ -558,7 +583,7 @@ export default class PermManager extends Plugin {
                     rich.addField("경고", perms + "\n\u{26A0} 봇에 권한이 없어 위 권한들은 적용이 불가능합니다.")
                 }
             }
-            await msg.edit(rich)
+            await msg.edit(`${sushi} 그룹 편집을 완료했습니다.`, rich)
         }
         return Promise.resolve()
     }
