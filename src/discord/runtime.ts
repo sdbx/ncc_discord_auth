@@ -18,7 +18,8 @@ import PermManager from "./module/perm"
 import Ping from "./module/ping"
 import Purge from "./module/purge"
 import Plugin from "./plugin"
-import { CmdParam, CommandHelp, DiscordFormat, getRichTemplate, ParamType } from "./runutil"
+import { CmdParam, ParamType } from "./rundefine"
+import { CommandHelp, DiscordFormat, getRichTemplate } from "./runutil"
 
 /**
  * List of presets
@@ -225,9 +226,11 @@ export default class Runtime extends EventEmitter {
             /*
               Let Commandhelp parse them.
             */
+            const isDM = msg.channel.type === "dm" || msg.channel.type === "group" ||
+                msg.guild == null || !msg.guild.available
             const status:CmdParam = {
                 isAdmin: this.global.isAdmin(msg.author.id),
-                isDM: msg.channel.type === "dm",
+                isDM,
                 isSimple: !prefix.test(text) && text.startsWith(this.global.simplePrefix),
             }
             try {
@@ -262,7 +265,7 @@ export default class Runtime extends EventEmitter {
         const setCmd = new CommandHelp("설정/보여",this.lang.sudoNeed, false, { reqAdmin:true })
         setCmd.addField(ParamType.dest, "목적", true)
         setCmd.addField(ParamType.to, "설정값", false)
-        const adminCmd = new CommandHelp("token", "토큰 인증", false, { dmOnly:true })
+        const adminCmd = new CommandHelp("token", "토큰 인증", false, { chatType: "dm" })
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true)
         const saveCmd = new CommandHelp("저장", "저장", true,{reqAdmin:true})
 
@@ -298,7 +301,7 @@ export default class Runtime extends EventEmitter {
             })
             // filter permission
             helps = helps.filter((_v) => {
-                return !((_v.dmOnly && msg.channel.type !== "dm")
+                return !((_v.chatType === "dm" && msg.channel.type !== "dm")
                     || (_v.reqAdmin && !this.global.isAdmin(msg.author.id)))
             })
             if (helps.length === 0) {

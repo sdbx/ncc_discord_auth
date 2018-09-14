@@ -3,43 +3,12 @@ import { MessageMentions } from "discord.js"
 import * as Long from "long"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
+import { blankChar, blankChar2, ClonedMessage, CmdParam, ParamAccept, ParamType } from "./rundefine"
 import { MainCfg } from "./runtime"
 
-/**
- * Semi-transparent char
- * 
- * Works in nickname, but showing char in sublime
- */
-export const blankChar = "\u{17B5}"
-/**
- * Fully-transparent char
- * 
- * Does not work in nickname.
- */
-export const blankChar2 = "\u{FFF5}"
-/**
- * Thin space char
- * 
- * \> `0px` && < `1/5em`
- */
-export const thinSpace = "\u{200A}"
+
 const safeCmd = /(".+?")|('.+?')/i
 const seperator = "/"
-export enum ParamType {
-    thing = "이/가",
-    dest = "을/를/좀",
-    for = "에게/한테",
-    to = "으로/로",
-    from = "에서",
-    do = "해줘/해/줘",
-    much = "만큼",
-}
-export enum ParamAccept {
-    ANY,
-    NUMBER,
-    USER,
-    CHANNEL,
-}
 // tslint:disable-next-line
 class AcceptRegex {
     public static check(type:ParamAccept, str:string):string | null {
@@ -58,24 +27,17 @@ class AcceptRegex {
         return null
     }
 }
-export interface Param {
-    type:ParamType; // type via natural (~~to)
-    code?:string[]; // type via simple (!auth code:Pickaxe) - maybe null
-    accept?:ParamAccept; // accept types
-    desc:string; // Description of command
-    require:boolean; // require?
-}
 export class CommandHelp {
     public cmds:string[] // allow cmds
     public params:Param[] // parameter info
     public complex:boolean // receive only keyword is matching?
     public reqAdmin:boolean // require admin?
-    public dmOnly:boolean // direct message only..
+    public chatType:"dm" | "guild" | "*" // direct message only..
     private _description:string // Description command
     private example:Map<string, string> // example parameter.. todo.
     // public singleWord:boolean; // receive only single word?
     public constructor(commands:string, desc:string,complex:boolean = false,
-        options?:{ reqAdmin?:boolean, dmOnly?:boolean, example?:Map<string, string>}) {
+        options?:{ reqAdmin?:boolean, chatType?:"dm" | "guild", example?:Map<string, string>}) {
         this.cmds = commands.split(seperator)
         this._description = desc
         this.example = this.safeGet(this.example, new Map())
@@ -83,16 +45,17 @@ export class CommandHelp {
         this.complex = complex
         if (options != undefined && options != null) {
             this.reqAdmin = this.safeGet(options.reqAdmin, false)
-            this.dmOnly = this.safeGet(options.dmOnly, false)
+            this.chatType = this.safeGet(options.chatType, "*")
             // this.singleWord = options.singleWord && true;
             if (this.reqAdmin) {
                 this._description += " (관리자)"
             }
-            if (this.dmOnly) {
+            if (this.chatType === "dm") {
                 this._description += " (1:1챗)"
             }
         } else {
-            this.reqAdmin = this.dmOnly = false
+            this.reqAdmin = false
+            this.chatType = "*"
         }
     }
     public get description() {
@@ -117,7 +80,7 @@ export class CommandHelp {
     public get simpleTitle():string {
         return this.getTitle(true)
     }
-    public check(global:MainCfg,content:string,state?:CmdParam):CommandStatus {
+    public check(global:{prefix:RegExp, simplePrefix:string}, content:string, state?:CmdParam):CommandStatus {
         const output = {
             match: false,
             reqParam: false,
@@ -127,7 +90,7 @@ export class CommandHelp {
         }
         const encoded = this.encode(content)
         let message = encoded.encoded
-        if ((this.reqAdmin && !state.isAdmin) || (this.dmOnly && !state.isDM)) {
+        if ((this.reqAdmin && !state.isAdmin) || this.chatType === (!state.isDM ? "dm" : "guild")) {
             return new CommandStatus(output.match, output.reqParam, output.requires,
                 output.opticals, output.command)
         }
@@ -821,15 +784,12 @@ export class CommandStatus {
         }
     }
 }
-export interface ChainData {
-    type:number;
-    data:unknown;
-    time:number;
-}
-export interface CmdParam {
-    isAdmin:boolean,
-    isDM:boolean,
-    isSimple:boolean,
+interface Param {
+    type:ParamType; // type via natural (~~to)
+    code?:string[]; // type via simple (!auth code:Pickaxe) - maybe null
+    accept?:ParamAccept; // accept types
+    desc:string; // Description of command
+    require:boolean; // require?
 }
 interface FieldBlock {
     content:string;
@@ -1007,11 +967,6 @@ export function cloneMessage(msg:Discord.Message) {
         embeds,
         content,
     } as ClonedMessage
-}
-export interface ClonedMessage {
-    attaches:Discord.Attachment[];
-    embeds:Discord.RichEmbed[];
-    content:string;
 }
 export class SnowFlake {
     public static from(snowflake:string) {

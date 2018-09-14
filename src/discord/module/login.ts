@@ -34,7 +34,8 @@ export default class Login extends Plugin {
         // super: load config
         await super.ready()
         // CommandHelp: suffix, description
-        this.naverLogin = new CommandHelp("네이버 로그인", this.lang.login.descLogin, true, {reqAdmin:true, dmOnly:true})
+        this.naverLogin = new CommandHelp("네이버 로그인", this.lang.login.descLogin, true,
+            {reqAdmin:true, chatType: "dm"})
         // add parameter
         this.naverLogin.addField(ParamType.to,"OTP 코드", false)
         // get parameter as complex

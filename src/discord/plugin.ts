@@ -10,8 +10,9 @@ import Log from "../log"
 import Ncc from "../ncc/ncc"
 import Profile from "../ncc/structure/profile"
 import Lang from "./lang"
+import { blankChar, ChainData, CmdParam, UniqueID } from "./rundefine"
 import { MainCfg } from "./runtime"
-import { blankChar, ChainData, cloneMessage, CmdParam, CommandHelp,
+import { cloneMessage, CommandHelp,
     getFirst, getFirstMap, getRichTemplate } from "./runutil"
 /**
  * The base of bot command executor
@@ -429,6 +430,9 @@ export default abstract class Plugin {
             this.subs.set(key, newI)
         }
         return Promise.resolve(newI)
+    }
+    protected async subUnique<T extends Config>(message:Discord.Message, type:UniqueID, sync = true) {
+
     }
     /**
      * get default formatted rich
