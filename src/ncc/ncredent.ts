@@ -133,8 +133,6 @@ export default class NcCredent extends EventEmitter {
         // this.credit.password = "__";
         if (name != null) {
             this.credit.username = name
-            this._name = new Cache(name, 43200)
-            await fs.writeFile(this.cookiePath, this.credit.export)
             await this.onLogin(name)
         } else {
             this._name.revoke()
@@ -245,8 +243,6 @@ export default class NcCredent extends EventEmitter {
         let userid:string = null
         if (valid != null) {
             userid = await this.credit.fetchUserID()
-            this._name = new Cache(userid, 43200)
-            await fs.writeFile(this.cookiePath, this.credit.export)
             await this.onLogin(userid)
         } else {
             this._name.revoke()
@@ -259,6 +255,9 @@ export default class NcCredent extends EventEmitter {
      */
     protected async onLogin(username:string):Promise<void> {
         Log.i("Runtime-ncc",`Logined by ${username}.`)
+        this._name = new Cache(username, 43200)
+        await fs.writeFile(this.cookiePath, this.credit.export)
+
         this.emit("login", username)
         return Promise.resolve()
     }

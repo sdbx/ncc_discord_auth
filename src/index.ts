@@ -70,7 +70,7 @@ async function client() {
     }
     const credit = ncc["credit"]
     const channel = await NcChannel.from(credit, listChannels[inputChNo - 1])
-    channel.connect(credit)
+    channel.connect(credit).catch(Log.e)
     if (channel.detail.lastestMessage.messageId != null) {
         await new Promise((res, rej) => {
             let stopper:() => void = null

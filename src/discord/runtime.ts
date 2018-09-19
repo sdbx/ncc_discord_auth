@@ -102,9 +102,13 @@ export default class Runtime extends EventEmitter {
         // save time: now
         this.lastSaved = Date.now()
         // ncc register event
+        this.ncc.useNcc = true
+        /*
         this.ncc.on("login", async () => {
-            this.ncc.connect(true)
+            Log.d("Connect", "connect")
+            // this.ncc.connect(true).catch(Log.e)
         })
+        */
         // ncc test auth by cookie
         try {
             if (await this.ncc.loadCredit() == null) {
