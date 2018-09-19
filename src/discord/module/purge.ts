@@ -3,7 +3,7 @@ import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { CmdParam, ParamType } from "../rundefine"
+import { CmdParam, ParamType, UniqueID } from "../rundefine"
 import { cloneMessage, CommandHelp, DiscordFormat,
     getFirstMap, getRichTemplate, SnowFlake } from "../runutil"
 
@@ -219,6 +219,44 @@ export default class Purge extends Plugin {
                 await msg.channel.send(this.lang.purge.working)
                 return Promise.resolve()
             }
+            const gConfig = await this.subUnique(this.config, msg, UniqueID.guild)
+            const allowTime = msg.createdTimestamp - gConfig.delaySec * 1000
+            /**
+             * Simple Delete for few messages.
+             */
+            if (deleteCount + (deleteALL ? 0 : 50) < 100) {
+                // instant delete
+                const fastFetches = await msg.channel.fetchMessages({
+                    limit: 100,
+                    before: msg.id,
+                })
+                const selected:string[] = []
+                let connectedLast = true
+                for (const [k, fetchM] of fastFetches) {
+                    const authored = fetchM.author.id !== msg.author.id
+                    if (selected.length >= deleteCount + 1) {
+                        break
+                    }
+                    if (!fetchM.author.bot && !authored) {
+                        // break Solo-say
+                        connectedLast = false
+                    }
+                    if (gConfig.allowLast && connectedLast) {
+                        if (authored || deleteALL) {
+                            selected.push(fetchM.id)
+                        }
+                        continue
+                    }
+                    if (fetchM.createdTimestamp < allowTime || deleteALL) {
+                        // ok.
+                        if (authored || deleteALL) {
+                            selected.push(fetchM.id)
+                        }
+                    }
+                }
+                await msg.channel.bulkDelete(selected)
+                return Promise.resolve()
+            }
             // check cache
             const caching = this.caching
             const progress = await this.updateCache(msg.channel, msg.id, caching)
@@ -389,6 +427,8 @@ export default class Purge extends Plugin {
 }
 class PurgeConfig extends Config {
     public filterExplicit = false
+    public delaySec = 0
+    public allowLast = true
     public backupChannel = "5353"
     constructor() {
         super("purger")
