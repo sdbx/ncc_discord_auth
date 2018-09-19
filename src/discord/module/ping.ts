@@ -25,12 +25,12 @@ export default class Ping extends Plugin {
         if (message.content === "끝") {
             return this.endChain(message,type,data)
         }
-        data.time = Date.now()
-        data.data["words"].push(message.content)
+        data.time = Date.now();
+        (data.data as object)["words"].push(message.content)
         return Promise.resolve(data)
     }
     protected async onChainEnd(message:Discord.Message, type:number, data:ChainData):Promise<void> {
-        await message.channel.send(data.data["words"].join(" "))
+        await message.channel.send((data.data as object)["words"].join(" "))
         return Promise.resolve()
     }
 }

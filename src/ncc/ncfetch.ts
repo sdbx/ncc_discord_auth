@@ -1,6 +1,7 @@
 import * as caller from "caller"
 import * as cheerio from "cheerio"
 import * as encoding from "encoding"
+import * as fs from 'fs-extra'
 import * as get from "get-value"
 import * as Entities from "html-entities"
 import { Agent } from "https"
@@ -8,19 +9,28 @@ import * as querystring from "querystring"
 import * as request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
-import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE,
-    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix, whitelistDig } from "./ncconstant"
+import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
+    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix,
+    naverRegex, whitelistDig } from "./ncconstant"
+import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
 import Article from "./structure/article"
 import Cafe from "./structure/cafe"
 import Comment from "./structure/comment"
 import Profile from "./structure/profile"
 import NcJson from "./talk/ncjson"
+import uploadImage from "./talk/uploadphoto"
 const userAgent = "Mozilla/5.0 (Node; NodeJS Runtime) Gecko/57.0 Firefox/57.0"
+/**
+ * Naver fetcher class using **jQuery**
+ * 
+ * @extends NcCredent
+ */
 export default class NcFetch extends NcCredent {
     protected parser = new Entities.AllHtmlEntities()
     private cacheDetail = new Map<number, Cache<Cafe>>()
     private cacheCafeID = new Map<string, Cache<number>>()
+    private cacheNCMC4:Cache<string>
     private httpsAgent:Cache<Agent>
     constructor() {
         super()
@@ -34,21 +44,29 @@ export default class NcFetch extends NcCredent {
         }, 60)
     }
     /**
-     * Get Cheerio(jquery) object from url
-     * @returns jQuery
+     * Get Cheerio(jQuery) object from url
      * @param requrl URL request
      * @param param get parameter
      * @param option convert to EUC-KR / use cookie for auth
+     * @returns jQuery
+     * @deprecated use NCredit.
      */
     public async getWeb(requrl:string, param:{ [key:string]: string | number } = {},
             option = new RequestOption()):Promise<CheerioStatic> {
         /**
          * Check cookie status
          */
-        const isNaver = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm").test(requrl)
-        if (option.useAuth && (!isNaver || !await this.availableAsync())) {
-            Log.w("ncc-getWeb",`${requrl}: ${isNaver ? "Wrong url" : "Cookie error!"}`)
+        const isNaver = naverRegex.test(requrl)
+        if (option.useAuth && !await this.availableAsync()) {
+            Log.w("ncc-getWeb",`${requrl}: ${!isNaver ? "Wrong url" : "Cookie error!"}`)
             return Promise.reject()
+        }
+        if (option.eucKR && option.type === SendType.POST && option.postdata != null) {
+            // Legacy need
+        } else {
+            const reqBody = await this.credit.req(
+                option.type, requrl, param, option.postdata, option.referer, option.eucKR ? "ms949" : "utf-8") as string
+            return cheerio.load(reqBody)
         }
         /**
          * form data modification
@@ -474,7 +492,15 @@ export default class NcFetch extends NcCredent {
      * @param nickname 회원의 별명
      */
     public async getMemberByNick(cafeid:number, nickname:string) {
-        const profiles = await this.queryMembersByNick(cafeid,nickname)
+        let chainNick = nickname
+        let profiles:Profile[]
+        // due to naver api bug
+        do {
+            profiles = await this.queryMembersByNick(cafeid, chainNick)
+            if (chainNick.length >= 1) {
+                chainNick = chainNick.substring(0, chainNick.length - 1)
+            }
+        } while (profiles.length <= 0 && chainNick.length  >= 1)
         const real = profiles.filter((_v) => _v.nickname === nickname)
         if (real.length === 0) {
             return Promise.reject(`${nickname} 닉의 유저는 없음`)
@@ -553,6 +579,46 @@ export default class NcFetch extends NcCredent {
         return memberList
     }
     /**
+     * Upload image to naver server
+     * @param file File Path | File URL | File Buffer
+     * @param filename FileName
+     * @returns Image info / reject (if not logined or fail)
+     */
+    public async uploadImage(file:string | Buffer, filename?:string) {
+        if (!await this.availableAsync()) {
+            return Promise.reject("Not Logined")
+        }
+        return uploadImage(this.credit, file, filename)
+    }
+    public async fetchWatching(cafeid:number) {
+        if (this.cacheNCMC4 == null || this.cacheNCMC4.expired) {
+            if (!await this.availableAsync()) {
+                return Promise.reject("Not Logined")
+            }
+            const str = await this.credit.reqGet("https://cafe.naver.com/sdbx") as string
+            const first = getFirst(str.match(/.+ncmc4.+/ig))
+            if (first == null) {
+                return Promise.reject("Not Logined")
+            }
+            this.cacheNCMC4 = new Cache(first.substring(first.indexOf("\"") + 1, first.lastIndexOf("\"")), 3600)
+        }
+        const url = "https://lm02.cafe.naver.com/addAndList.nhn"
+        const query = {
+            "r": "linkedMember",
+            "cafeKey": cafeid,
+            "ncmc4": this.cacheNCMC4.value
+        }
+        const json = JSON.parse(await this.credit.reqGet(url, query) as string)
+        const users:Array<{userid:string, name:string}> = []
+        for (const obj of get(json, "l")) {
+            users.push({
+                userid: get(obj, "m"),
+                name: get(obj, "n"),
+            })
+        }
+        return users
+    }
+    /**
      * Change Nickname or image
      * @param cafeid Naver CafeID
      * @param nickname to change Nickname (null if u don't change)
@@ -561,6 +627,9 @@ export default class NcFetch extends NcCredent {
     public async changeProfile(cafeid:number | Cafe, nickname?:string, image?:string) {
         if (typeof cafeid !== "number") {
             cafeid = cafeid.cafeId
+        }
+        if (!await this.availableAsync()) {
+            return Promise.resolve(null)
         }
         const uname = this.credit.username
         if (nickname == null || image == null) {
@@ -606,7 +675,9 @@ export default class NcFetch extends NcCredent {
         return Promise.resolve(t[0])
     }
     /**
-     * 닉네임 검색
+     * Query users using nick
+     * @param cafeid CafeID
+     * @param nick Nickname
      */
     protected async queryMembersByNick(cafeid:number,nick:string) {
         // http://cafe.naver.com/static/js/mycafe/javascript/nickNameValidationChk-1516327387000-7861.js

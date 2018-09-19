@@ -7,6 +7,7 @@ import { Agent } from "https"
 import * as querystring from "querystring"
 import * as orgrq from "request"
 import * as request from "request-promise-native"
+import { Stream } from "stream"
 import { Cookie, CookieJar, parseDate } from "tough-cookie"
 import Cache from "../../cache"
 import Log from "../../log"
@@ -19,27 +20,55 @@ const likepost = ["POST", "PUT"]
 const consumerKey = "kqbJYsj035JR"
 const signKey = "4EE81426ewcSpNzbjul1"
 
+/**
+ * Core Naver authorization library
+ * 
+ * Original: https://github.com/yoo2001818/node-ncc-es6/blob/master/src/credentials.js
+ */
 export default class NCredit extends EventEmitter {
+    /**
+     * Naver id
+     */
     public username:string
+    /**
+     * Naver password (This can be **null**)
+     */
     protected _password:string
-    protected cookieJar:CookieJar = new CookieJar()
-    private httpsAgent:Cache<Agent>
+    /**
+     * Naver auth's cookie
+     */
+    protected cookieJar:CookieJar
+    /**
+     * Https keep-Alive
+     */
+    private httpsAgent:Map<string, BAgent>
+    private urlTimestamp:Map<string, number>
+    /**
+     * Create NCredit with id, password
+     * 
+     * No matter parameter when login to OTP
+     * @param username 
+     * @param password 
+     */
     constructor(username?:string, password?:string) {
         super()
-        this.username = username
-        this._password = password
-        this.httpsAgent = new Cache((old) => {
-            if (old != null) {
-                old.destroy()
-            }
-            return new Agent({
-                keepAlive: true
-            })
-        }, 60)
+        this.set(username, password)
+        this.urlTimestamp = new Map()
+        this.httpsAgent = new Map()
     }
+    /**
+     * Clear cookie
+     * 
+     * It doesn't clear username and password.
+     */
     public clear() {
         this.cookieJar = new CookieJar()
     }
+    /**
+     * Set username and password to login
+     * @param username Naver ID
+     * @param password Naver PW
+     */
     public set(username?:string, password?:string) {
         this.clear()
         if (username != null) {
@@ -51,9 +80,10 @@ export default class NCredit extends EventEmitter {
     }
     /**
      * Validate Naver logined.
-     * Recommand Caching value
+     * 
+     * Recommend Caching value
      * @param captcha Naver captcha parameter(check other class for detail)
-     * @returns captcha if false (Promise.reject)
+     * @returns resolve when SUCCESS / reject {@link LoginError} when error
      */
     public async login(captcha:{key:string, value:string} = null) {
         log("Starting logging in")
@@ -134,7 +164,7 @@ export default class NCredit extends EventEmitter {
     /**
      * Login via Naver OTP code
      * @param otpcode otpcode
-     * @returns userid if success / null if fail (resolve)
+     * @returns userid if SUCCESS / null if FAIL (resolve)
      */
     public async loginOTP(otpcode:number | string) {
         const code = typeof otpcode === "number" ? otpcode.toString().padStart(8) : otpcode
@@ -177,7 +207,7 @@ export default class NCredit extends EventEmitter {
         }
     }
     /**
-     * Get userid even if logined by cookie
+     * Get userid for logined by cookie
      */
     public async fetchUserID() {
         const home = await this.reqGet(CHAT_HOME_URL) as string
@@ -196,6 +226,9 @@ export default class NCredit extends EventEmitter {
      * useless?
      */
     public async logout() {
+        const url = `https://nid.naver.com/nidlogin.logout?returl=https://talk.cafe.naver.com/`
+        await this.reqGet(url) // useless maybe?
+        // empty cookie
         this.cookieJar = new CookieJar()
         log("Logging out")
         this.emit("logout")
@@ -203,30 +236,33 @@ export default class NCredit extends EventEmitter {
     }
     /**
      * Validate naver login
-     * @returns username or Promise.reject() (fail)
+     * @returns username or null (fail)
      */
-    public async validateLogin() {
+    public async validateLogin(throwCause = false) {
         const content = asJSON(await this.reqGet(CHATAPI_PHOTO_SESSION_KEY) as string)
+        const rej = (cause:string) => {
+            Log.w("Valid-Login", cause)
+            return throwCause ? Promise.reject(cause) : Promise.resolve(null as string)
+        }
         if (content == null) {
             // not found.
-            return Promise.reject("404 NOT FOUND")
+            return rej("404 NOT FOUND")
         }
         const errorCode = get(content, "message.status", {default: "-1"})
         if (errorCode === "1002") {
             // {"message":{"status":"500","error":{"code":"1002","msg":"로그인이 필요합니다","errorResult":null},"result":null}}
-            // 로그인이 필요합니다
-            return Promise.reject("1002 NEED LOGIN")
+            return rej("1002 NOT FOUND")
         }
-        return errorCode === "200" ? Promise.resolve(this.username) : Promise.reject(`${errorCode} UNKNOWN`)
+        if (errorCode === "200") {
+            return Promise.resolve(this.username)
+        } else {
+            return rej(`${errorCode} UNKNOWN`)
+        }
     }
     /**
-     * Gen OTP
+     * Generate OTP
      * 
      * token: 8-diget token **number**
-     * 
-     * expires: When expire otp
-     * 
-     * naverID: ?
      */
     public async genOTP() {
         const oauthURL = "https://nid.naver.com/naver.oauth"
@@ -270,7 +306,7 @@ export default class NCredit extends EventEmitter {
             token: Number.parseInt(json["number"] as string),
             expires: new Date(
                 (Number.parseInt(json["timestamp"], 10) + Number.parseInt(json["expires_in"], 10)) * 1000),
-            naverID: json["id"]
+            naverID: json["id"] as string
         }
     }
     /**
@@ -354,7 +390,7 @@ export default class NCredit extends EventEmitter {
         referer = CHAT_HOME_URL, encoding = "utf-8") {
         // set origin
         const originRegex = /http(s)?:\/\/.+?\//
-        let origin
+        let origin:string
         if (originRegex.test(referer)) {
             origin = referer.match(originRegex)[0]
         } else {
@@ -366,7 +402,6 @@ export default class NCredit extends EventEmitter {
         if (from != null) {
             from = from.substr(from.lastIndexOf("/") + 1)
         }
-        Log.url("Fetch URL", _url, from)
         // check post type
         const likePost = likepost.indexOf(sendType) >= 0
         let binary = false
@@ -376,7 +411,7 @@ export default class NCredit extends EventEmitter {
                     if (value == null) {
                         continue
                     }
-                    if (value instanceof Buffer) {
+                    if (value instanceof Buffer || value instanceof Stream) {
                         return true
                     }
                     if (typeof value === "object") {
@@ -391,8 +426,15 @@ export default class NCredit extends EventEmitter {
             binary = deepCheck(postD)
         }
         // refresh httpsAgent
-        if (this.httpsAgent.expired) {
-            this.httpsAgent.doRefresh()
+        if (!this.httpsAgent.has(origin)) {
+            this.httpsAgent.set(origin, {
+                using: false,
+                agent: new Agent({keepAlive: true, keepAliveMsecs: 60000}),
+            })
+        }
+        const agent_pair = this.httpsAgent.get(origin)
+        if (!agent_pair.using) {
+            agent_pair.using = true
         }
         const cookie = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
@@ -402,7 +444,7 @@ export default class NCredit extends EventEmitter {
             useQuerystring: true,
             form: likePost && !binary ? postD : undefined,
             formData: binary ? postD : undefined,
-            agent: this.httpsAgent.value,
+            agent: agent_pair.using ? null : agent_pair.agent,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
             strictSSL: true,
             timeout: 5000,
@@ -413,9 +455,15 @@ export default class NCredit extends EventEmitter {
             },
             jar: cookie,
         }
-        this.saveCookie(COOKIE_SITES, cookie)
         try {
+            const bf = Date.now()
             const buffer:Buffer | string = await request(options)
+            agent_pair.using = false
+            if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 120000 < Date.now()) {
+                Log.url("Fetch URL", _url, from + " - " + (Date.now() - bf))
+                this.urlTimestamp.set(_url, Date.now())
+            }
+            this.saveCookie(COOKIE_SITES, cookie)
             if (typeof buffer === "string") {
                 // utf-8 encoded
                 return Promise.resolve(buffer)
@@ -430,7 +478,7 @@ export default class NCredit extends EventEmitter {
                 }
             }
         } catch (err) {
-            this.httpsAgent.doRefresh()
+            agent_pair.using = false
             Log.e(err)
             return Promise.resolve(null as string)
         }
@@ -451,6 +499,25 @@ export default class NCredit extends EventEmitter {
         } catch {
             log("Cookie parse:fail")
         }
+    }
+    /**
+     * Check cookie exists.
+     * @param url Cookie's URL
+     * @param key Cookie's key
+     */
+    public hasCookie(url:string, key?:string) {
+        const cookies = this.cookieJar.getCookiesSync(url)
+        if (cookies.length < 0) {
+            return false
+        } else if (key == null) {
+            return true
+        }
+        for (const cookie of cookies) {
+            if (cookie.key === key) {
+                return true
+            }
+        }
+        return false
     }
     /**
      * Generate NNB cookie
@@ -480,6 +547,11 @@ export default class NCredit extends EventEmitter {
         entcpCookie.expires = new Date(2050, 11, 30)
         return entcpCookie
     }
+    /**
+     * Save cookie(request) to CookieJar
+     * @param sites Save sites
+     * @param cookie Request Cookie
+     */
     private saveCookie(sites:string[], cookie:orgrq.CookieJar) {
         try {
             sites.forEach((v) => {
@@ -502,11 +574,22 @@ export default class NCredit extends EventEmitter {
         }
     }
 }
+interface BAgent {
+    using:boolean;
+    agent:Agent
+}
+/**
+ * Response of naver login
+ */
 export interface LoginError {
     captcha:boolean;
     captchaURL?:string;
     captchaKey?:string;
 }
+/**
+ * Kkiro's log
+ * @param str string
+ */
 function log(str:string) {
     Log.d(str)
 }

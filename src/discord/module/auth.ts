@@ -92,12 +92,13 @@ export default class Auth extends Plugin {
              */
             let type = testAuth.code(ParamType.to)
             let member:Profile
-            const param = testAuth.get(ParamType.to)
+            let param = testAuth.get(ParamType.to)
             const guildCfg = await this.sub(this.config, msg.guild.id)
             const cafeID = await this.ncc.parseNaver(guildCfg.commentURL)
             if (type === PType.ID) {
                 member = await this.ncc.getMemberById(cafeID.cafeId, param).catch((err) => null)
             } else if (type === PType.NICK) {
+                param = param.replace(/"/ig, "")
                 member = await this.ncc.getMemberByNick(cafeID.cafeId, param).catch((err) => null)
             } else {
                 if (param.replace(/[a-zA-Z0-9]+/ig, "").length === 0) {
@@ -107,6 +108,7 @@ export default class Auth extends Plugin {
                 if (member == null) {
                     // Check by nick
                     type = PType.NICK
+                    param = param.replace(/"/ig, "")
                     member = await this.ncc.getMemberByNick(cafeID.cafeId, param).catch((err) => null)
                 }
             }

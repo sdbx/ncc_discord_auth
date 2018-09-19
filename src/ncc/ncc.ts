@@ -4,6 +4,7 @@ import * as io from "socket.io-client"
 import { EventDispatcher, IEventHandler, ISimpleEventHandler, SimpleEventDispatcher } from "strongly-typed-events"
 import Cache from "../cache"
 import Log from "../log"
+import { bindFn, TimerID, WebpackTimer } from "../webpacktimer"
 import NCredit from "./credit/ncredit"
 import NCaptcha from "./ncaptcha"
 import { CAFE_DEFAULT_IMAGE, CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
@@ -24,6 +25,10 @@ import NcJoinedChannel, { parseFromJoined } from "./talk/ncjoinedchannel"
 import NcJson from "./talk/ncjson"
 import NcMessage from "./talk/ncmessage"
 
+/**
+ * Chains Naver-Cafe-Chat and JSON-API in naver cafe
+ * @extends NcFetch
+ */
 export default class Ncc extends NcFetch {
     /**
      * Joined channels
@@ -40,7 +45,7 @@ export default class Ncc extends NcFetch {
     /**
      * Auto update tasker
      */
-    protected syncTask:NodeJS.Timer
+    protected syncTask:TimerID
     protected events:Events
     constructor() {
         super()
@@ -354,7 +359,7 @@ export default class Ncc extends NcFetch {
         }
         await this.syncChannels()
         if (autoUpdate) {
-            this.syncTask = setTimeout(this.syncChannels.bind(this), intervalNormal)
+            this.syncTask = setTimeout(bindFn(this.syncChannels, this), intervalNormal)
         }
         return Promise.resolve()
     }
@@ -365,7 +370,7 @@ export default class Ncc extends NcFetch {
      */
     public clearChannels() {
         if (this.syncTask != null) {
-            clearTimeout(this.syncTask)
+            WebpackTimer.clearTimeout(this.syncTask)
         }
         this.connectedChannels.forEach((v) => v.disconnect())
         this.connectedChannels = []
@@ -449,9 +454,10 @@ export default class Ncc extends NcFetch {
             errored = true
         }
         if (this.syncTask != null) {
-            clearTimeout(this.syncTask)
+            WebpackTimer.clearTimeout(this.syncTask)
             // error : 30 seconds
-            setTimeout(this.syncChannels.bind(this), errored ? intervalError : intervalNormal)
+            this.syncTask = WebpackTimer.setTimeout(
+                bindFn(this.syncChannels, this), errored ? intervalError : intervalNormal)
         }
     }
     /**

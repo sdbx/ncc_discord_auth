@@ -1,10 +1,28 @@
 import * as Discord from "discord.js"
 import { MessageMentions } from "discord.js"
+import * as Long from "long"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
 import { MainCfg } from "./runtime"
 
+/**
+ * Semi-transparent char
+ * 
+ * Works in nickname, but showing char in sublime
+ */
 export const blankChar = "\u{17B5}"
+/**
+ * Fully-transparent char
+ * 
+ * Does not work in nickname.
+ */
+export const blankChar2 = "\u{FFF5}"
+/**
+ * Thin space char
+ * 
+ * \> `0px` && < `1/5em`
+ */
+export const thinSpace = "\u{200A}"
 const safeCmd = /(".+?")|('.+?')/i
 const seperator = "/"
 export enum ParamType {
@@ -376,25 +394,11 @@ export class CommandHelp {
         }
         return echo
     }
-    private encode(source:string) {
-        let chain = source
-        const safeList:string[] = []
-        while (safeCmd.test(chain)) {
-            const value = source.match(safeCmd)[0]
-            safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")))
-            chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}")
-        }
-        return {
-            encoded: chain,
-            key: safeList,
-        }
+    private encode(str:string) {
+        return encodeCmdInput(str)
     }
     private decode(encoded:string, key:string[]) {
-        let chain = encoded
-        key.forEach((value, index) => {
-            chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value)
-        })
-        return chain
+        return decodeCmdInput(encoded, key)
     }
     private safeGet<T>(obj:T | undefined, defaultV:T | null):T | null {
         return obj == null ? defaultV : obj
@@ -478,6 +482,15 @@ export class DiscordFormat {
      */
     public static mentionChannel(channelid:string) {
         return `<#${channelid}>`
+    }
+    /**
+     * Discord RoleID -> `@Role`
+     * 
+     * check Role is mentionable.
+     * @param roleid Role's id
+     */
+    public static mentionRole(roleid:string) {
+        return `<@&${roleid}>`
     }
     /**
      * Format discord Emoji
@@ -810,7 +823,7 @@ export class CommandStatus {
 }
 export interface ChainData {
     type:number;
-    data:object;
+    data:unknown;
     time:number;
 }
 export interface CmdParam {
@@ -828,7 +841,10 @@ interface FieldBlock {
  * Get first element in Array
  * @param arr Array
  */
-export function getFirst<T>(arr:T[]):T {
+export function getFirst<T>(arr:T[] | T):T {
+    if (!Array.isArray(arr)) {
+        return arr
+    }
     if (arr != null && arr.length >= 1) {
         return arr[0]
     } else {
@@ -896,6 +912,37 @@ export function getRichTemplate(global:MainCfg, client:Discord.Client) {
     // rich.setFooter(client.user.username, client.user.avatarURL)
     rich.setTimestamp(new Date(Date.now()))
     return rich
+}
+export function toLowerString(str:string) {
+    return str.split("_").map((v) => {
+        v = v.toLowerCase()
+        if (v.length >= 2) {
+            v = v.charAt(0).toUpperCase() + v.substr(1)       
+        } else if (v.length >= 1) {
+            v = v.charAt(0).toUpperCase()
+        }
+        return v
+    }).join(" ")
+}
+export function encodeCmdInput(source:string) {
+    let chain = source
+    const safeList:string[] = []
+    while (safeCmd.test(chain)) {
+        const value = source.match(safeCmd)[0]
+        safeList.push(value.substring(value.indexOf("\"") + 1, value.lastIndexOf("\"")))
+        chain = chain.replace(safeCmd, "${" + (safeList.length - 1) + "}")
+    }
+    return {
+        encoded: chain,
+        key: safeList,
+    }
+}
+export function decodeCmdInput(encoded:string, key:string[]) {
+    let chain = encoded
+    key.forEach((value, index) => {
+        chain = chain.replace(new RegExp("\\$\\{" + index + "\\}", "i"), value)
+    })
+    return chain
 }
 /**
  * Clone message
@@ -965,4 +1012,27 @@ export interface ClonedMessage {
     attaches:Discord.Attachment[];
     embeds:Discord.RichEmbed[];
     content:string;
+}
+export class SnowFlake {
+    public static from(snowflake:string) {
+        const L = Long.fromString(snowflake, true, 10)
+        const th = new SnowFlake()
+        
+        th.timestamp = new Date(L.shiftRight(22).toNumber() + 1420070400000)
+        th.increment = L.and(0xFFF).toNumber()
+        th.iWorkerID = L.and(0x3E0000).shiftRight(17).toNumber()
+        th.iProcessID = L.and(0x1F000).shiftRight(12).toNumber()
+        return th
+    }
+    public timestamp:Date
+    public increment:number
+    private iWorkerID:number
+    private iProcessID:number
+    private _original:string
+    public toString() {
+        return this._original
+    }
+    public get id() {
+        return this._original
+    }
 }

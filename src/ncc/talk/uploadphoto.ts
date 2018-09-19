@@ -4,7 +4,7 @@ import * as request from "request-promise-native"
 import { Stream } from "stream"
 import NCredit from "../credit/ncredit"
 import { CHAT_IMAGE_UPLOAD_URL, CHAT_IMAGE_UPLOADED_HOST, CHATAPI_PHOTO_SESSION_KEY } from "../ncconstant"
-import { getFirst, withName } from "../nccutil"
+import { getFirst, parseFile, withName } from "../nccutil"
 import NcJson from "./ncjson"
 import { NcImage } from "./ncmessage"
 
@@ -16,31 +16,8 @@ import { NcImage } from "./ncmessage"
  * @returns Image or Promise.reject()
  */
 export default async function uploadImage(credit:NCredit, file:string | Buffer, filename:string = null) {
-    let send:Buffer | Stream = null
-    if (typeof file === "string") {
-        if (/http(s)?:\/\//.test(file)) {
-            if (filename == null) {
-                filename = decodeURIComponent(file.replace(/\?.*/ig, ""))
-                filename = filename.substring(filename.lastIndexOf("/") + 1)
-            }
-            send = await request.get(file, {encoding: null}).catch((err) => null)
-        } else {
-            file = file.replace(/\\\s/ig, " ")
-            const p = path.resolve(file)
-            if (await fs.pathExists(p)) {
-                if (filename == null) {
-                    filename = path.basename(file)
-                }
-                send = fs.createReadStream(p)
-            }
-        }
-    } else {
-        if (filename == null) {
-            filename = "unknown.png"
-        }
-        send = file
-    }
-    if (filename == null || (send == null)) {
+    const param = await parseFile(file, filename)
+    if (param.filename == null || (param.sendable == null)) {
         return Promise.reject("Invalid file or filename")
     }
     const sessionRes = await credit.reqGet(CHATAPI_PHOTO_SESSION_KEY) as string
@@ -57,7 +34,7 @@ export default async function uploadImage(credit:NCredit, file:string | Buffer, 
         "type": "",
     }
     const form = {
-        "image": withName(send, filename),
+        "image": withName(param.sendable, param.filename),
     }
     const content = await credit.reqPost(CHAT_IMAGE_UPLOAD_URL.get(sessionKey.result), qs, form) as string
     return {

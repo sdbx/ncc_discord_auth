@@ -14,6 +14,7 @@ import Color from "./module/color"
 import EventNotifier from "./module/event"
 import Gather from "./module/gather"
 import Login from "./module/login"
+import PermManager from "./module/perm"
 import Ping from "./module/ping"
 import Purge from "./module/purge"
 import Plugin from "./plugin"
@@ -81,7 +82,7 @@ export default class Runtime extends EventEmitter {
         this.plugins.push(
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
             new Cast(), new Gather(), new EventNotifier(), new Color(),
-            new Purge())
+            new Purge(), new PermManager())
     }
     /**
      * **Async**
@@ -133,7 +134,12 @@ export default class Runtime extends EventEmitter {
             }
         }
         // client login (ignore)
-        await this.client.login(this.global.token)
+        try {
+            await this.client.login(this.global.token)
+        } catch (err) {
+            Log.e(err)
+            return Promise.reject(err)
+        }
         return Promise.resolve("")
     }
     /**

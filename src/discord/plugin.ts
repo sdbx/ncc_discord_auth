@@ -43,7 +43,7 @@ export default abstract class Plugin {
     /**
      * Chaining timeout. (**ms**)
      */
-    protected timeout = 1 * 60 * 1000 // 1 is minutes
+    protected timeout = 10 * 60 * 1000 // 1 is minutes
     /**
      * Chaining cache
      */
@@ -291,6 +291,18 @@ export default abstract class Plugin {
         return this.chains.has(`${channel}$${user}`)
     }
     /**
+     * Get Chained data (null if no exists)
+     * @param channel 채널
+     * @param user 유저
+     */
+    public getChainedData<T extends object>(channel:string, user:string) {
+        if (this.chaining(channel, user)) {
+            return this.chains.get(`${channel}$${user}`).data as T
+        } else {
+            return null
+        }
+    }
+    /**
      * Calling chain for receive message
      * @param message received id (uses channelid, userid)
      * @param channel manual channel id (useless for now)
@@ -308,9 +320,11 @@ export default abstract class Plugin {
             const chainData = this.chains.get(id)
             if (Date.now() - chainData.time >= this.timeout) {
                 this.chains.delete(id)
+                await message.channel.send(this.lang.chainEnd)
                 return Promise.resolve(false)
             }
             const chained = await this.onChainMessage(message, chainData.type, chainData)
+            chainData.time = Date.now()
             if (chained.type === -1) {
                 // chain end.
                 Log.d("Chain", "chain end.")
@@ -378,12 +392,12 @@ export default abstract class Plugin {
      * @param type 체인 타입
      * @param data 값
      */
-    protected startChain(channel:string, user:string, type:number, data:object = {}):void {
+    protected startChain<T extends unknown>(channel:string, user:string, type:number, data?:T):void {
         const id = `${channel}$${user}`
         if (!this.chains.has(id)) {
             this.chains.set(id,{
                 type,
-                data,
+                data: (data == null ? {} : data),
                 time: Date.now(),
             } as ChainData)
         } else {
@@ -578,7 +592,7 @@ export default abstract class Plugin {
      * @deprecated use runutil export
      * @param arr Array
      */
-    protected getFirst<T>(arr:T[]):T {
+    protected getFirst<T>(arr:T[] | T):T {
         return getFirst(arr)
     }
     /**

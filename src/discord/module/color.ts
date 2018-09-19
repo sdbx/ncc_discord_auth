@@ -9,7 +9,8 @@ import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
 
 // tslint:disable-next-line
-const mdnPicker = `https://mdn.mozillademos.org/en-US/docs/Web/CSS/CSS_Colors/Color_picker_tool$samples/ColorPicker_Tool`
+const mdnPicker = `https://htmlcolorcodes.com/color-picker/`
+export const coolors = mdnPicker
 export default class Color extends Plugin {
     // declare config file: use save data
     protected config = new ColorConfig()
@@ -147,7 +148,7 @@ export default class Color extends Plugin {
                 if (colorCode.toLowerCase() === "random" || colorCode === "랜덤") {
                     const role = await msg.guild.createRole({
                         name: prefix + "Random",
-                        permissions:[],
+                        permissions:[0],
                         mentionable: true,
                         color: 0x000000,
                     })

@@ -1,6 +1,7 @@
 import { ParamStr } from "./nccutil"
 const s = ParamStr.make
 
+export const naverRegex = new RegExp(/^(http|https):\/\/[A-Za-z0-9\.]*naver\.com\//, "gm")
 export const cafePrefix = "https://cafe.naver.com"
 export const mCafePrefix = "https://m.cafe.naver.com"
 export const whitelistDig = ["div", "p", "span", "h1", "h2", "h3", "h4", "h5", "h6", "br"]
@@ -18,6 +19,7 @@ export const INSECURE_CAPTCHA = `http://captcha.naver.com`
 export const CAFE_LOGIN_CHECK = `${cafePrefix}/LoginCheck.nhn?m=check`
 export const CAFE_PROFILE_UPDATE = `${cafePrefix}/CafeMemberInfoUpdate.nhn`
 export const CAFE_NICKNAME_CHECK = `${cafePrefix}/CafeMemberNicknameCheckAjax.nhn`
+export const CAFE_UPLOAD_FILE = `https://up.cafe.naver.com/AttachFile.nhn`
 
 export const CHAT_BACKEND_URL = "https://talkwss.cafe.naver.com"
 export const CHAT_SOCKET_IO = `${CHAT_BACKEND_URL}/socket.io/`

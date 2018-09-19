@@ -98,6 +98,10 @@ export default class Lang extends Config {
         working: "진행중입니다.",
         fetching: "메세지 목록을 받아오고 있습니다.",
     }
+    public perm = {
+        noPermMangeRole: "Role을 관리하는 권한이 없습니다.",
+        selected: "선택됨",
+    }
     /*
      * Module: artinoti
      */
@@ -144,6 +148,8 @@ export default class Lang extends Config {
     public adminGranted = "%(mention)s님 인증완료."
     // notlogin
     public noNaver = "네이버 계정으로 로그인 안되어 있습니다."
+    // chain end
+    public chainEnd = "기존 실행중인 명령어가 취소되었습니다."
 
     constructor() {
         super("lang")

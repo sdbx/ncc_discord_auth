@@ -3,6 +3,7 @@ import * as Discord from "discord.js"
 import * as readline from "readline"
 import * as request from "request-promise-native"
 import Runtime from "./discord/runtime"
+import { getFirst } from "./discord/runutil"
 import Log from "./log"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
 import Cafe from "./ncc/structure/cafe"
@@ -19,7 +20,7 @@ async function start() {
         Log.d("Main", "Restarting Runtime...")
         setTimeout(start, 2000)
     })
-    await run.start()
+    await run.start().catch(() => setTimeout(start, 10000))
 }
 // Log.hook()
 Log.enable = true
@@ -45,6 +46,7 @@ async function init() {
             } catch (err) {
                 Log.e(err)
             }
+            const cafe = await ncc.parseNaverDetail(26686242)
         }
     }
 }

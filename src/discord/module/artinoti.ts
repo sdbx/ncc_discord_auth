@@ -4,6 +4,7 @@ import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import { cafePrefix } from "../../ncc/ncconstant"
+import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
@@ -14,7 +15,7 @@ export default class ArtiNoti extends Plugin {
     protected config = new AlertConfig()
     // declare command.
     private toggle:CommandHelp
-    private timer
+    private timer:TimerID
     private articleCache:Map<string,number> = new Map()
     /**
      * Initialize command
@@ -27,7 +28,7 @@ export default class ArtiNoti extends Plugin {
         // get parameter as complex
         this.toggle.complex = true
         // setinterval
-        this.timer = setInterval(this.fetch.bind(this),60000)
+        this.timer = WebpackTimer.setInterval(bindFn(this.fetch, this),60000)
         // call once :)
         await this.fetch()
         return Promise.resolve()
@@ -54,7 +55,7 @@ export default class ArtiNoti extends Plugin {
     }
     public async onDestroy() {
         await super.onDestroy()
-        clearInterval(this.timer)
+        WebpackTimer.clearInterval(this.timer)
         return Promise.resolve()
     }
     protected async fetch() {

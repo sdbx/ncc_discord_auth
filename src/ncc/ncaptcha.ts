@@ -1,5 +1,5 @@
 import Log from "../log"
-import NCredit from "./credit/ncredit"
+import NCredit, { LoginError } from "./credit/ncredit"
 import { CHATAPI_CAPTCHA, INSECURE_CAPTCHA, NID_CAPTCHA } from "./ncconstant"
 import NcJson from "./talk/ncjson"
 
@@ -24,6 +24,19 @@ export default class NCaptcha {
         } else {
             return Promise.reject("Wrong Data")
         }
+        return captcha
+    }
+    /**
+     * Get NCaptcha from login response
+     * @param loginError Login response in {@link NCredit}
+     */
+    public static fromResponse(loginError:LoginError) {
+        const captcha = new NCaptcha()
+        if (!loginError.captcha) {
+            return null
+        }
+        captcha.key = loginError.captchaKey
+        captcha.url = loginError.captchaURL
         return captcha
     }
     /**
