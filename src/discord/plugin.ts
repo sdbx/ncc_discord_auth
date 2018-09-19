@@ -431,8 +431,26 @@ export default abstract class Plugin {
         }
         return Promise.resolve(newI)
     }
-    protected async subUnique<T extends Config>(message:Discord.Message, type:UniqueID, sync = true) {
-
+    protected async subUnique<T extends Config>(parent:T, message:Discord.Message, type:UniqueID, sync = true) {
+        let code:string
+        switch (type) {
+            case UniqueID.channel:
+                code = message.channel.id
+                break
+            case UniqueID.guild: {
+                if (message.guild == null || !message.guild.available) {
+                    code = message.channel.id
+                } else {
+                    code = message.guild.id
+                }
+            } break
+            case UniqueID.user:
+                code = message.author.id
+                break
+            default:
+                throw new Error("Invalid Type")
+        }
+        return this.sub(parent, code, sync)
     }
     /**
      * get default formatted rich

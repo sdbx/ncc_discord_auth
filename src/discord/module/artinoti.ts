@@ -6,6 +6,7 @@ import Log from "../../log"
 import { cafePrefix } from "../../ncc/ncconstant"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
+import { UniqueID } from "../rundefine"
 import { MainCfg } from "../runtime"
 import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
 import { AuthConfig } from "./auth"
@@ -40,7 +41,7 @@ export default class ArtiNoti extends Plugin {
         // test command if match
         const testToggle = this.toggle.check(this.global,command,state)
         if (testToggle.match) {
-            const cfg = await this.sub(this.config, msg.guild.id)
+            const cfg = await this.subUnique(this.config, msg, UniqueID.guild)
             if (cfg.toPostChannel.indexOf(msg.channel.id) >= 0) {
                 cfg.toPostChannel.splice(cfg.toPostChannel.indexOf(msg.channel.id), 1)
             } else {
