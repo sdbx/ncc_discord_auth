@@ -1,12 +1,11 @@
 import * as colorConvert from "color-convert"
 import * as Discord from "discord.js"
 import { sprintf } from "sprintf-js"
-import Cache from "../../cache"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { CmdParam, ParamType } from "../rundefine"
+import { CommandHelp, DiscordFormat } from "../runutil"
 
 // tslint:disable-next-line
 const mdnPicker = `https://htmlcolorcodes.com/color-picker/`

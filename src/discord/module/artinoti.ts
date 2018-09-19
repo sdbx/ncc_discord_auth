@@ -1,14 +1,13 @@
 import * as Discord from "discord.js"
 import * as request from "request-promise-native"
-import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import { cafePrefix } from "../../ncc/ncconstant"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { UniqueID } from "../rundefine"
-import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { CmdParam } from "../rundefine"
+import { CommandHelp, DiscordFormat } from "../runutil"
 import { AuthConfig } from "./auth"
 
 export default class ArtiNoti extends Plugin {

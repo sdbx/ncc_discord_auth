@@ -1,20 +1,16 @@
 import * as Discord from "discord.js"
-import * as request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import Cache from "../../cache"
 import Config from "../../config"
 import Log from "../../log"
 import { NccEvents } from "../../ncc/ncc"
-import Article from "../../ncc/structure/article"
-import Cafe from "../../ncc/structure/cafe"
-import Comment from "../../ncc/structure/comment"
 import Profile from "../../ncc/structure/profile"
 import { ChannelType } from "../../ncc/talk/ncbasechannel"
 import NcChannel from "../../ncc/talk/ncchannel"
-import NcMessage, { NcImage, NcSticker } from "../../ncc/talk/ncmessage"
+import NcMessage from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, getFirst, ParamType, } from "../runutil"
+import { CmdParam, ParamType, UniqueID } from "../rundefine"
+import { CommandHelp, DiscordFormat, getFirst } from "../runutil"
 
 export default class Auth extends Plugin {
     protected defaultConfig = {
@@ -93,7 +89,7 @@ export default class Auth extends Plugin {
             let type = testAuth.code(ParamType.to)
             let member:Profile
             let param = testAuth.get(ParamType.to)
-            const guildCfg = await this.sub(this.config, msg.guild.id)
+            const guildCfg = await this.subUnique(this.config, msg, UniqueID.guild)
             const cafeID = await this.ncc.parseNaver(guildCfg.commentURL)
             if (type === PType.ID) {
                 member = await this.ncc.getMemberById(cafeID.cafeId, param).catch((err) => null)
@@ -203,7 +199,7 @@ export default class Auth extends Plugin {
                 return Promise.resolve()
             }
             const dest = testInfo.get(ParamType.dest)
-            const guildCfg = await this.sub(this.config, msg.guild.id)
+            const guildCfg = await this.subUnique(this.config, msg, UniqueID.guild)
             const cafe = await this.ncc.parseNaver(guildCfg.commentURL)
             let naver:Profile
             // check member

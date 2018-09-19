@@ -3,9 +3,9 @@ import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { CmdParam } from "../rundefine"
-import { MainCfg } from "../runtime"
-import { CommandHelp } from "../runutil"
+import { ChainData, CmdParam, ParamAccept, ParamType } from "../rundefine"
+import { cloneMessage, CommandHelp, CommandStatus, DiscordFormat,
+    getFirstMap, getRichTemplate, SnowFlake } from "../runutil"
 
 
 export default class Sample extends Plugin {

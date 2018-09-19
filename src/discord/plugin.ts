@@ -1,6 +1,7 @@
 import * as Discord from "discord.js"
 import * as get from "get-value"
 import * as Hangul from "hangul-js"
+import * as Long from "long"
 const set = require("set-value")
 import * as fs from "fs-extra"
 import { sprintf } from "sprintf-js"
@@ -406,32 +407,52 @@ export default abstract class Plugin {
         }
     }
     /**
-     * Umran
-     * @param global class object 
-     * @param subName sub name :)
+     * Get sub-config from Long Identifier
+     * @param origin The prototype of Config
+     * @param subCode The long-number identify unique config
+     * @param sync Synchorize config?
      */
-    protected async sub<T extends Config>(parent:T,subName:string,sync = true):Promise<T> {
-        const key = this.subKey(parent.name, subName)
+    protected async sub<T extends Config>(origin:T,subCode:Long | string,sync = true):Promise<T> {
+        if (typeof subCode === "string") {
+            if (Number.isInteger(Number.parseInt(subCode))) {
+                subCode = Long.fromString(subCode)
+            } else {
+                throw new Error("Deprecated.")
+            }
+        }
+        const key = this.subKey(origin.name, subCode.toString(16))
         if (this.subs.has(key)) {
             const cfg = this.subs.get(key) as T
-            const receiver = {
-                set: (target, p, value, r) => {
-                    Log.d("SubConfig", "Hooked setting value: " + p.toString())
-                    return false
-                }
-            } as ProxyHandler<T>
-            const proxy = new Proxy(cfg, receiver)
-            return sync ? cfg : proxy
+            if (sync) {
+                return cfg
+            } else {
+                const receiver = {
+                    set: (target, p, value, r) => {
+                        Log.d("SubConfig", "Hooked setting value: " + p.toString())
+                        return false
+                    }
+                } as ProxyHandler<T>
+                const proxy = new Proxy(cfg, receiver)
+                return proxy
+            }
         }
-        const newI:T = new (parent["constructor"] as any)(subName, parent.name) as T
-        newI.initialize(subName, parent.name)
+        const newI:T = new (origin["constructor"] as any)(origin.name) as T
+        newI.initialize(origin.name, subCode)
         await newI.import(true).catch(Log.e)
         if (sync) {
             this.subs.set(key, newI)
         }
-        return Promise.resolve(newI)
+        return newI
     }
-    protected async subUnique<T extends Config>(parent:T, message:Discord.Message, type:UniqueID, sync = true) {
+    /**
+     * Get sub-config from message with type
+     * @param origin The store which loads into data.
+     * @param message Discord's received message
+     * @param type Identify Type
+     * @param sync Sync config?
+     * @throws `Invalid Type` If type is invalid
+     */
+    protected async subUnique<T extends Config>(origin:T, message:Discord.Message, type:UniqueID, sync = true) {
         let code:string
         switch (type) {
             case UniqueID.channel:
@@ -450,7 +471,7 @@ export default abstract class Plugin {
             default:
                 throw new Error("Invalid Type")
         }
-        return this.sub(parent, code, sync)
+        return this.sub(origin, Long.fromString(code), sync)
     }
     /**
      * get default formatted rich

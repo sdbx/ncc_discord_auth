@@ -1,8 +1,7 @@
 import * as Discord from "discord.js"
-import Config from "../../config"
-import Log from "../../log"
 import Plugin from "../plugin"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, ParamType } from "../runutil"
+import { ChainData, CmdParam } from "../rundefine"
+import { CommandHelp } from "../runutil"
 
 export default class Ping extends Plugin {
     private ping:CommandHelp

@@ -1,16 +1,14 @@
 import * as Discord from "discord.js"
-import * as fs from "fs-extra"
 import * as Hangul from "hangul-js"
 import * as request from "request-promise-native"
 import { sprintf } from "sprintf-js"
-import * as tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import { LoginError } from "../../ncc/credit/ncredit"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { ChainData, CmdParam, ParamType } from "../rundefine"
+import { CommandHelp, DiscordFormat } from "../runutil"
 
 const refreshDelay = 43200 * 1000
 

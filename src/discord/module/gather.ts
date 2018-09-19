@@ -1,12 +1,9 @@
 import * as Discord from "discord.js"
-import { sprintf } from "sprintf-js"
-import { file } from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, ClonedMessage, cloneMessage, CmdParam,
-  CommandHelp, CommandStatus, DiscordFormat, ParamType } from "../runutil"
+import { ClonedMessage, CmdParam, ParamType } from "../rundefine"
+import { cloneMessage, CommandHelp, DiscordFormat } from "../runutil"
 
 const regexEmoji = /<:[A-Za-z0-9_]{2,}:\d+>/ig
 export default class Gather extends Plugin {

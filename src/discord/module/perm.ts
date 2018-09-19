@@ -4,10 +4,8 @@ import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { blankChar, blankChar2, ChainData, CmdParam, CommandHelp,
-    CommandStatus, decodeCmdInput, DiscordFormat, encodeCmdInput,
-    ParamType, thinSpace, toLowerString, } from "../runutil"
+import { blankChar2, ChainData, CmdParam, ParamType, thinSpace } from "../rundefine"
+import { CommandHelp, decodeCmdInput, DiscordFormat, encodeCmdInput, toLowerString } from "../runutil"
 import { coolors } from "./color"
 const checkAdmin = false
 /**

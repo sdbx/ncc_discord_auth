@@ -4,8 +4,8 @@ import Config from "../../config"
 import Log from "../../log"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { ChainData, CmdParam, ParamType } from "../rundefine"
+import { CommandHelp, DiscordFormat } from "../runutil"
 
 export default class EventNotifier extends Plugin {
     // declare config file: use save data

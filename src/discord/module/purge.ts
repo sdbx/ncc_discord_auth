@@ -1,12 +1,11 @@
 import * as Discord from "discord.js"
 import { sprintf } from "sprintf-js"
-import Cache from "../../cache"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, cloneMessage, CmdParam, CommandHelp, CommandStatus, DiscordFormat,
-    getFirstMap, getRichTemplate, ParamAccept, ParamType, SnowFlake } from "../runutil"
+import { CmdParam, ParamType } from "../rundefine"
+import { cloneMessage, CommandHelp, DiscordFormat,
+    getFirstMap, getRichTemplate, SnowFlake } from "../runutil"
 
 const bulkLimit = 100
 const timeLimit = 1000 * 3600 * 24 * 14 + 300000

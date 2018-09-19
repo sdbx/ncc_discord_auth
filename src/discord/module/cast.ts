@@ -2,7 +2,6 @@ import * as Discord from "discord.js"
 import * as fs from "fs-extra"
 import * as hangul from 'hangul-js'
 import * as request from "request-promise-native"
-import { sprintf } from "sprintf-js"
 import * as tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
@@ -12,8 +11,8 @@ import NcChannel from "../../ncc/talk/ncchannel"
 import NcJoinedChannel from "../../ncc/talk/ncjoinedchannel"
 import NcMessage, { MessageType, NcImage, NcSticker, SystemType } from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
-import { MainCfg } from "../runtime"
-import { ChainData, CmdParam, CommandHelp, CommandStatus, DiscordFormat, ParamType, } from "../runutil"
+import { CmdParam, ParamType, UniqueID } from "../rundefine"
+import { CommandHelp, DiscordFormat } from "../runutil"
 import { AuthConfig, getNaver } from "./auth"
 
 export default class Cast extends Plugin {
@@ -59,7 +58,7 @@ export default class Cast extends Plugin {
                 return Promise.resolve()
             }
             const roomCfg = await this.sub(this.config, roomid.toString())
-            const channelCfg = await this.sub(new LinkConfig(), msg.channel.id)
+            const channelCfg = await this.subUnique(new LinkConfig(), msg, UniqueID.channel)
             // already listening?
             if (roomCfg.channelID === channel.id && channelCfg.roomID === roomCfg.roomID &&
                 roomCfg.channelID && channelCfg.channelID) {
@@ -129,7 +128,7 @@ export default class Cast extends Plugin {
         const guild = msg.guild
         const channel = msg.channel
 
-        const channelCfg = await this.sub(new LinkConfig(), msg.channel.id)
+        const channelCfg = await this.subUnique(new LinkConfig(), msg, UniqueID.channel)
         const roomCfg = await this.sub(this.config, channelCfg.roomID.toString())
 
         if (roomCfg.channelID !== msg.channel.id || msg.author.bot) {
@@ -140,7 +139,7 @@ export default class Cast extends Plugin {
             await channel.send(this.lang.cast.readonly)
             return Promise.resolve()
         }
-        const authL = await this.sub(new AuthConfig(),guild.id, false)
+        const authL = await this.subUnique(new AuthConfig(), msg, UniqueID.guild, false)
         const n = getNaver(authL, guild.id, msg.author.id)
         const room = await this.ncc.getConnectedChannel(roomCfg.roomID)
         if (room == null || (roomCfg.authedOnly && n == null)) {

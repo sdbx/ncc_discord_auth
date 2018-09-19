@@ -19,7 +19,7 @@ export default class Config {
     public blacklist:string[] // blacklist for config
     // private readonly saveTo:string = "./config/config.json";
     protected configName:string
-    protected subDir:string // subdir
+    protected subCode:Long // subdir
     protected saveTo:string // save location
     public static get dirpath():string {
         let rootDir = path.resolve(process.cwd())
@@ -47,17 +47,19 @@ export default class Config {
     public initialize(_name:string, _sub:Long, _version = Config.appVersion) {
         this.version = _version
         this.blacklist = []
-        this.subDir = _sub.toString(10)
+        if (_sub.neq(0)) {
+            this.subCode = _sub
+        }
         this.name = _name
     }
     public set sub(n:string) {
-        this.subDir = n
+        this.subCode = Long.fromString(n)
         this.name = this.name
     }
     public set name(n:string) {
         this.configName = n
-        if (this.subDir != null) {
-            this.saveTo = path.resolve(Config.dirpath, this.subDir, `${n}.json`)
+        if (this.subCode != null) {
+            this.saveTo = path.resolve(Config.dirpath, n, `${this.subCode.toString(10)}.json`)
         } else {
             this.saveTo = path.resolve(Config.dirpath, `${n}.json`)
         }
