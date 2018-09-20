@@ -20,7 +20,10 @@ async function start() {
         Log.d("Main", "Restarting Runtime...")
         setTimeout(start, 2000)
     })
-    await run.start().catch(() => setTimeout(start, 10000))
+    run.start().catch((err) => {
+        Log.e(err)
+        setTimeout(start, 10000)
+    })
 }
 // Log.hook()
 Log.enable = true

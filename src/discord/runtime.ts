@@ -124,6 +124,10 @@ export default class Runtime extends EventEmitter {
         // client register
         this.client.on("ready",this.ready.bind(this))
         this.client.on("message",this.onMessage.bind(this))
+        this.client.on("error", (err) => Log.e(err))
+        this.client.on("reconnecting", () => Log.d("Discord", "Reconnecting Websocket.."))
+        this.client.on("resume", (n) => Log.i("Discord", "Websocket Resumed!\nnum:" + n))
+        this.client.on("warn", (warn) => Log.w("Discord", "Warning\n" + warn))
         // ncc login
         if (this.global.consoleLogin && !await this.ncc.availableAsync()) {
             while (await this.ncc.genCreditByConsole() == null) {
@@ -192,6 +196,7 @@ export default class Runtime extends EventEmitter {
         // set client option
         this.client.options.disabledEvents = ["PRESENCE_UPDATE", "TYPING_START"]
         this.emit("ready")
+        Log.d("Logined", "Logined by " + this.client.user.username)
     }
     /**
      * Discord's onMessage event receiver

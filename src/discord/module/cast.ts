@@ -129,6 +129,9 @@ export default class Cast extends Plugin {
         const channel = msg.channel
 
         const channelCfg = await this.subUnique(new LinkConfig(), msg, UniqueID.channel)
+        if (Number.isNaN(channelCfg.roomID)) {
+            channelCfg.roomID = -1
+        }
         const roomCfg = await this.sub(this.config, channelCfg.roomID.toString())
 
         if (roomCfg.channelID !== msg.channel.id || msg.author.bot) {

@@ -58,8 +58,8 @@ export default class Auth extends Plugin {
         const user = msg.author
         const guild = msg.guild
         const channel = msg.channel
-        const testAuth = this.authNaver.check(this.global,command)
-        const testInfo = this.infoNaver.check(this.global,command)
+        const testAuth = this.authNaver.check(this.global,command, state)
+        const testInfo = this.infoNaver.check(this.global,command, state)
         if (testAuth.match) {
             // check naver
             if (!await this.ncc.availableAsync()) {

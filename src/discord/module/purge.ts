@@ -224,7 +224,7 @@ export default class Purge extends Plugin {
             /**
              * Simple Delete for few messages.
              */
-            if (deleteCount + (deleteALL ? 0 : 50) < 100) {
+            if (deleteCount + (deleteALL ? 0 : 50) < 0) {
                 // instant delete
                 const fastFetches = await msg.channel.fetchMessages({
                     limit: 100,
@@ -232,9 +232,9 @@ export default class Purge extends Plugin {
                 })
                 const selected:string[] = []
                 let connectedLast = true
-                for (const [k, fetchM] of fastFetches) {
-                    const authored = fetchM.author.id !== msg.author.id
-                    if (selected.length >= deleteCount + 1) {
+                for (const [, fetchM] of fastFetches) {
+                    const authored = fetchM.author.id === msg.author.id
+                    if (selected.length >= deleteCount) {
                         break
                     }
                     if (!fetchM.author.bot && !authored) {
@@ -254,6 +254,9 @@ export default class Purge extends Plugin {
                         }
                     }
                 }
+                if (selected.indexOf(msg.id) < 0) {
+                    selected.push(msg.id)
+                }
                 await msg.channel.bulkDelete(selected)
                 return Promise.resolve()
             }
@@ -270,9 +273,32 @@ export default class Purge extends Plugin {
             const deleteIDs:string[] = []
             const recents = this.listMessage.get(msg.channel.id)
             let recentL = recents.length
+            let multiplySelf = true
             for (let i = 0; i < recentL; i += 1) {
-                const {authorId, msgId} = recents[i]
-                if (deleteALL || authorId.toString() === msg.author.id) {
+                const {authorId, msgId, timestamp} = recents[i]
+                const self = authorId === msg.author.id
+                const selfBot = authorId === this.client.user.id
+                if (multiplySelf && !self && !selfBot) {
+                    multiplySelf = false
+                }
+                let del = false
+                if (timestamp < allowTime) {
+                    // old time: pass
+                    del = true
+                } else if (gConfig.allowLast && multiplySelf) {
+                    // solo said: pass
+                    del = true
+                }
+                if (deleteALL || self) {
+                    // delete target
+                    if (!del) {
+                        // exception by rule
+                        deleteCount -= 1
+                    }
+                } else {
+                    del = false
+                }
+                if (del) {
                     recentL -= 1
                     recents.splice(i, 1)
                     i -= 1

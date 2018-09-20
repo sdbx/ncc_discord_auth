@@ -6,7 +6,17 @@ import Log from "./log"
 export default class Config {
     public static readonly appVersion:number = 2 // app version
     // tslint:disable-next-line
-    private static readonly excludes:string = "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name,subDir,sub";
+    private static readonly excludes:string[] = [
+        // "appVersion,defaultblacklist,saveTo,blacklist,dirpath,configName,name,subCode,sub";
+        "appVersion",
+        "blacklist",
+        "configName",
+        "subCode",
+        "saveTo",
+        "dirpath",
+        "sub",
+        "name",
+    ]
     public version:number // config version
     /*
     public discordID:IDiscordID = {articleChannels:[]} as any;
@@ -46,7 +56,7 @@ export default class Config {
     }
     public initialize(_name:string, _sub:Long, _version = Config.appVersion) {
         this.version = _version
-        this.blacklist = []
+        this.blacklist = [...Config.excludes]
         if (_sub.neq(0)) {
             this.subCode = _sub
         }
@@ -72,10 +82,8 @@ export default class Config {
      * @returns success? (reject,resolve)
      */
     public async export():Promise<void> {
-        const ignore:string[] = this.blacklist.map(a => Object.assign({}, a))
-        Config.excludes.split(",").forEach(v => ignore.push(v))
         const write:string = JSON.stringify(this,
-            (key:string,value:any) => (ignore.indexOf(key) >= 0) ? undefined : value,"\t")
+            (key:string,value:any) => (this.blacklist.indexOf(key) >= 0) ? undefined : value,"\t")
         try {
             await fs.ensureFile(this.saveTo)
             await fs.writeFile(this.saveTo,write,{encoding:"utf-8"})
@@ -108,8 +116,7 @@ export default class Config {
             }
             file_version = data.version
             // remove non-cloneable
-            const ignore:string[] = this.blacklist.map(a => Object.assign({}, a))
-            Config.excludes.split(",").forEach(v => ignore.push(v))
+            const ignore:string[] = [...this.blacklist]
             ignore.push("version")
             for (const [key, value] of Object.entries(ignore)) {
                 if (ignore.indexOf(key) >= 0) {
@@ -134,7 +141,8 @@ export default class Config {
     }
     protected _clone(source:any) {
         for (const key of Object.keys(this)) {
-            if (this.hasOwnProperty(key) && source.hasOwnProperty(key)) {
+            if (this.blacklist.indexOf(key) < 0 && this.hasOwnProperty(key)
+                && source.hasOwnProperty(key)) {
                 this[key] = this.clone_chain(source[key],this[key])
             }
         }
@@ -149,6 +157,27 @@ export default class Config {
     protected clone_chain<T>(source:any,dest:T):T {
         if (source == null || Array.isArray(dest) || !(dest instanceof Object) || dest == null) {
             // primitive type
+            if (!Array.isArray(dest) && dest != null) {
+                if (typeof dest === "number") {
+                    if (source == null) {
+                        source = 0
+                    } else if (typeof source === "string") {
+                        source = source.indexOf(".") >= 0 ?
+                            Number.parseFloat(source) : Number.parseInt(source)
+                    } else if (typeof source === "boolean") {
+                        source = source ? 1 : 0
+                    }
+                } else if (typeof dest === "boolean") {
+                    if (source === "1" || source === "true") {
+                        source = true
+                    } else if (source === "0" || source === "false") {
+                        source = false
+                    } else {
+                        // :thinking:
+                        source = false
+                    }
+                }
+            }
             return source as T
         }
         const out:T = dest.constructor()
