@@ -43,9 +43,12 @@ export default class Cache<T> {
     }
     public doRefresh() {
         // tslint:disable-next-line
-        this.refresh
+        this.refresh(this.value)
     }
-    public revoke() {
+    public revoke(newV?:T) {
         this.ends = -1
+        if (newV !== undefined) {
+            this.data = newV
+        }
     }
 }

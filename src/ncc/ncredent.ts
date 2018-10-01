@@ -20,21 +20,25 @@ const setTimeoutP = util.promisify(setTimeout)
  * A Wrapper of NCredit
  */
 export default class NcCredent extends EventEmitter {
+    /**
+     * Cache end, 12 Hours.
+     */
+    public cacheEnds = 43200
     protected credit:NCredit
     protected readonly cookiePath
-    private _name:Cache<string>
+    private logined:Cache<boolean>
     constructor() {
         super()
         this.credit = new NCredit("id","pw")
         this.cookiePath = path.resolve(Config.dirpath,"choco.cookie")
-        this._name = new Cache("",-1)
+        this.logined = new Cache(false,-1)
     }
     /**
      * This is not mean "auth is vaild.".
      * But it means buffer!
      */
-    public get available():boolean {
-        return !this._name.expired && this._name.cache != null && this._name.cache.length >= 2
+    protected get available():boolean {
+        return this.logined.value
     }
     /**
      * Naver ID
@@ -46,7 +50,12 @@ export default class NcCredent extends EventEmitter {
      * Check logined (Cached or fetch)
      */
     public async availableAsync():Promise<boolean> {
-        return Promise.resolve(this.available || (await this.validateLogin(true)) != null)
+        Log.i("Explired", this.logined.expired + "")
+        if (this.logined.expired) {
+            return await this.validateLogin() != null
+        } else {
+            return this.available
+        }
     }
     /**
      * Validate login
@@ -54,13 +63,11 @@ export default class NcCredent extends EventEmitter {
      * @returns naver username or null(error)
      */
     public async validateLogin(ignoreCache = false):Promise<string> {
-        if (!ignoreCache && this._name != null && this._name.cache.length >= 2 && !this._name.expired) {
-            return this._name.cache
+        if (!ignoreCache && !this.logined.expired) {
+            return this.available ? this.username : null
         }
-        const username:string = await this.credit.validateLogin().then((u) => u).catch(() => null)
-        if (username != null) {
-            this._name = new Cache(username, 43200)
-        }
+        const username:string = await this.credit.validateLogin().catch(() => null)
+        this.logined = new Cache(username != null, this.cacheEnds)
         return username
     }
     /**
@@ -136,15 +143,15 @@ export default class NcCredent extends EventEmitter {
         if (errorCode != null) {
             return Promise.reject(errorCode)
         }
-        const name = uname == null ? null : await this.validateLogin()
+        const name = uname == null ? null : await this.validateLogin(true)
         // this.credit.password = "__";
         if (name != null) {
             this.credit.username = name
-            this._name = new Cache(name, 43200)
+            this.logined = new Cache(true, this.cacheEnds)
             await fs.writeFile(this.cookiePath, this.credit.export)
             await this.onLogin(name)
         } else {
-            this._name.revoke()
+            this.logined.revoke(false)
         }
         return Promise.resolve(name)
     }
@@ -153,7 +160,7 @@ export default class NcCredent extends EventEmitter {
      */
     public async logout() {
         await this.onLogout()
-        this._name.revoke()
+        this.logined.revoke(false)
         await this.credit.logout() // empty cookie
         return Promise.resolve()
     }
@@ -181,7 +188,7 @@ export default class NcCredent extends EventEmitter {
             const delay = Math.min(minDelay * 1000, Math.max(otp.expires.getTime() - Date.now() - 10000, 0))
             Log.d("OTP", "OTP Code: " + otp.token + "\nExpirer: " + new Date(otp.expires) +
                 "\nDelay: " + Math.floor(delay / 100))
-            this._name = new Cache("", delay)
+            this.logined.revoke(false)
             // wait delay
             await setTimeoutP(delay)
             // logout
@@ -249,14 +256,16 @@ export default class NcCredent extends EventEmitter {
         const valid:string = await this.validateLogin().catch((err) => null)
         let userid:string = null
         if (valid != null) {
-            userid = await this.credit.fetchUserID()
-            this._name = new Cache(userid, 43200)
-            await fs.writeFile(this.cookiePath, this.credit.export)
-            await this.onLogin(userid)
-        } else {
-            this._name.revoke()
+            userid = await this.credit.fetchUserID().catch(Log.e)
+            if (userid != null) {
+                this.logined = new Cache(true, this.cacheEnds)
+                await fs.writeFile(this.cookiePath, this.credit.export)
+                await this.onLogin(userid)
+                return userid
+            }
         }
-        return Promise.resolve(userid == null ? valid : userid)
+        this.logined.revoke(false)
+        return valid
     }
     /**
      * onLogin Do

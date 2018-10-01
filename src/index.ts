@@ -43,7 +43,7 @@ async function init() {
     if (loaded != null) {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
-        if (ncc.available) {
+        if (await ncc.availableAsync()) {
             try {
                 Log.d("OTP", (await ncc["credit"].genOTP()).token.toString())
             } catch (err) {

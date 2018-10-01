@@ -3,9 +3,11 @@ import { EventEmitter } from "events"
 import { a } from "hangul-js"
 import * as path from "path"
 import { sprintf } from "sprintf-js"
+import Cache from "../cache"
 import Config from "../config"
 import Log from "../log"
 import Ncc from "../ncc/ncc"
+import { IRuntime } from "./iruntime"
 import Lang from "./lang"
 import ArtiNoti from "./module/artinoti"
 import Auth from "./module/auth"
@@ -38,29 +40,16 @@ const presetCfgs:{[key:string]: string[]} = {
  * Manage Config, Discord, Ncc and cast to plugins
  * @class 메인 클라이언트
  */
-export default class Runtime extends EventEmitter {
-    /**
-     * Global config like token, prefix..
-     * 최상위 설정 파일
-     */
-    private global:MainCfg
-    /**
-     * The list of config with plugins
-     */
-    private locals:Map<string, Config>
-    /**
-     * language file
-     * 언어팩 - 기본: 프레타체
-     */
-    private lang:Lang
-    /**
-     * Discord client
-     */
-    private client:Discord.Client
-    /**
-     * Naver Cafe Chat + Naver Cafe API client
-     */
-    private ncc:Ncc
+export default class Runtime extends EventEmitter implements IRuntime {
+    public global:MainCfg
+    public subConfigs:Map<string, Config>
+    public lang:Lang
+    public client:Discord.Client
+    public ncc:Ncc
+    public webhooks:Map<string, Cache<{
+        value:Discord.Webhook,
+        img:string,
+    }>>
     /**
      * Plugins
      */
@@ -94,7 +83,9 @@ export default class Runtime extends EventEmitter {
         // load config
         this.global = new MainCfg()
         await this.global.import(true).catch((err) => null)
-        this.locals = new Map()
+        // set map
+        this.webhooks = new Map()
+        this.subConfigs = new Map()
         // init client
         this.client = new Discord.Client()
         // create ncc - not authed
@@ -189,8 +180,9 @@ export default class Runtime extends EventEmitter {
                 client:this.client,
                 ncc: this.ncc,
                 lang: this.lang,
-                mainConfig: proxy,
-                subConfigs: this.locals,
+                global: proxy,
+                subConfigs: this.subConfigs,
+                webhooks: this.webhooks,
             })
         }
         // set client option
@@ -243,17 +235,25 @@ export default class Runtime extends EventEmitter {
                   * hard coding!
                 */
                 if (!await this.hardCodingCmd(msg, text, status)) {
-                    Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)))
+                    await Promise.all(this.plugins.map((value) => value.onCommand.bind(value)(msg, text, status)))
                 }
             } catch (err) {
                 Log.e(err)
             }
         }
+        Log.time()
+        for (const p of this.plugins) {
+            Log.d("Running", p.constructor.name)
+            await p.onMessage(msg)
+            Log.time("Part")
+        }
+        /*
         try {
-            Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)))
+            await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)))
         } catch (err) {
             Log.e(err)
         }
+        */
         return Promise.resolve()
     }
     /**

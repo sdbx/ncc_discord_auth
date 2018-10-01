@@ -60,6 +60,9 @@ export default class Color extends Plugin {
             }).filter((v) => v != null)
             const randRoles = colorRoles.filter((v) => v.rand)
             for (const rRole of randRoles) {
+                if (rRole.value.members.size <= 0) {
+                    continue
+                }
                 let color:number
                 if (Math.random() * 100 >= sub.pureRand) { 
                     color = colorRoles[Math.floor(colorRoles.length * Math.random())].value.color

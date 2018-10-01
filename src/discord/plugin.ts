@@ -10,6 +10,7 @@ import Config from "../config"
 import Log from "../log"
 import Ncc from "../ncc/ncc"
 import Profile from "../ncc/structure/profile"
+import { IRuntime } from "./iruntime"
 import Lang from "./lang"
 import { blankChar, ChainData, CmdParam, UniqueID } from "./rundefine"
 import { MainCfg } from "./runtime"
@@ -59,9 +60,8 @@ export default abstract class Plugin {
      * Webhooks (channel, id)
      */
     private webhooks:Map<string, Cache<{
-        webhook:Discord.Webhook,
-        name:string,
-        image:string,
+        value:Discord.Webhook,
+        img:string,
     }>>
 
     /**
@@ -69,14 +69,13 @@ export default abstract class Plugin {
      * @param cl client
      * @param ncc nccapi
      */
-    public init(runtime:{
-        client:Discord.Client, ncc:Ncc, lang:Lang, mainConfig:MainCfg, subConfigs:Map<string,Config>}):void {
+    public init(runtime:IRuntime):void {
         this.client = runtime.client
         this.ncc = runtime.ncc
         this.lang = runtime.lang
         this.chains = new Map()
-        this.webhooks = new Map()
-        this.global = runtime.mainConfig
+        this.webhooks = runtime.webhooks
+        this.global = runtime.global
         this.subs = runtime.subConfigs
     }
     /**
@@ -580,7 +579,7 @@ export default abstract class Plugin {
         }
         if (!this.webhooks.has(channel.id) || this.webhooks.get(channel.id).expired) {
             const webhooks = await channel.fetchWebhooks()
-            for (const [key, hook] of webhooks) {
+            for (const [, hook] of webhooks) {
                 if ((hook.owner as Discord.User).id === this.client.user.id) {
                     if (name != null || image != null) {
                         const n = hook.name
@@ -598,23 +597,28 @@ export default abstract class Plugin {
                 webhook = await channel.createWebhook(name, image)
             }
             this.webhooks.set(channel.id, new Cache({
-                webhook,
-                name: webhook.name,
-                image: webhook.avatar,
+                value: webhook,
+                img:image,
             }, 3600))
         } else {
             const info = this.webhooks.get(channel.id).cache
-            const changeImage = image != null && info.image !== image
-            if ((name != null && info.name !== name) || changeImage) {
-                const n = name != null ? name : info.webhook.name
-                const i = changeImage ? image : null
-                await info.webhook.edit(n, i)
-                info.name = n
-                if (i != undefined) {
-                    info.image = i
+            const changeImage = image != null && info.img !== image
+            const changeName = name != null && info.value.name !== name
+            if (changeName || changeImage) {
+                const n = changeName ? name : info.value.name
+                const i = changeImage ? image : undefined
+                try {
+                    await info.value.edit(n, i)
+                    if (changeImage) {
+                        info.img = i
+                    }
+                } catch (err) {
+                    Log.w("Plugin", "Webhook deprecated? Or Permission Denied?")
+                    this.webhooks.delete(channel.id)
+                    return null
                 }
             }
-            webhook = info.webhook
+            webhook = info.value
         }
         webhook.client.options.disableEveryone = true
         return webhook

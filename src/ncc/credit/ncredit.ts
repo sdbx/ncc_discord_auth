@@ -134,7 +134,12 @@ export default class NCredit extends EventEmitter {
         const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
             log("Successfully logged in")
-            const userid = await this.fetchUserID()
+            let userid:string
+            try {
+                userid = await this.fetchUserID()
+            } catch {
+                return Promise.reject({captcha: false} as LoginError)
+            }
             this.emit("login")
             return Promise.resolve(userid)
         } else {
@@ -213,7 +218,7 @@ export default class NCredit extends EventEmitter {
         const home = await this.reqGet(CHAT_HOME_URL) as string
         const q = home.match(/userId.+/i)
         if (q == null) {
-            return Promise.reject("Not Logined!")
+            return Promise.reject(new Error("Not Logined!"))
         }
         const q1 = q[0]
         const userid = q1.substring(q1.indexOf("'") + 1, q1.lastIndexOf("'")).trim()
