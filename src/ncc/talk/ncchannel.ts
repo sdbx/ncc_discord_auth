@@ -127,7 +127,7 @@ export default class NcChannel {
             if (!response.valid) {
                 Log.e("Wrong status code! - " + response.status)
                 // @todo error.code 3006: Not joined room.
-                return Promise.reject(response.error.msg)
+                return Promise.reject(response.errorMsg)
             }
             this.instance = response.result.channelI
             const memberList = response.result.memberList

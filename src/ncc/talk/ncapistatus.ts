@@ -16,7 +16,7 @@ export default class NcAPIStatus {
                             err.errorType = value
                         }
                     }
-                    err.errorMsg = response.error.msg
+                    err.errorMsg = response.errorMsg
                 }
             }
         } catch (er) {

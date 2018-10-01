@@ -27,19 +27,42 @@ export default class NcJson<T> {
             try {
                 resObj = JSON.parse(response)
             } catch {
-                return
+                // :)
             }
         } else {
             resObj = response
         }
-        this.status = get(resObj, "message.status", {default: "-1"})
-        this.error = get(resObj, "message.error") as NcError
+        if (resObj != null) {
+            this.status = get(resObj, "message.status", {default: "-1"})
+            this.error = get(resObj, "message.error") as NcError
+        }
+        if (this.error == null) {
+            this.error = {
+                code: "UNKNOWN",
+                msg: JSON.stringify(resObj),
+                errorResult: "",
+            }
+            this.result = null
+        }
         if (this.valid) {
             this.result = parser(get(resObj, "message.result"))
         }
     }
     public get valid() {
         return this.status === "200"
+    }
+    public get errorCode() {
+        const code = get(this.error, "code")
+        if (code == null) {
+            return "UNKNOWN"
+        }
+        return code
+    }
+    public get errorMsg() {
+        const msg = get(this.error, "msg")
+        if (msg == null) {
+            return "Unknown."
+        }
     }
 }
 interface NcError {

@@ -452,6 +452,7 @@ export default class NCredit extends EventEmitter {
             agent: agent_pair.using ? null : agent_pair.agent,
             encoding: encoding.toLowerCase() === "utf-8" ? encoding : null,
             strictSSL: true,
+            timeout: 5000,
             headers: {
                 // "cache-control": "no-cache, no-store, max-age=0",
                 "referer": referer,

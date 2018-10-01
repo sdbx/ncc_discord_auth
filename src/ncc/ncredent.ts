@@ -272,6 +272,9 @@ export default class NcCredent extends EventEmitter {
      */
     protected async onLogin(username:string):Promise<void> {
         Log.i("Runtime-ncc",`Logined by ${username}.`)
+        this.logined = new Cache(true, 43200)
+        await fs.writeFile(this.cookiePath, this.credit.export)
+
         this.emit("login", username)
         return Promise.resolve()
     }

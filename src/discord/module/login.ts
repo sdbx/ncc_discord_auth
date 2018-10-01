@@ -40,7 +40,7 @@ export default class Login extends Plugin {
         this.naverLogin.complex = true
         this.status = new CommandHelp("상태 알려", "상태를 확인합니다.", true)
         // Login Refresh
-        this.refreshLogin = new CommandHelp("로그인 갱신", this.lang.login.descRefresh, true)
+        this.refreshLogin = new CommandHelp("로그인 갱신", this.lang.login.descRefresh, true, {reqAdmin: true})
         if (await this.ncc.availableAsync()) {
             this.lastLogined = Date.now()
         }
@@ -59,12 +59,17 @@ export default class Login extends Plugin {
      * Refresh account
      * @returns did
      */
-    public async refreshAccount() {
+    public async refreshAccount(_channel:Discord.Channel = null) {
         if (this.refreshing) {
             return false
         }
         this.refreshing = true
-        const ch = this.client.channels.find((v) => v.id === this.config.refreshAlertCh)
+        let ch:Discord.Channel
+        if (_channel != null) {
+            ch = _channel
+        } else {
+            ch = this.client.channels.find((v) => v.id === this.config.refreshAlertCh)
+        }
         let msg:Discord.Message
         if (ch != null && ch instanceof Discord.TextChannel) {
             try {
@@ -170,11 +175,11 @@ export default class Login extends Plugin {
         }
         const _refresh = this.refreshLogin.check(this.global, command, state)
         if (_refresh.match) {
-            if (Date.now() - this.lastLogined <= 60000) {
+            if (Date.now() - this.lastLogined <= 6000) {
                 await msg.channel.send("로그인 후 1분이 지나야 합니다.")
                 return Promise.resolve()
             }
-            this.refreshAccount().then((success) => {
+            this.refreshAccount(msg.channel).then((success) => {
                 if (!success) {
                     msg.channel.send("이미 갱신 중입니다.")
                 } else {

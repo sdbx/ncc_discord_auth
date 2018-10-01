@@ -39,6 +39,10 @@ export default class Ncc extends NcFetch {
      */
     public connectedChannels:NcChannel[] = []
     /**
+     * Auto connect to ncc.
+     */
+    public useNcc = false
+    /**
      * Auto update tasker
      */
     protected syncTask:TimerID
@@ -133,7 +137,7 @@ export default class Ncc extends NcFetch {
         }))
         await this.syncChannels()
         if (!response.valid) {
-            return Promise.reject(response.error.msg)
+            return Promise.reject(response.errorMsg)
         }
         const channel = this.getConnectedChannel(response.result.channelID)
         return channel
@@ -517,13 +521,11 @@ export default class Ncc extends NcFetch {
         })
     }
     protected async onLogin(username:string):Promise<void> {
-        /*
-        this.session = new Session(this.credit);
-        await this.session.connect();
-        await this.chat.getRoomList();
-        this.chat.on("message",this.onNccMessage.bind(this));
-        */
-        return super.onLogin(username)
+        await super.onLogin(username)
+        if (this.useNcc) {
+            await this.connect(true).catch(Log.e)
+        }
+        return Promise.resolve()
     }
     protected async onLogout():Promise<void> {
         this.clearChannels()
@@ -642,7 +644,7 @@ export default class Ncc extends NcFetch {
             channel = await NcChannel.from(this.credit, id)
         }
         if (channel != null) {
-            await channel.connect(this.credit)
+            await channel.connect(this.credit).catch(Log.e)
             // register event
             this.registerChannelEvents(channel)
             this.connectedChannels.push(channel)
