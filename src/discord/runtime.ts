@@ -241,19 +241,19 @@ export default class Runtime extends EventEmitter implements IRuntime {
                 Log.e(err)
             }
         }
+        /*
         Log.time()
         for (const p of this.plugins) {
             Log.d("Running", p.constructor.name)
             await p.onMessage(msg)
             Log.time("Part")
         }
-        /*
+        */
         try {
             await Promise.all(this.plugins.map((value) => value.onMessage.bind(value)(msg)))
         } catch (err) {
             Log.e(err)
         }
-        */
         return Promise.resolve()
     }
     /**

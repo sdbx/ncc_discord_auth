@@ -168,9 +168,9 @@ export default class Config {
                         source = source ? 1 : 0
                     }
                 } else if (typeof dest === "boolean") {
-                    if (source === "1" || source === "true") {
+                    if (source === "1" || source === "true" || source === true) {
                         source = true
-                    } else if (source === "0" || source === "false") {
+                    } else if (source === "0" || source === "false" || source === false) {
                         source = false
                     } else {
                         // :thinking:

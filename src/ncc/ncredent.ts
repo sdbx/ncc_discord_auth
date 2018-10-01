@@ -50,7 +50,6 @@ export default class NcCredent extends EventEmitter {
      * Check logined (Cached or fetch)
      */
     public async availableAsync():Promise<boolean> {
-        Log.i("Explired", this.logined.expired + "")
         if (this.logined.expired) {
             return await this.validateLogin() != null
         } else {

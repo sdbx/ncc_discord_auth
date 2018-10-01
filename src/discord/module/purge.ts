@@ -224,6 +224,7 @@ export default class Purge extends Plugin {
             /**
              * Simple Delete for few messages.
              */
+            /*
             if (deleteCount + (deleteALL ? 0 : 50) < 0) {
                 // instant delete
                 const fastFetches = await msg.channel.fetchMessages({
@@ -260,6 +261,7 @@ export default class Purge extends Plugin {
                 await msg.channel.bulkDelete(selected)
                 return Promise.resolve()
             }
+            */
             // check cache
             const caching = this.caching
             const progress = await this.updateCache(msg.channel, msg.id, caching)
@@ -285,7 +287,7 @@ export default class Purge extends Plugin {
                 if (timestamp < allowTime) {
                     // old time: pass
                     del = true
-                } else if (gConfig.allowLast && multiplySelf) {
+                }else if (gConfig.allowLast && multiplySelf) {
                     // solo said: pass
                     del = true
                 }
@@ -341,7 +343,7 @@ export default class Purge extends Plugin {
      * @param caching override caching value
      * @returns State Message
      */
-    private async updateCache(channel:Discord.TextChannel, lastID:string, caching = this.caching) {
+    private async updateCache(channel:Discord.TextChannel, lastID:string, caching:boolean) {
         // check cache
         const key = channel.id
         if (!caching) {
@@ -420,7 +422,6 @@ export default class Purge extends Plugin {
                     Log.d("NaN", end)
                 }
                 if (end != null && Number.parseInt(fMsg.id) <= Number.parseInt(end)) {
-                    Log.d("EndPoint found", end)
                     breakL = true
                     break
                 }
