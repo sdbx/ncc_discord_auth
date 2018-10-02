@@ -1,0 +1,5 @@
+export const RIGHT_ARROW_FILL = "\u{E0B0}"
+export const RIGHT_ARROW_EMPTY = "\u{E0B1}"
+export const LEFT_ARROW_FILL = "\u{E0B2}"
+export const LEFT_ARROW_EMPTY = "\u{E0B3}"
+export const BRANCH = "\u{E0A0}"
