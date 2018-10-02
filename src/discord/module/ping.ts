@@ -1,14 +1,17 @@
 import * as Discord from "discord.js"
+import Log from "../../log"
 import Plugin from "../plugin"
 import { ChainData, CmdParam } from "../rundefine"
 import { CommandHelp } from "../runutil"
 
 export default class Ping extends Plugin {
     private ping:CommandHelp
+    private logget:CommandHelp
     public async ready() {
         const out = super.ready()
         this.ping = new CommandHelp("핑", this.lang.ping.helpPing)
         this.ping.complex = true
+        this.logget = new CommandHelp("로그 확인", "로그 확인용", true, {reqAdmin: true})
         return out
     }
     public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
@@ -17,6 +20,11 @@ export default class Ping extends Plugin {
         const check = this.ping.check(this.global, command, state)
         if (check.match) {
             await msg.reply(`퐁! \`${this.client.ping}\` <:GWchinaSakuraThinking:398950680217255977>`)
+        }
+        const checkLog = this.logget.check(this.global, command, state)
+        if (checkLog.match) {
+            const file = Buffer.from(Log.getStack().join("\n"), "utf-8")
+            await msg.reply(new Discord.Attachment(file, "log.txt"))
         }
         return Promise.resolve()
     }

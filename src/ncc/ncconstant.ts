@@ -55,7 +55,8 @@ export const CHAT_URL_CRAWLER = `${CHAT_HOME_URL}/crawler`
 
 /* ncc config */
 // ms
-export const intervalNormal = 120000
+// 120000 ms
+export const intervalNormal = 30000
 export const intervalError = 10000
 
 export interface NcIDBase {

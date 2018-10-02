@@ -192,7 +192,6 @@ export default class Runtime extends EventEmitter implements IRuntime {
         // set client option
         this.client.options.disabledEvents = ["PRESENCE_UPDATE", "TYPING_START"]
         this.emit("ready")
-        Log.d("Logined", "Logined by " + this.client.user.username)
     }
     /**
      * Discord's onMessage event receiver

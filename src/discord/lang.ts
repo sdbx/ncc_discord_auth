@@ -119,6 +119,7 @@ export default class Lang extends Config {
         webhookFail: "웹훅을 할 수 없다냐!",
         webhookSuccess: "웹훅 설정이 끝냤다냐!",
         sendImage: "이미지를 보냈습니다.",
+        sendSticker: "스티커를 보냈습니다.",
         fallbackNick: "시스템 메세지입니다.",
         optoutMessage: "<opt-out 된 회원의 메세지입니다>",
         readonly: "읽기 전용입니다.",

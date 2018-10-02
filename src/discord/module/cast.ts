@@ -27,7 +27,7 @@ export default class Cast extends Plugin {
         // super: load config
         super.ready()
         // CommandHelp: suffix, description
-        this.setup = new CommandHelp("중계/집결", this.lang.cast.castDesc, true, {reqAdmin: true})
+        this.setup = new CommandHelp("중계", this.lang.cast.castDesc, true, {reqAdmin: true})
         this.setup.addField(ParamType.from, "네이버 카페", false)
         this.setup.addField(ParamType.dest, this.lang.cast.castParam, true)
         this.setup.addField(ParamType.to, "auth|ro|delete", false)
@@ -225,8 +225,10 @@ export default class Cast extends Plugin {
             } break
             case MessageType.sticker:
             case MessageType.image: {
-                const url = (message.type === MessageType.sticker) ?
-                    (message.content as NcSticker).imageUrl : (message.content as NcImage).url
+                const isSticker = message.type === MessageType.sticker
+                // That type, naver sucks..
+                const url = isSticker ?
+                    (message.content as NcSticker).imageUrl + "?type=p50_50" : (message.content as NcImage).url
                 const optout = roomCfg.optouts.indexOf(message.sendUser.userid)
                 let fn = url.substring(url.lastIndexOf("/") + 1)
                 if (fn.indexOf("?") >= 0) {
@@ -237,11 +239,14 @@ export default class Cast extends Plugin {
                 if (optout >= 0) {
                     await webhook.send(this.lang.cast.optoutMessage)
                 } else {
-                    rich.setTitle(this.lang.cast.sendImage)
-                    rich.attachFile(new Discord.Attachment(image, fn))
+                    await webhook.send(new Discord.Attachment(image, fn))
+                    /*
+                    rich.setTitle(isSticker ? this.lang.cast.sendSticker : this.lang.cast.sendImage)
+                    rich.attachFile()
                     rich.setImage(`attachment://${fn}`)
                     rich.setURL(url)
                     await webhook.send(rich)
+                    */
                 }
             } break
             case MessageType.system: {

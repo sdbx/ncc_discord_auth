@@ -146,8 +146,6 @@ export default class NcCredent extends EventEmitter {
         // this.credit.password = "__";
         if (name != null) {
             this.credit.username = name
-            this.logined = new Cache(true, this.cacheEnds)
-            await fs.writeFile(this.cookiePath, this.credit.export)
             await this.onLogin(name)
         } else {
             this.logined.revoke(false)
@@ -257,8 +255,6 @@ export default class NcCredent extends EventEmitter {
         if (valid != null) {
             userid = await this.credit.fetchUserID().catch(Log.e)
             if (userid != null) {
-                this.logined = new Cache(true, this.cacheEnds)
-                await fs.writeFile(this.cookiePath, this.credit.export)
                 await this.onLogin(userid)
                 return userid
             }
@@ -272,9 +268,8 @@ export default class NcCredent extends EventEmitter {
      */
     protected async onLogin(username:string):Promise<void> {
         Log.i("Runtime-ncc",`Logined by ${username}.`)
-        this.logined = new Cache(true, 43200)
+        this.logined = new Cache(true, this.cacheEnds)
         await fs.writeFile(this.cookiePath, this.credit.export)
-
         this.emit("login", username)
         return Promise.resolve()
     }

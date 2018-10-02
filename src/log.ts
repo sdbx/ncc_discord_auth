@@ -45,6 +45,16 @@ namespace Log {
         level: colorLevel === 1 ? 0 : colorLevel
     })
     /**
+     * Stacks of log
+     */
+    const stack:string[] = []
+    /**
+     * Get Stacks
+     */
+    export function getStack() {
+        return stack
+    }
+    /**
      * Warning
      * @param title Title or Content 
      * @param content Content if exists
@@ -278,6 +288,12 @@ namespace Log {
         if (!Log.enable) {
             return
         }
+        if (stack.length >= 10000) {
+            stack.shift()
+        }
+        stack.push(`${
+            (stack.length).toString(10).padStart(5)
+        } ${defaultH} ${content.title}> ${content.content}`)
         const prefix = content.content == null ? caller() : content.title
         let message = content.content == null ? content.title : content.content
         // set content width

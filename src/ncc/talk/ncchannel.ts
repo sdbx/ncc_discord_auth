@@ -34,6 +34,7 @@ export default class NcChannel {
         try {
             await instance.update(credit, id)
         } catch (err) {
+            Log.e(err)
             return null
         }
         return instance
@@ -185,6 +186,7 @@ export default class NcChannel {
             if (message == null) {
                 return Promise.resolve()
             }
+            Log.d("ChannelMessage", "Received - " + this.info.name)
             this.appendMessages(message)
             this.events.onMessage.dispatchAsync(this, message)
         })
@@ -648,7 +650,7 @@ export default class NcChannel {
      * Append Now messages to last
      * @param messages That received Message.
      */
-    protected async appendMessages(...messages:NcMessage[]) {
+    protected appendMessages(...messages:NcMessage[]) {
         const ln = messages.length
         const iLn = this.messages.length
 
