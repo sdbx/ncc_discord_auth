@@ -95,7 +95,8 @@
     "terminal-link": "^1.1.0",
     "tmp-promise": "^1.0.5",
     "tough-cookie": "^2.4.3",
-    "typesafe-get": "^2.0.1"
+    "typesafe-get": "^2.0.1",
+    "xlsx": "^0.14.0"
   },
   "devDependencies": {
     "ava": "^1.0.0-beta.8",
