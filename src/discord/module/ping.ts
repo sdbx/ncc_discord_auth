@@ -24,7 +24,8 @@ export default class Ping extends Plugin {
         const checkLog = this.logget.check(this.global, command, state)
         if (checkLog.match) {
             const file = Buffer.from(Log.getStack().join("\n"), "utf-8")
-            await msg.reply(new Discord.Attachment(file, "log.txt"))
+            await msg.reply(new Discord.Attachment(file, 
+                `log${Math.floor(Date.now() / 1000) % 86400}.txt`))
         }
         return Promise.resolve()
     }

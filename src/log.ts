@@ -291,9 +291,10 @@ namespace Log {
         if (stack.length >= 10000) {
             stack.shift()
         }
+        const n = new Date(Date.now())
         stack.push(`${
             (stack.length).toString(10).padStart(5)
-        } ${defaultH} ${content.title}> ${content.content}`)
+        } ${defaultH} ${shortTime(n)} >> ${content.title} > ${content.content}`)
         const prefix = content.content == null ? caller() : content.title
         let message = content.content == null ? content.title : content.content
         // set content width
@@ -372,7 +373,7 @@ namespace Log {
                 Log.e(args[0])
             }
         })
-        this.enable = true
+        Log.enable = true
         ansi("2J")
         ansi("0;0H")
         ansi("?25l")
@@ -622,6 +623,18 @@ namespace Log {
             Log.ui.write(buffer)
         }
         */
+    }
+    /**
+     * Show time in short `P12:55:12`
+     * @param date Date
+     */
+    function shortTime(date:Date) {
+        const pad = (n:number) => n.toString(10).padStart(2, "0")
+        const h = date.getHours()
+        const pm = h >= 12
+        const halfH = h % 12
+        return `${pm ? "P" : "A"}${pad(halfH === 0 ? 12 : halfH)}:${
+            pad(date.getMinutes())}:${pad(date.getSeconds())}`
     }
 }
 
