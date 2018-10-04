@@ -116,6 +116,11 @@ export default class NcChannel {
     }
     private constructor() {
         // :)
+        setInterval(() => {
+            if (this.info != null) {
+                Log.d(this.info.name, "Connected: " + this.connected)
+            }
+        }, 60000)
     }
     /**
      * Update this channel's objects with new
@@ -702,7 +707,7 @@ export default class NcChannel {
             reconnectionAttempts: 100,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 1000,
-            forceNew: true,
+            forceNew: false,
             // forceJSONP: true,
             transports: ["websocket"],
             transportOptions: {
