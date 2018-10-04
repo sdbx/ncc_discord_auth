@@ -415,7 +415,7 @@ export default class Ncc extends NcFetch {
                 }
                 const org = getFirst(original, (v) => v.channelID === channel.channelID)
                 if (org != null) {
-                    if (org.lastestMessage.messageId !== channel.lastestMessage.messageId ||
+                    if (org.latestMessage.messageId !== channel.latestMessage.messageId ||
                         JSON.stringify(org.channelInfo) !== JSON.stringify(channel.channelInfo)) {
                         modified.push(channel)
                     }
@@ -561,7 +561,7 @@ export default class Ncc extends NcFetch {
      * @param channel 
      */
     protected shouldConnected(channel:NcJoinedChannel) {
-        const lastDate = channel.lastestMessage.messageId == null ? channel.createdAt : channel.lastestMessage.timestamp
+        const lastDate = channel.latestMessage.messageId == null ? channel.createdAt : channel.latestMessage.timestamp
         return Date.now() - lastDate <= 432000000 // 5 days
     }
     /**

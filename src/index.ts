@@ -65,7 +65,7 @@ async function client() {
         const _channel = listChannels[i]
         Log.v((i + 1).toString(),
             `${_channel.channelInfo.name} (${
-                _channel.lastestMessage.sender.nick} : ${getSimpleString(_channel.lastestMessage)})`)
+                _channel.latestMessage.sender.nick} : ${getSimpleString(_channel.latestMessage)})`)
     }
     Log.i("채널", "접속할 채널의 번호를 골라주세요.")
     const inputChNo = Number.parseInt(await Log.read("채널 번호", {hide:false, logResult: false}))
@@ -76,7 +76,7 @@ async function client() {
     const credit = ncc["credit"]
     const channel = await NcChannel.from(credit, listChannels[inputChNo - 1])
     channel.connect(credit).catch(Log.e)
-    if (channel.detail.lastestMessage.messageId != null) {
+    if (channel.detail.latestMessage.messageId != null) {
         await new Promise((res, rej) => {
             let stopper:() => void = null
             stopper = channel.on(channel.events.onPastMessage, async (ch, msgs) => {

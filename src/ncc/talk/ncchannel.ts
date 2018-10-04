@@ -179,6 +179,8 @@ export default class NcChannel {
         // fetch recent message
         s.on("connect", async () => {
             if (this.messages.length === 0) {
+                // sendack need - message_list_recent return old message if not ACK;
+                await this.sendAck(this.latestMessageNo)
                 this.session.emit("message_list_recent", {
                     sessionKey: this.credit.accessToken,
                 }, (code, data) => {
@@ -531,7 +533,7 @@ export default class NcChannel {
         if (!this.connected) {
             return
         }
-        this.session.emit("ack", {
+        this.session.emit(ChannelEvent.ACK, {
             messageSerialNumber: messageid,
             sessionKey: this.credit.accessToken,
         })
