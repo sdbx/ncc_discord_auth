@@ -104,8 +104,18 @@ export default class NcChannel {
             ...this.detail.channelInfo
         }
     }
+    /**
+     * Latest Message No (in room)
+     */
+    public get latestMessageNo() {
+        if (this.detail.latestMessage == null) {
+            return 0
+        } else {
+            return this.detail.latestMessage.messageId
+        }
+    }
     private constructor() {
-
+        // :)
     }
     /**
      * Update this channel's objects with new
@@ -544,7 +554,12 @@ export default class NcChannel {
             return
         }
         const pasts = []
-        const nowFirst = this.messages.length === 0 ? this.detail.lastestMessageNo : this.messages[0].id
+        let nowFirst:number
+        if (this.messages.length === 0) {
+            nowFirst = this.latestMessageNo
+        } else {
+            nowFirst = this.messages[0].id
+        }
         const dateMode = mode === "DATE"
         let end:number
         /*
@@ -687,7 +702,7 @@ export default class NcChannel {
             reconnectionDelayMax: 1000,
             forceNew: true,
             // forceJSONP: true,
-            transports: ["polling", "websocket"],
+            transports: ["websocket"],
             transportOptions: {
                 polling: {
                     extraHeaders: {

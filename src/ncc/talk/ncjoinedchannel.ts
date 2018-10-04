@@ -19,13 +19,13 @@ export default interface NcJoinedChannel extends NcBaseChannel {
      */
     updatedAt:number;
     /**
-     * First message ID saved in naver server
+     * First message ID saved in ~~naver server~~ Myself
      */
-    firstMessageNo:number;
+    userFirstMessageNo:number;
     /**
      * ??
      */
-    lastestMessageNo:number;
+    userLatestMessageNo:number;
     /**
      * Message delete period
      */
@@ -41,7 +41,7 @@ export default interface NcJoinedChannel extends NcBaseChannel {
     /**
      * Latest message
      */
-    lastestMessage:NcMessage;
+    latestMessage:NcMessage;
     /**
      * Now owner (detail info)
      */
@@ -71,17 +71,17 @@ export function parseFromJoined(joined:JoinedChatInfo) {
         joined: joined.userStatus === "JOIN",
         newMessageCount: joined.newMessageCount,
         updatedAt: joined.updatedAt,
-        firstMessageNo: joined.userFirstMessageNo,
-        lastestMessageNo: joined.userLatestMessageNo,
+        userFirstMessageNo: joined.userFirstMessageNo,
+        userLatestMessageNo: joined.userLatestMessageNo,
         period: [0, 30, 360][(joined.messagePeriod - 1) % 3],
         isOpen: joined.open,
         isVisible: joined.visible,
-        // lastestMessage: 
+        // latestMessage: 
         // owner: 
         isOwnerOrginal: joined.originalOwner,
         unreadCountVisible: joined.unreadCountVisible,
     } as NcJoinedChannel
-    parsed.lastestMessage = new NcMessage(joined.latestMessage, parsed.cafe, parsed.channelID)
+    parsed.latestMessage = new NcMessage(joined.latestMessage, parsed.cafe, parsed.channelID)
     const owner = joined.owner
     parsed.owner = {
         ...parsed.cafe,
