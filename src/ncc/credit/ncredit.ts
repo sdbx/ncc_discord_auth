@@ -438,9 +438,6 @@ export default class NCredit extends EventEmitter {
             })
         }
         const agent_pair = this.httpsAgent.get(origin)
-        if (!agent_pair.using) {
-            agent_pair.using = true
-        }
         const cookie = this.reqCookie
         const options:request.RequestPromiseOptions | request.OptionsWithUrl = {
             method: sendType,
@@ -462,9 +459,10 @@ export default class NCredit extends EventEmitter {
         }
         try {
             const bf = Date.now()
+            agent_pair.using = true
             const buffer:Buffer | string = await request(options)
             agent_pair.using = false
-            if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 120000 < Date.now()) {
+            if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 5000 < Date.now()) {
                 Log.url("Fetch URL", _url, from + " - " + (Date.now() - bf))
                 this.urlTimestamp.set(_url, Date.now())
             }
