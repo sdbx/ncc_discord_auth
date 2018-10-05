@@ -10,6 +10,7 @@ import * as request from "request-promise-native"
 import * as terminalImage from "terminal-image"
 import * as terminalLink from "terminal-link"
 import * as Util from "util"
+import { TimerID, WebpackTimer } from "./webpacktimer"
 
 /* tslint:disable:no-namespace */
 /**
@@ -645,15 +646,15 @@ export default Log
  * @private
  */
 class IME {
-    public mute:boolean = false
+    public mute = false
     private readonly timeout = 30
-    private resolve
-    private reject
+    private resolve:(v) => void
+    private reject:(r) => void
     private time = this.timeout
-    private timer
-    private title
-    private hide
-    private logR
+    private timer:TimerID
+    private title:string
+    private hide:boolean
+    private logR:boolean
     private data:string[]
     constructor(title:string, defaultContent:string, hide:boolean, logR:boolean,
         res:(value:string | PromiseLike<string>) => void,rej:(reason:any) => void) {
@@ -663,7 +664,7 @@ class IME {
         this.hide = hide
         this.logR = logR
         this.data = []
-        this.timer = setInterval(this.cancel,1000)
+        this.timer = WebpackTimer.setInterval(this.cancel,1000)
         if (defaultContent != null) {
             for (const letter of defaultContent.split("")) {
                 this.data.push(letter)
@@ -678,7 +679,7 @@ class IME {
         }
     }
     public onData(key:Uint8Array) {
-        clearTimeout(this.timer)
+        WebpackTimer.clearTimeout(this.timer)
         let keycode = 0
         const ln = key.length - 1
         const str = key.toString()

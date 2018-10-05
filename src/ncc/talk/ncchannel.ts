@@ -2,6 +2,7 @@ import * as get from "get-value"
 import * as io from "socket.io-client"
 import { EventDispatcher, IEventHandler } from "strongly-typed-events"
 import Log from "../../log"
+import { TimerID, WebpackTimer } from "../../webpacktimer"
 import NCredit from "../credit/ncredit"
 import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
@@ -68,6 +69,10 @@ export default class NcChannel {
      */
     public hideACK = false
     /**
+     * Server latency between naver and client
+     */
+    public latency = -1
+    /**
      * Credit for internal use
      */
     protected credit:NCredit = null
@@ -75,6 +80,10 @@ export default class NcChannel {
      * First message in fetchable
      */
     protected firstMsgNo:number
+    /**
+     * Check available..
+     */
+    private checkTimer:TimerID
     /**
      * Is session connected?
      */
@@ -116,11 +125,6 @@ export default class NcChannel {
     }
     private constructor() {
         // :)
-        setInterval(() => {
-            if (this.info != null) {
-                Log.d(this.info.name, "Connected: " + this.connected)
-            }
-        }, 60000)
     }
     /**
      * Update this channel's objects with new
@@ -196,6 +200,10 @@ export default class NcChannel {
                     }
                 })
             }
+        })
+        // ping
+        s.on("pong", (latency) => {
+            this.latency = latency
         })
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
@@ -700,16 +708,17 @@ export default class NcChannel {
         const channel = this.channelID
         this.credit = credit
         this.session = io(`${CHAT_BACKEND_URL}/chat`, {
-            multiplex: false,
-            timeout: 5000,
+            multiplex: true,
+            timeout: 12000,
             host:CHAT_BACKEND_URL,
             reconnection: true,
-            reconnectionAttempts: 100,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 1000,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 10000,
             forceNew: false,
+            autoConnect: false,
             // forceJSONP: true,
-            transports: ["websocket"],
+            transports: ["websocket", "polling"],
             transportOptions: {
                 polling: {
                     extraHeaders: {
@@ -738,7 +747,7 @@ export default class NcChannel {
         }
         for (const successE of ["connect", "connect_timeout", "reconnecting", "disconnect"]) {
             this.session.on(successE, () => {
-                Log.d(successE + "")
+                Log.d(this.info.name, successE)
             })
         }
         for (const naverE of Object.values(ChannelEvent)) {
@@ -750,6 +759,12 @@ export default class NcChannel {
                 Log.json("Object", t)
             })
         }
+        // debug
+        this.checkTimer = WebpackTimer.setInterval(() => {
+            if (this.info != null) {
+                Log.d(this.info.name, "Connected: " + this.connected + " / Latency: " + this.latency + "ms")
+            }
+        }, 60000)
         this.session.open()
     }
     /**
@@ -764,6 +779,10 @@ export default class NcChannel {
         if (this.session != null) {
             this.session.removeAllListeners()
             this.session = null
+        }
+        if (this.checkTimer != null) {
+            WebpackTimer.clearInterval(this.checkTimer)
+            this.checkTimer = null
         }
         for (const e of Object.values(this.events)) {
             e.clear()

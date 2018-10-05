@@ -169,7 +169,7 @@ export default class NcCredent extends EventEmitter {
      * @param minDelay Delay before login (0 ~ 60) - Blocking unexpected request
      * @returns Resolve when success, reject when fail
      */
-    public async refresh(minDelay = 3) {
+    public async refresh(minDelay = 0) {
         if (await this.validateLogin(true) == null) {
             return Promise.reject("Refresh Failed. Cause: Not logined.")
         }
@@ -187,7 +187,9 @@ export default class NcCredent extends EventEmitter {
                 "\nDelay: " + Math.floor(delay / 100))
             this.logined.revoke(false)
             // wait delay
-            await setTimeoutP(delay)
+            if (delay > 0) {
+                await setTimeoutP(delay)
+            }
             // logout
             await this.logout()
             // login with otp
