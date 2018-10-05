@@ -115,11 +115,19 @@ export default abstract class Plugin {
      * 
      * @todo on message received
      * 
-     * **DO NOT SEND MESSAGE when BOT has spoken** unless filtering. (Cause Infinite loop)
+     * **DO NOT SEND MESSAGE when SELF have been spoken** unless filtering. (Cause Infinite loop)
      * @param msg 
      */
     public async onMessage(msg:Discord.Message):Promise<void> {
         return Promise.resolve()
+    }
+    /**
+     * on Config changed
+     * @param key Config path (a.b.c)
+     * @param value To changed Value
+     */
+    public async onConfigChange(msg:Discord.Message, key:string, value:unknown):Promise<unknown> {
+        return value
     }
     /**
      * reload config
@@ -132,7 +140,7 @@ export default abstract class Plugin {
      * @param key Config indepth key
      * @param value data
      */
-    public async setConfig(key:string, value:string, view = false):Promise<{str:string}> {
+    public async setConfig(key:string, value:string, view = false, msg:Discord.Message):Promise<{str:string}> {
         if (this.config == null) {
             // ignore
             return Promise.resolve(null)
@@ -241,8 +249,12 @@ export default abstract class Plugin {
                     }
                     if (data != null) {
                         oldValue = depth
-                        set(config, _path, data)
-                        await this.onSave()
+                        set(config, _path, await this.onConfigChange(msg, _path, data))
+                        try {
+                            await this.onSave()
+                        } catch (err) {
+                            Log.e(err)
+                        }
                     }
                     break
                 }

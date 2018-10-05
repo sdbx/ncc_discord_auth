@@ -389,19 +389,20 @@ export default class Runtime extends EventEmitter implements IRuntime {
                 await msg.channel.send(rich)
                 return Promise.resolve(true)
             }
+            const watch = _set.command === "보여"
             for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
                 if (presetK === from) {
                     // preset execute
                     for (let preFrom of presetFrom) {
                         preFrom = preFrom.replace(/%g/ig,msg.guild.id)
-                        richE.push(await this.setConfig(preFrom, to, _set.command === "보여"))
+                        richE.push(await this.setConfig(preFrom, to, watch, msg))
                     }
                     result = true
                     break
                 }
             }
             if (!result) {
-                richE.push(await this.setConfig(from, to,_set.command === "보여"))
+                richE.push(await this.setConfig(from, to, watch, msg))
             }
             for (const rich of richE) {
                 if (rich != null) {
@@ -439,14 +440,14 @@ export default class Runtime extends EventEmitter implements IRuntime {
      * @param value to setting value (don't matter when watching)
      * @param see Watching?
      */
-    private async setConfig(key:string, value:string, see = false):Promise<Discord.RichEmbed> {
+    private async setConfig(key:string, value:string, see = false, msg:Discord.Message):Promise<Discord.RichEmbed> {
         let say:object
         if (see && value == null) {
             value = ""
         }
         for (const plugin of this.plugins) {
             const req = await plugin.setConfig(
-                key, value, see)
+                key, value, see, msg)
             if (req != null) {
                 say = req
                 break
