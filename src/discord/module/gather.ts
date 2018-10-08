@@ -17,7 +17,7 @@ export default class Gather extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.gather = new CommandHelp("집결", this.lang.gather.gatherDesc, true, {reqAdmin: true})
         this.gather.addField(ParamType.to, "대표", false)

@@ -21,7 +21,7 @@ export default class EventNotifier extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.welcome = new CommandHelp("환영", this.lang.events.descWelcome, true, {reqAdmin: true})
         this.eventR = new CommandHelp("이벤트 수신", this.lang.events.descBotCh, true, {reqAdmin: true})

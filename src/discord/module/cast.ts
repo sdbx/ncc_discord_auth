@@ -25,7 +25,7 @@ export default class Cast extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.setup = new CommandHelp("중계", this.lang.cast.castDesc, true, {reqAdmin: true})
         this.setup.addField(ParamType.from, "네이버 카페", false)

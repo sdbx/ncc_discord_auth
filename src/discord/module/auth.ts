@@ -28,7 +28,7 @@ export default class Auth extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.authNaver = new CommandHelp("인증", this.lang.auth.authCmdDesc)
         this.authNaver.addField(ParamType.to, "계정", true, {code: [PType.ID, PType.NICK]})

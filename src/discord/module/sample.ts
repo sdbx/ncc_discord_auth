@@ -18,7 +18,7 @@ export default class Sample extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.sample = new CommandHelp("안녕", this.lang.sample.hello)
         // get parameter as complex

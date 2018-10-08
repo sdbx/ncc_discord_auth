@@ -22,7 +22,7 @@ export default class Color extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.colorize = new CommandHelp("염색/색 입혀", this.lang.color.colorDesc)
         this.colorize.addField(ParamType.to, "<6Digit Hex> or default or 기본", true)

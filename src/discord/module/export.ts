@@ -15,7 +15,7 @@ export default class ExportMessages extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.keep = new CommandHelp("메세지 저장", this.lang.sample.hello)
         // get parameter as complex

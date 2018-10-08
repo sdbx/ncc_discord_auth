@@ -145,7 +145,7 @@ export default class PermManager extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.editRole = new CommandHelp("roles/그룹 편집", this.lang.sample.hello, true)
         this.editRole.addField(ParamType.dest, "Role 이름", false)
