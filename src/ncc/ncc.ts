@@ -545,6 +545,7 @@ export default class Ncc extends NcFetch {
      */
     protected registerChannelEvents(channel:NcChannel) {
         Log.v("Register", "Register Channel Event - " + channel.info.name)
+        this.setMaxListeners(10)
         channel.hideACK = true
         channel.on(channel.events.onMessage, (ch, msg) => {
             if (!ch.hideACK) {

@@ -81,6 +81,10 @@ export default class NcChannel {
      */
     protected firstMsgNo:number
     /**
+     * Unsubscribe Functions
+     */
+    protected unsubs:Array<() => void> = []
+    /**
      * Check available..
      */
     private checkTimer:TimerID
@@ -174,7 +178,17 @@ export default class NcChannel {
      * @returns unsubscribe function
      */
     public on<V>(dispatcher:EventDispatcher<NcChannel, V>, handler:IEventHandler<NcChannel, V>) {
-        return dispatcher.asEvent().subscribe(handler)
+        const unsub = dispatcher.subscribe(handler)
+        this.unsubs.push(unsub)
+        return unsub
+    }
+    /**
+     * Unsubscribe ALL
+     */
+    public offAll() {
+        for (const unsub of this.unsubs) {
+            unsub()
+        }
     }
     /**
      * Internal register
@@ -776,6 +790,7 @@ export default class NcChannel {
         if (this.connected) {
             this.session.disconnect()
         }
+        this.offAll()
         if (this.session != null) {
             this.session.removeAllListeners()
             this.session = null

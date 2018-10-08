@@ -8,11 +8,11 @@ export default class Ping extends Plugin {
     private ping:CommandHelp
     private logget:CommandHelp
     public async ready() {
-        const out = super.ready()
+        await super.ready()
         this.ping = new CommandHelp("핑", this.lang.ping.helpPing)
         this.ping.complex = true
         this.logget = new CommandHelp("로그 확인", "로그 확인용", true, {reqAdmin: true})
-        return out
+        return
     }
     public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         const channel = msg.channel

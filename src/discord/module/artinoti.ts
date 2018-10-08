@@ -22,7 +22,7 @@ export default class ArtiNoti extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
         // CommandHelp: suffix, description
         this.toggle = new CommandHelp("알림 전환", this.lang.noti.toggleDesc, true, {reqAdmin:true})
         // get parameter as complex

@@ -18,6 +18,7 @@ import Gather from "./module/gather"
 import Login from "./module/login"
 import PermManager from "./module/perm"
 import Ping from "./module/ping"
+import Presense from "./module/presense"
 import Purge from "./module/purge"
 import Plugin from "./plugin"
 import { CmdParam, ParamType } from "./rundefine"
@@ -33,6 +34,8 @@ const presetCfgs:{[key:string]: string[]} = {
     "인증 그룹" : ["auth<%g>.destRole"],
     "비속어 필터": ["purger<%g>.filterExplicit"],
     "메세지 백업 채널": ["purger<%g>.backupChannel"],
+    "상태 메시지": ["presense.stateMessage"],
+    "상태": ["presense.state"],
 }
 /**
  * The home of bot
@@ -72,7 +75,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
         this.plugins.push(
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
             new Cast(), new Gather(), new EventNotifier(), new Color(),
-            new Purge(), new PermManager())
+            new Purge(), new PermManager(), new Presense())
     }
     /**
      * **Async**
@@ -111,6 +114,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
             Log.e(err)
         }
         // event register
+        this.setMaxListeners(this.plugins.length + 1)
         this.plugins.forEach(((v,i) => {
             this.on("ready",v.ready.bind(v))
             // this.on("message",v.onMessage.bind(v))
@@ -270,13 +274,21 @@ export default class Runtime extends EventEmitter implements IRuntime {
         const helpCmd = new CommandHelp("도움/도와/도움말",this.lang.helpDesc,true)
         const helpCode = "명령어/name"
         helpCmd.addField(ParamType.dest, "궁금한", false, {code: [helpCode]})
-        const setCmd = new CommandHelp("설정/보여",this.lang.sudoNeed, false, { reqAdmin:true })
+        const setCmd = new CommandHelp("설정/보여/알려",this.lang.sudoNeed, false, { reqAdmin:true })
         setCmd.addField(ParamType.dest, "목적", true)
         setCmd.addField(ParamType.to, "설정값", false)
         const adminCmd = new CommandHelp("token", "토큰 인증", false, { chatType: "dm" })
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true)
         const saveCmd = new CommandHelp("저장", "저장", true,{reqAdmin:true})
-
+        const rebootCmd = new CommandHelp("재부팅", "재부팅합니다.", true, {reqAdmin:true})
+        /*
+            Rebooting
+        */
+       const _reboot = rebootCmd.check(this.global, cmd, status)
+       if (_reboot.match) {
+           this.emit("restart")
+           return Promise.resolve(true)
+       }
         /*
             Help Command
         */
@@ -294,7 +306,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
                 /**
                  * Add hard-coded commands
                  */
-                helps.push(helpCmd, setCmd, adminCmd, saveCmd)
+                helps.push(helpCmd, setCmd, adminCmd, saveCmd, rebootCmd)
             }
             this.plugins.map((_v) => _v.help).forEach((_v, _i) => {
                 _v.forEach((__v, __i) => {
@@ -336,11 +348,12 @@ export default class Runtime extends EventEmitter implements IRuntime {
          */
         const _set = setCmd.check(this.global, cmd, status)
         if (!result && /* msg.channel.type === "dm" && */ _set.match) {
+            const watch = _set.command === "보여" || _set.command === "알려"
             /**
              * option set
              */
             if (!_set.has(ParamType.to)) {
-                if (_set.command === "보여") {
+                if (watch) {
                     _set.set(ParamType.to,"_")
                 } else {
                     return Promise.resolve(false)
@@ -349,7 +362,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
             /**
              * Extremely Dangerous Setting 
              */
-            if (msg.channel.type === "dm" && !(_set.command === "보여")) {
+            if (msg.channel.type === "dm" && !watch) {
                 let pass = true
                 let reboot = false
                 switch (_set.get(ParamType.dest)) {
@@ -381,7 +394,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
             const richE:Discord.RichEmbed[] = []
             const from = _set.get(ParamType.dest)
             const to = _set.get(ParamType.to)
-            if (from === "프리셋" && (_set.command === "보여")) {
+            if (from === "프리셋" && watch) {
                 const rich = this.plugins[0].defaultRich
                 for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
                     rich.addField(presetK, presetFrom.join("\n").replace(/%g/ig, msg.guild.id))
@@ -389,7 +402,6 @@ export default class Runtime extends EventEmitter implements IRuntime {
                 await msg.channel.send(rich)
                 return Promise.resolve(true)
             }
-            const watch = _set.command === "보여"
             for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
                 if (presetK === from) {
                     // preset execute
@@ -454,19 +466,20 @@ export default class Runtime extends EventEmitter implements IRuntime {
             }
         }
         if (say != null) {
+            const nullcheck = (str:string) => (str == null || str.length === 0) ? "없음" : str
             if (say.hasOwnProperty("old")) {
                 const richMsg = this.plugins[0].defaultRich
                 richMsg.setTitle("설정: " + say["config"])
                 richMsg.addField("경로", say["key"])
-                richMsg.addField("원래 값", say["old"])
+                richMsg.addField("원래 값", nullcheck(say["old"]))
                 if (!see) {
-                    richMsg.addField("새로운 값", say["value"])
+                    richMsg.addField("새로운 값", nullcheck(say["value"]))
                 }
                 // richMsg.setDescription(say.str);
                 return Promise.resolve(richMsg)
             } else {
                 const richMsg = this.plugins[0].defaultRich
-                richMsg.setDescription(say["str"])
+                richMsg.setDescription(nullcheck(say["str"]))
                 return Promise.resolve(richMsg)
             }
         }

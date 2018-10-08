@@ -16,7 +16,14 @@ export default class Presense extends Plugin {
      */
     public async ready() {
         // super: load config
-        super.ready()
+        await super.ready()
+        await this.client.user.setPresence({
+            status: this.config.state as Discord.PresenceStatus,
+            game: {
+                name: this.config.stateMessage,
+                type: this.config.pType as Discord.ActivityType,
+            }
+        }).catch(Log.e)
         return Promise.resolve()
     }
     /**
@@ -44,7 +51,7 @@ export default class Presense extends Plugin {
     }
     public async setPlayingType(type:string) {
         let pType:Discord.ActivityType
-        switch (type) {
+        switch (type.toLowerCase()) {
             case PresensePlaying.playing:
                 pType = "PLAYING"
                 break
@@ -89,22 +96,22 @@ export default class Presense extends Plugin {
     }
 }
 class PresenseConfig extends Config {
-    public state = PresenseState.ONLINE
-    public pType = PresensePlaying.playing
-    public stateMessage = ""
+    public state:Discord.PresenceStatus = "online"
+    public pType:Discord.ActivityType = "PLAYING"
+    public stateMessage:string = ""
     public constructor() {
         super("presense")
     }
 }
 enum PresensePlaying {
-    playing = "play",
-    watching = "watch",
-    streaming = "stream",
-    listening = "listen",
+    playing = "playing",
+    watching = "watching",
+    streaming = "streaming",
+    listening = "listening",
 }
 enum PresenseState {
     ONLINE = "온라인",
     IDLE = "자리비움",
     BUSY = "다른 용무 중",
-    INVISIBLE = "오프라인 표시",
+    INVISIBLE = "오프라인",
 }

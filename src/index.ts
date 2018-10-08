@@ -18,7 +18,7 @@ async function start() {
         run.removeAllListeners("restart")
         await run.destroy()
         Log.d("Main", "Restarting Runtime...")
-        setTimeout(start, 2000)
+        setTimeout(start, 5000)
     })
     run.start().catch((err) => {
         Log.e(err)
