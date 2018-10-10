@@ -3,7 +3,11 @@ import Log from "../../log"
 import Plugin from "../plugin"
 import { ChainData, CmdParam } from "../rundefine"
 import { CommandHelp } from "../runutil"
-
+/**
+ * Ping & debug module.
+ * 
+ * Develop only.
+ */
 export default class Ping extends Plugin {
     private ping:CommandHelp
     private logget:CommandHelp

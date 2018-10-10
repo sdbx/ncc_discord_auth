@@ -1,4 +1,15 @@
 export default class Cache<T> {
+    /**
+     * Create cache with Generator
+     * @param generator Generator Function
+     * @param endOffset offset (**sec**)
+     * @param day Current Time
+     */
+    public static fromGen<V>(generator:(old?:V) => V, endOffset:number, day = Date.now()) { 
+        const obj = new Cache<V>(null, endOffset, day)
+        obj.generator = generator
+        return obj
+    }
     private data:T
     private offset:number
     private ends:number
@@ -8,15 +19,10 @@ export default class Cache<T> {
      * @param target target
      * @param endOffset offset (**second**)
      */
-    constructor(target:T | ((old:T) => T),endOffset:number, day = Date.now()) {
+    constructor(target:T,endOffset:number, day = Date.now()) {
         this.offset = endOffset * 1000
-        if (typeof target === "function") {
-            this.refresh = target
-            this.doRefresh()
-        } else {
-            this.data = target
-            this.ends = day + this.offset
-        }
+        this.data = target
+        this.ends = day + this.offset
     }
     public get value():T {
         return this.data
@@ -31,24 +37,20 @@ export default class Cache<T> {
     public get expired() {
         return Date.now() > this.ends
     }
-    public set refresh(value:(old:T) => T) {
-        this.refreshFn = value
-    }
-    public get refresh() {
+    public refresh() {
         if (this.refreshFn != null) {
             this.data = this.refreshFn(this.value)
             this.ends = Date.now() + this.offset
         }
-        return this.refreshFn
-    }
-    public doRefresh() {
-        // tslint:disable-next-line
-        this.refresh(this.value)
     }
     public revoke(newV?:T) {
         this.ends = -1
         if (newV !== undefined) {
             this.data = newV
         }
+    }
+    private set generator(fn:(old?:T) => T) {
+        this.refreshFn = fn
+        this.refresh()
     }
 }

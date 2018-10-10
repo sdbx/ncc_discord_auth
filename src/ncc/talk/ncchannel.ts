@@ -204,20 +204,27 @@ export default class NcChannel {
             if (this.messages.length === 0) {
                 // sendack need - message_list_recent return old message if not ACK;
                 await this.sendAck(this.latestMessageNo)
-                this.session.emit("message_list_recent", {
+                const {code, data, success} = await this.socketEmit("message_list_recent", {
                     sessionKey: this.credit.accessToken,
-                }, (code, data) => {
+                })
+                if (success) {
                     if (code !== "accessDenied" && data["resultCode"] === 0) {
                         this.firstMsgNo = get(data, "data.firstMessageNo")
                         const testArr = get(data, "data.messageList")
                         this.allocPastMessages(testArr == null ? [] : testArr)
                     }
-                })
+                } else {
+                    Log.w("NccSocket", "Recent message fetch failed.")
+                }
             }
         })
         // ping
-        s.on("pong", (latency) => {
+        s.on("pong", async (latency) => {
             this.latency = latency
+            const success = await this.updateConnection(true)
+            if (!success) {
+                Log.w("NcChannel", "Pong - Unconnected.")
+            }
         })
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
@@ -325,7 +332,12 @@ export default class NcChannel {
      * Sync Channel
      */
     public async syncChannel() {
-        return this.update()
+        try {
+            return this.update()
+        } catch (err) {
+            Log.e(err)
+            return
+        }
     }
     /**
      * Invite Users.
@@ -454,16 +466,12 @@ export default class NcChannel {
         if (content != null) {
             extras = JSON.stringify({snippet: content})
         }
-        if (!this.connected) {
-            return Promise.resolve()
-        }
-        this.session.emit("send", {
+        return this.socketEmit("send", {
             extras,
             message: text,
             messageTypeCode: 1,
             sessionKey: this.credit.accessToken,
-        })
-        return Promise.resolve()
+        }).then((v) => v.success)
     }
     /**
      * Send Image to Chat
@@ -473,7 +481,7 @@ export default class NcChannel {
     public async sendImage(image:string | Buffer, text?:string) {
         let naverImage:NcImage = null
         if (!this.connected) {
-            return Promise.resolve()
+            return Promise.resolve(false)
         }
         try {
             const uploaded = await uploadImage(this.credit, image)
@@ -484,18 +492,18 @@ export default class NcChannel {
                 is_original_size: false,
             }
         } catch {
+            Log.w("NcChannel", "Image upload failed.")
             // no upload
         }
         if (naverImage == null) {
-            return Promise.resolve()
+            return Promise.resolve(false)
         }
-        this.session.emit("send", {
+        return this.socketEmit("send", {
             extras: JSON.stringify({image: naverImage}),
             message: text == null ? "" : text,
             messageTypeCode: 11,
             sessionKey: this.credit.accessToken,
-        })
-        return Promise.resolve()
+        }).then((v) => v.success)
     }
     /**
      * Set message expires day
@@ -557,13 +565,20 @@ export default class NcChannel {
      * @param messageid The last watched message ID
      */
     public async sendAck(messageid:number) {
-        if (!this.connected) {
-            return
-        }
-        this.session.emit(ChannelEvent.ACK, {
+        return this.socketEmit(ChannelEvent.ACK, {
             messageSerialNumber: messageid,
             sessionKey: this.credit.accessToken,
-        })
+        }).then((v) => v.success)
+    }
+    /**
+     * I don't know what this does.
+     * @param connected Connected?
+     */
+    public async updateConnection(connected:boolean) {
+        return this.socketEmit("update_conn_status", {
+            type: connected ? 2 : 1,
+            sessionKey: this.credit.accessToken,
+        }).then((v) => v.success)
     }
     /**
      * Fetch Past Messages
@@ -605,22 +620,18 @@ export default class NcChannel {
         }
         end = Math.min(Math.max(this.firstMsgNo, end),nowFirst)
         for (let i = nowFirst - 1; i >= end; i -= 30) {
-            await new Promise((res, rej) => {
-                this.session.emit("message_list_range", {
-                    fromMessageNo: Math.max(end, i - 29),
-                    toMessageNo: i,
-                    sessionKey: this.credit.accessToken,
-                }, (code, data) => {
-                    if (code == null && data.resultCode === 0) {
-                        if (pasts.length === 0) {
-                            pasts.push(...get(data, "data.messageList"))
-                        } else {
-                            pasts.unshift(...get(data, "data.messageList"))
-                        }
-                    }
-                    res()
-                })
+            const {data, success} = await this.socketEmit("message_list_range", {
+                fromMessageNo: Math.max(end, i - 29),
+                toMessageNo: i,
+                sessionKey: this.credit.accessToken,
             })
+            if (success) {
+                if (pasts.length === 0) {
+                    pasts.push(...get(data, "data.messageList"))
+                } else {
+                    pasts.unshift(...get(data, "data.messageList"))
+                }
+            }
             if (dateMode && pasts.length >= 1 && pasts[0].createTime <= num) {
                 let k = 0
                 while (true) {
@@ -803,6 +814,52 @@ export default class NcChannel {
             e.clear()
         }
         this.credit = null
+    }
+    protected async socketEmit(type:string, ...send:Array<unknown>) {
+        const obj = {
+            success: false,
+            code: null as string,
+            data: null as any,
+        }
+        if (!this.connected) {
+            return obj
+        }
+        try {
+            const result = await new Promise<{code:string | null, data:any}>((resolve, reject) => {
+                const tout = WebpackTimer.setTimeout(() => {
+                    reject(new Error("Timeout."))
+                }, 3000)
+                const eRes = (code:string | null, data:any) => {
+                    WebpackTimer.clearTimeout(tout)
+                    resolve({
+                        code,
+                        data,
+                    })
+                }
+                if (send.length === 0) {
+                    this.session.emit(type, eRes)
+                } else {
+                    this.session.emit(type, ...send, eRes)
+                }
+            })
+            obj.code = result.code
+            if (result.data == null) {
+                throw new Error("Data > null")
+            }
+            const rCode = get(result.data, "resultCode", {default: -1})
+            if (rCode !== 0) {
+                throw new Error("Result Code > " + rCode)
+            }
+            const rMessage = get(result.data, "resultMessage", {default: "undefined"})
+            if (rMessage !== "SUCCESS") {
+                throw new Error("Result Message > " + rMessage)
+            }
+            obj.success = true
+            obj.data = result.data
+        } catch (err) {
+            Log.w("NccSocket", "Code: " + type + " > Failed.\nError: " + err.toString())
+        }
+        return obj
     }
     
     /**************** Utilities *************************/

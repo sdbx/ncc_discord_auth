@@ -220,7 +220,7 @@ export default class Ncc extends NcFetch {
         return Promise.reject(NcAPIStatus.from(response))
     }
     /**
-     * Toggle CafeChat using
+     * Toggle CafeChat usable
      * 
      * If cafe is unusable chat, just return success code.
      * @param cafe Cafe

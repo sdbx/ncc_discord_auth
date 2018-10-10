@@ -34,7 +34,7 @@ export default class NcFetch extends NcCredent {
     private httpsAgent:Cache<Agent>
     constructor() {
         super()
-        this.httpsAgent = new Cache((old) => {
+        this.httpsAgent = Cache.fromGen((old) => {
             if (old != null) {
                 old.destroy()
             }
@@ -80,7 +80,7 @@ export default class NcFetch extends NcCredent {
          * Check keep-session need refresh
          */
         if (this.httpsAgent.expired) {
-            this.httpsAgent.doRefresh()
+            this.httpsAgent.refresh()
         }
         /**
          * Make referer and options.
@@ -112,7 +112,7 @@ export default class NcFetch extends NcCredent {
         try {
             buffer = await request(options)
         } catch (err) {
-            this.httpsAgent.doRefresh()
+            this.httpsAgent.refresh()
             return Promise.reject(err)
         }
         let body:string
