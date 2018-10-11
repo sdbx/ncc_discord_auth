@@ -2,6 +2,7 @@ import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
 import NcBaseChannel, { OpenChatInfo, parseFromOpen } from "./ncbasechannel"
 import NcMessage from "./ncmessage"
+import { ILastMessage } from "./ncprotomsg"
 
 export default interface NcJoinedChannel extends NcBaseChannel {
     /**
@@ -81,7 +82,8 @@ export function parseFromJoined(joined:JoinedChatInfo) {
         isOwnerOrginal: joined.originalOwner,
         unreadCountVisible: joined.unreadCountVisible,
     } as NcJoinedChannel
-    parsed.latestMessage = new NcMessage(joined.latestMessage, parsed.cafe, parsed.channelID)
+    parsed.latestMessage = new NcMessage(
+        NcMessage.fromLast(joined.latestMessage, parsed.channelID), parsed.cafe, parsed.channelID)
     const owner = joined.owner
     parsed.owner = {
         ...parsed.cafe,
@@ -113,20 +115,11 @@ export interface JoinedChatInfo extends OpenChatInfo {
     messagePeriod:number;
     open:boolean;
     visible:boolean;
-    latestMessage:LatestMessage;
+    latestMessage:ILastMessage;
     owner:Owner;
     originalOwner:boolean;
     unreadCountVisible:boolean;
     cafeChatRoomId?:null;
-}
-interface LatestMessage {
-    id:number;
-    body:string;
-    writerId:string;
-    writerName:string;
-    type:number;
-    createdTime:number;
-    extras?:null;
 }
 interface Owner {
     memberId:string;

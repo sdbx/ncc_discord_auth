@@ -1,7 +1,6 @@
-﻿import { NcIDBase } from "../ncconstant"
-import Cafe from "../structure/cafe"
+﻿import Cafe from "../structure/cafe"
 
-export default interface NcBaseChannel extends NcIDBase {
+export default interface NcBaseChannel {
     /**
      * Unique Channel ID
      */

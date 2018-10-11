@@ -180,3 +180,8 @@ export class ParamStr {
         return this.content
     }
 }
+export function allocInterface<T extends object>(cls:T, inf:T) {
+    for (const [key, value] of Object.entries(inf)) {
+        cls[key] = value
+    }
+}

@@ -1,9 +1,80 @@
 import * as get from "get-value"
-import { NcIDBase } from "../ncconstant"
+import { allocInterface } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
-
-export default class NcMessage implements NcIDBase {
+import { ILastMessage, INcMessage, INowMessage, IPastMessage,
+    MessageType, NcEmbed, NcImage, NcSticker, SystemType } from "./ncprotomsg"
+/**
+ * Classify of Ncc's Message
+ * 
+ * Anyway There's no new feature.
+ */
+export default class NcMessage {
+    /**
+     * Parse Message from Past
+     * 
+     * `authorName` is *null*.
+     * @param m Past Message (using websocket)
+     */
+    public static fromPast(m:IPastMessage):INcMessage {
+        return {
+            messageId: m.messageNo,
+            content: m.content,
+            extras: m.extras,
+            authorId: m.userId,
+            authorName: null,
+            messageType: m.messageTypeCode,
+            createdTime: m.createTime,
+            updatedTime: m.updateTime,
+            channelId: m.channelNo,
+            readCount: m.readCount,
+            memberCount: m.memberCount,
+        }
+    }
+    /**
+     * Parse Message from Last
+     * 
+     * `readCount`, `memberCount`, `updatedTime` is *invalid*.
+     * @param m Last Message (from synced)
+     * @param channelNo Channel ID
+     */
+    public static fromLast(m:ILastMessage, channelNo:number):INcMessage {
+        return {
+            messageId: m.id,
+            content: m.body,
+            extras: m.extras == null ? "" : m.extras,
+            authorId: m.writerId,
+            authorName: m.writerName,
+            messageType: m.type,
+            createdTime: m.createdTime,
+            updatedTime: m.createdTime,
+            channelId: channelNo,
+            readCount: -1,
+            memberCount: -1,
+        }
+    }
+    /**
+     * Parse Message from Received Event
+     * 
+     * `authorName` is *null*.
+     * @param m Received Message (from websocket)
+     * @param channelNo Channel ID
+     */
+    public static fromNow(m:INowMessage, channelNo:number):INcMessage {
+        return {
+            messageId: Number.parseInt(m.serialNumber),
+            content: m.contents,
+            extras: m.extras,
+            authorId: m.userId,
+            authorName: null,
+            messageType: m.typeCode,
+            createdTime: Number.parseInt(m.createTime),
+            updatedTime: Number.parseInt(m.updateTime),
+            channelId: channelNo,
+            readCount: m.readCount,
+            memberCount: m.memberCount,
+        }
+    }
     public static typeAsString(t:MessageType) {
         switch (t) {
             case MessageType.text: return "text"
@@ -14,117 +85,112 @@ export default class NcMessage implements NcIDBase {
         }
     }
     /**
-     * Channel ID (only ID)
-     * 
-     * 보낸 방의 ID (오직 ID만)
+     * Message's Cafe.
      */
-    public channelID:number
+    public cafe:Cafe
     /**
-     * 안읽은 숫자
-     */
-    public readCount:number
-    /**
-     * User Profile
+     * Message's Author. 
      * 
-     * null if lastMessage (joinedChannel)
+     * extends `authorId`, `authorName`
      */
-    public sendUser:Profile
-    private readonly instance:INcMessage
-    private _cafe:Cafe
-    constructor(obj:object, cafe:Cafe, channelId:number, overrideUser:Profile = null) {
-        this.instance = {...obj} as INcMessage
-        this._cafe = cafe
-        this.channelID = channelId
-        this.readCount = obj["readCount"] != null ? obj["readCount"] : 0
-
+    private _author:Profile
+    private instance:INcMessage
+    constructor(obj:INcMessage, cafe:Cafe, channelId:number, overrideUser:Profile = null) {
+        this.instance = obj
+        this.cafe = cafe
+        this.instance.channelId = channelId
         if (overrideUser != null) {
-            this.instance.writerId = overrideUser.userid
-            this.instance.writerName = overrideUser.nickname
-            this.sendUser = overrideUser
+            this.instance.authorId = overrideUser.userid
+            this.instance.authorName = overrideUser.nickname
+            this._author = overrideUser
+        }
+        if (this.instance.extras != null && this.instance.extras.length === 0) {
+            this.instance.extras = null
         }
     }
     /**
-     * Cafe Info
-     * 
-     * 네이버 카페 정보
+     * Channel's ID
      */
-    public get cafe() {
-        return this._cafe
+    public get channelId() {
+        return this.instance.channelId
+    }
+    /**
+     * Message read count
+     */
+    public get readCount() {
+        return this.instance.readCount
+    }
+    /**
+     * Message's id
+     */
+    public get id() {
+        return this.instance.messageId
+    }
+    /**
+     * Get INcMessage.
+     */
+    public get info() {
+        return this.instance
     }
     /**
      * Message ID
      * 
      * 메세지 ID
      */
-    public get messageId() {
+/*     public get messageId() {
         return this.instance.id
-    }
+    } */
     /**
-     * Content (내용)
+     * Content
      * 
-     * 내용.. TextOnly
+     * Possible Type - `MessageType.text`, `MessageType.system`
+     * 
+     * @returns Text.
      */
-    public get content():string | NcImage | NcSticker {
-        const extras = this.instance.extras
+    public get content():string {
         switch (this.type) {
-            case MessageType.image: {
-                if (extras == null) {
-                    return null
-                }
-                const parse = JSON.parse(extras)
-                return this.parseImage(parse["image"])
-            }
-            case MessageType.sticker: {
-                if (extras == null) {
-                    return null
-                }
-                const parse = JSON.parse(extras)
-                return {...parse["sticker"]} as NcSticker
-            }
             case MessageType.text: {
-                return this.instance.body
+                return this.instance.content
             }
             case MessageType.system: {
-                return this.instance.body
+                return this.instance.content
             }
             default: {
-                // system message
-                return this.instance.body
+                // ??
+                return ""
             }
         }
-        // fallback
-        return ""
     }
     /**
-     * Type (타입)
+     * Possible Type - `MessageType.image`
      * 
-     * Image / Sticker / text (with RichEmbed)
+     * @returns Image JSON
      */
-    public get type() {
-        const t = this.instance.type
-        if ([1,10,11].indexOf(t) >= 0) {
-            return t as MessageType  
-        } else {
-            // 105: change room name
-            if ([101,102,103,105,106,121].indexOf(t) >= 0) {
-                return MessageType.system
-            }
-            return MessageType.unknown
+    public get image() {
+        const extras = this.instance.extras
+        if (this.type !== MessageType.image || extras == null) {
+            return null
         }
-    }
-    public get systemType():SystemType {
-        const t = this.instance.type
-        for (const value of Object.values(SystemType)) {
-            if (t === value) {
-                return value
-            }
-        }
-        return SystemType.unknown
+        const parse = JSON.parse(extras)
+        return this.parseImage(parse["image"])
     }
     /**
-     * Embed (세부 정보)
+     * Possible Type - `MessageType.sticker`
      * 
-     * If no exists, return null;
+     * @returns Naver Sticker (like image.)
+     */
+    public get sticker() {
+        const extras = this.instance.extras
+        if (this.type !== MessageType.sticker || extras == null) {
+            return null
+        }
+        const parse = JSON.parse(extras)
+        return parse["sticker"] as NcSticker
+    }
+    /**
+     * Possible Type - `MessageType.text`
+     * 
+     * @returns Naver Embed or null (not exists.)
      */
     public get embed() {
         if (this.type !== MessageType.text) {
@@ -144,11 +210,45 @@ export default class NcMessage implements NcIDBase {
         return embed
     }
     /**
-     * sender (system: null)
+     * Type
      * 
-     * 보낸 사람 (system: null)
+     * Image / Sticker / text (with RichEmbed)
      */
-    public get sender():{naverId:string, nick:string} {
+    public get type() {
+        const t = this.instance.messageType
+        if ([1,10,11].indexOf(t) >= 0) {
+            return t as MessageType  
+        } else {
+            // 105: change room name
+            if ([101,102,103,105,106,121].indexOf(t) >= 0) {
+                return MessageType.system
+            }
+            return MessageType.unknown
+        }
+    }
+    /**
+     * System Message's Type
+     * 
+     * Possible Type - `MessageType.system`
+     * 
+     * @returns SystemType
+     */
+    public get systemType():SystemType {
+        const t = this.instance.messageType
+        for (const value of Object.values(SystemType)) {
+            if (t === value) {
+                return value
+            }
+        }
+        return SystemType.unknown
+    }
+    /**
+     * Message's author
+     * 
+     * Special for `MessageType.system`
+     * @returns User / Can be **null**.
+     */
+    public get author():{naverId:string, nick:string} {
         if (this.type === MessageType.system) {
             if (this.instance.extras == null) {
                 return null
@@ -169,8 +269,8 @@ export default class NcMessage implements NcIDBase {
             }
         } else {
             return {
-                naverId: this.instance.writerId,
-                nick: this.instance.writerName,
+                naverId: this._author.userid,
+                nick: this._author.nickname,
             }
         }
     }
@@ -210,99 +310,4 @@ export default class NcMessage implements NcIDBase {
         } as NcImage
     }
 }
-/**
- * Message's type
- * only three found..
- */
-export enum MessageType {
-    text = 1,
-    image = 11,
-    sticker = 10,
-    system = -1,
-    unknown = -2,
-}
-export enum SystemType {
-    unknown = -1,
-    joined = 101,
-    quited = 102,
-    kicked = 103,
-    changed_Roomname = 105,
-    kick = 106,
-    changed_Master = 121,
-}
-export interface INcMessage {
-    id:number;
-    body:string;
-    writerId:string;
-    writerName:string;
-    type:number; // 1: text 11:image 10:sticker
-    createdTime:number;
-    extras:string; // image:{width, url, height, is...} json
-    readCount?:number;
-}
 
-export interface NcImage {
-    url:string; // nullable
-    width:number; // nullable
-    height:number; // nullable
-    is_original_size?:boolean; // nullable
-}
-export interface NcSticker {
-    stickerId:string; // stickerId
-    seq:number; // ??
-    packName:string; // packname... where use?
-    width:number; // useless
-    height:number; // useless
-    imageUrl:string; // umm
-}
-export interface NcEmbed {
-    /**
-     * Title of embed
-     */
-    title:string; // kkiro.kr - Title of embed
-    /**
-     * Description of embed
-     */
-    description:string; // Kkiro's personal blog
-    /**
-     * Display URL
-     */
-    domain:string; // kkiro.kr - ?
-    /**
-     * Link's URL (not shown)
-     */
-    url:string; // https://kkiro.kr/
-    /**
-     * "video" or null
-     */
-    type:string; // video | null - notfound.
-    /**
-     * Embed Image
-     */
-    image:NcImage;
-}
-/*
-
-extras - rich
-"extras":"{\"snippet\":{\"title\":\"kkiro.kr\",\"url\":\"https://kkiro.kr/\",
-\"description\":\"Kkiro's personal blog\",\"domain\":\"kkiro.kr\",
-\"type\":null,\"image\":{\"url\":null,\"height\":null,\"width\":null}}}"
-"extras":"{\"snippet\":{\"title\":\"League of Legends Soundtrack - 01 - Ranked Match Song\"
-,\"url\":\"https://www.youtube.com/watch?v=1PHJtkgAwE8\",\"description\":\"
-Click the link below to get more Info, and play League of Legends. http://s
-ignup.leagueoflegends.com/?ref=4d4b1e2e2a44f130428378 Thanks for the Views.\",
-\"domain\":\"www.youtube.com\",\"type\":\"video\",
-\"image\":{\"url\":\"https://i.ytimg.com/vi/1PHJtkgAwE8/maxresdefault.jpg\",\"height\":1080,\"width\":1440}}}"
-
-extras - sticker
-"extras":"{\"sticker\":{\"stickerId\":\"linebiz21_01-1-185-160\",\"seq\":1,
-\"packName\":\"linebiz21_01\",\"width\":185,\"height\":160,
-\"imageUrl\":\"https://gfmarket-phinf.pstatic.net/linebiz21_01/original_1.png\"}}"
-
-extras - image
-"extras":"{\"image\":{\"width\":617,
-\"url\":\"https://ssl.pstatic.net/cafechat.phinf/MjAxODA3MzFfOTMg/MDAxNTMzMDQ2NzY5MTY2.dwSX-YOXwGXc8l7-mccp
-IBB0Leq7Jhh1-nvyWYmTc8Ag.WnDE31tCOfhm0l9x8zi4zLqPapdodDbKOcg1lbCdAqog.PNG.alyacraft/
-Screen_Shot_2018-07-31_at_11.13.16_PM.png\",
-\"height\":158,\"is_original_size\":false}}"
-*/

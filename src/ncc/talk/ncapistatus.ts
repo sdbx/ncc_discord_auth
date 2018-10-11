@@ -2,6 +2,13 @@ import Log from "../../log"
 import NcJson from "./ncjson"
 
 export default class NcAPIStatus {
+    public static handleSuccess(req:string | Buffer) {
+        if (typeof req !== "string") {
+            return NcAPIStatus.error(NcErrorType.system, "For coder: Wrong type")
+        }
+        const instance = new NcJson(req, (obj) => ({ msg: obj["msg"] }))
+        return NcAPIStatus.from(instance)
+    }
     public static from<T>(response:NcJson<T>) {
         const err = new NcAPIStatus()
         err.success = response.valid

@@ -20,7 +20,7 @@ import Cafe from "./structure/cafe"
 import Profile from "./structure/profile"
 import NcAPIStatus from "./talk/ncapistatus"
 import NcBaseChannel, { ChannelInfo, ChannelType, parseFromOpen } from "./talk/ncbasechannel"
-import NcChannel, { ChannelEvent, handleSuccess } from "./talk/ncchannel"
+import NcChannel, { ChannelEvent } from "./talk/ncchannel"
 import NcJoinedChannel, { parseFromJoined } from "./talk/ncjoinedchannel"
 import NcJson from "./talk/ncjson"
 import NcMessage from "./talk/ncmessage"
@@ -168,7 +168,7 @@ export default class Ncc extends NcFetch {
         }
         const request = await this.credit.reqPost(CHATAPI_CHANNEL_JOIN.get(channelID))
         await this.syncChannels()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Leave channel
@@ -196,7 +196,7 @@ export default class Ncc extends NcFetch {
         const userid = typeof user === "string" ? user : user.userid
         const request = await this.credit.reqPost(CHATAPI_USER_BLOCK, {}, {blockedUserId: userid})
         await this.syncChannels()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Unblock member
@@ -206,7 +206,7 @@ export default class Ncc extends NcFetch {
         const userid = typeof user === "string" ? user : user.userid
         const request = await this.credit.req("DELETE", CHATAPI_USER_BLOCK, {unblockedUserId: userid})
         await this.syncChannels()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Get blocked member **ID**s
@@ -234,7 +234,7 @@ export default class Ncc extends NcFetch {
         if (blockables.length >= 1) {
             const block_req = await this.credit.req(block ? "POST" : "DELETE", CHATAPI_CAFE_BLOCK.get(cafeid),
                 !block ? {type} : {}, block ? {type} : {})
-            error = await handleSuccess(block_req)
+            error = NcAPIStatus.handleSuccess(block_req)
         }
         if (error != null && !error.success) {
             return error

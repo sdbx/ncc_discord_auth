@@ -8,7 +8,7 @@ import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
     CHAT_CHANNEL_URL, CHAT_HOME_URL, CHAT_URL_CRAWLER, CHATAPI_CHANNEL_BAN,
     CHATAPI_CHANNEL_CHGOWNER, CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE,
-    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_SITES, NcIDBase } from "../ncconstant"
+    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_SITES } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
@@ -16,7 +16,9 @@ import NcAPIStatus, { NcErrorType } from "./ncapistatus"
 import NcBaseChannel from "./ncbasechannel"
 import NcJoinedChannel, { parseFromJoined } from "./ncjoinedchannel"
 import NcJson from "./ncjson"
-import NcMessage, { INcMessage, MessageType, NcEmbed, NcImage, SystemType } from "./ncmessage"
+import NcMessage from "./ncmessage"
+import { ILastMessage, INcMessage, INowMessage, IPastMessage,
+    MessageType, NcEmbed, NcImage, NcSticker, SystemType } from "./ncprotomsg"
 import uploadImage from "./uploadphoto"
 
 /* tslint:disable:member-ordering */
@@ -46,7 +48,11 @@ export default class NcChannel {
      */
     protected instance:NcJoinedChannel
     public get detail() {
-        return {...this.instance}
+        return new Proxy(this.instance, {
+            set() {
+                return false
+            }
+        })
     }
     /**
      * Channel Users
@@ -59,7 +65,7 @@ export default class NcChannel {
     /**
      * Fetched messages
      */
-    public messages:PastMessage[] = []
+    public messages:INcMessage[] = []
     /**
      * events
      */
@@ -105,17 +111,13 @@ export default class NcChannel {
      * Cafe Info
      */
     public get cafe() {
-        return {
-            ...this.detail.cafe
-        } as Cafe
+        return this.detail.cafe as Cafe
     }
     /**
      * Channel info
      */
     public get info() {
-        return {
-            ...this.detail.channelInfo
-        }
+        return this.detail.channelInfo
     }
     /**
      * Latest Message No (in room)
@@ -124,8 +126,14 @@ export default class NcChannel {
         if (this.detail.latestMessage == null) {
             return 0
         } else {
-            return this.detail.latestMessage.messageId
+            return this.detail.latestMessage.id
         }
+    }
+    /**
+     * Latest Message (maybe incorrect)
+     */
+    public get latestMessage() {
+        return this.detail.latestMessage
     }
     private constructor() {
         // :)
@@ -135,7 +143,7 @@ export default class NcChannel {
      * @param credit Ncc Credentials
      * @param id Init id(private)
      */
-    public async update(credit:NCredit = null, id = -1) {
+    private async update(credit:NCredit = null, id = -1) {
         try {
             if (id < 0) {
                 id = this.channelID
@@ -325,6 +333,7 @@ export default class NcChannel {
                 } break
             }
         })
+        this.on(this.events.onMessage, (ch, msg) => this.instance.latestMessage = msg)
     }
 
     /* ************************* Commands ****************************** */
@@ -354,7 +363,7 @@ export default class NcChannel {
             captchaValue: captcha == null ? "" : captcha.value,
         })
         await this.syncChannel()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Ban user :p
@@ -366,7 +375,7 @@ export default class NcChannel {
         const id = typeof user === "string" ? user : user.userid
         const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_BAN.get(this.channelID, id))
         await this.syncChannel()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Leave Channel (No way to destroy channel :p)
@@ -375,7 +384,7 @@ export default class NcChannel {
      */
     public async leave() {
         const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_LEAVE.get(this.channelID))
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Destory Channel (OpenChat- Complely REMOVE)
@@ -384,7 +393,7 @@ export default class NcChannel {
      */
     public async destroy() {
         const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_INFO.get(this.channelID))
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Get Embed from URL (naver's api) - delay >=600ms?
@@ -520,7 +529,7 @@ export default class NcChannel {
         }
         const request = await this.credit.req("PUT", CHATAPI_CHANNEL_PERIOD.get(this.channelID), {}, {"period": code})
         await this.syncChannel()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Change owner to user
@@ -532,7 +541,7 @@ export default class NcChannel {
         const id = typeof user === "string" ? user : user.userid
         const request = await this.credit.req("PUT", CHATAPI_CHANNEL_CHGOWNER.get(this.cafe.cafeId, this.channelID, id))
         await this.syncChannel()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Change Info
@@ -558,7 +567,7 @@ export default class NcChannel {
             "description": org.description,
         })
         await this.syncChannel()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
      * Send ACK signal
@@ -579,6 +588,80 @@ export default class NcChannel {
             type: connected ? 2 : 1,
             sessionKey: this.credit.accessToken,
         }).then((v) => v.success)
+    }
+    /**
+     * Get Messages from `start` to `end`
+     * @param start 
+     * @param end 
+     * @param checker 
+     */
+    public async getMessages(start:number, end:number,
+        checker?:(msg:NcMessage, arr:NcMessage[]) => MessageCheck) {
+        // always start < end
+        if (start > end) {
+            const _mv = start
+            start = end
+            end = _mv
+        }
+        // update recent message
+        const recent = await this.socketEmit("message_list_recent", {
+            sessionKey: this.credit.accessToken,
+        })
+        if (!recent.success || recent.code === "accessDenied") {
+            throw new Error("Not response.")
+        }
+        // firstNo: first Message in naver server
+        const firstNo = get(recent.data, "firstMessageNo") as number
+        // lastNo: last Message from now.
+        const lastNo = get(recent.data, "lastMessageNo") as number
+        if (this.latestMessageNo < lastNo) {
+            await this.syncChannel()
+            // for stability
+            await this.sendAck(lastNo)
+        }
+        // safe with ncc server
+        end = Math.min(this.latestMessageNo, end)
+        start = Math.max(firstNo, start)
+        // fetch
+        const chunk = 50
+        // Message queue, order by recent.
+        const queue:NcMessage[] = []
+        for (let i = end; i >= start; i -= chunk) {
+            // include start, end
+            const {data, success} = await this.socketEmit("message_list_range", {
+                fromMessageNo: Math.max(start, i - chunk + 1),
+                toMessageNo: i,
+                sessionKey: this.credit.accessToken,
+            })
+            if (!success) {
+                break
+            }
+            // message order by msgNo (past.), so reverse push.
+            const messages:NcMessage[] = this.parseMessages(get(data, "data.messageList"))
+            let stop = false
+            for (let k = messages.length - 1; k >= 0; k -= 1) {
+                const _msg = messages[k]
+                // checker for rule
+                if (checker != null) {
+                    const ch = checker(_msg, queue)
+                    if (ch === MessageCheck.SKIP) {
+                        continue
+                    } else if (ch === MessageCheck.BREAK) {
+                        stop = true
+                        break
+                    }
+                }
+                // reverse push.
+                queue.push(_msg)
+            }
+            if (stop) {
+                break
+            }
+        }
+        return queue
+    }
+    public async fetchRecents() {
+
     }
     /**
      * Fetch Past Messages
@@ -656,20 +739,21 @@ export default class NcChannel {
     public async clearMessage() {
         const request = await this.credit.req("DELETE", CHATAPI_CHANNEL_CLEARMSG.get(this.channelID))
         await this.syncChannel()
-        return handleSuccess(request)
+        return NcAPIStatus.handleSuccess(request)
     }
     /**
-     * Push Socket.io's past messages to first
-     * @param messages Socket.io message_list_*** result
+     * Parse Message from Ncc's message response.
+     * @param messages Ncc's response.
      */
-    protected allocPastMessages(messages:any[]) {
+    protected parseMessages(messages:any[]):NcMessage[] {
         if (messages == null || messages.length <= 0) {
-            return
+            return []
         }
+        const out:NcMessage[] = []
         const ln = messages.length
         for (let i = 0; i < ln; i += 1) {
             const msg = messages[i]
-            messages[i] = {
+            const pMsg = {
                 id: msg.messageNo,
                 body: msg.content,
                 writerId: msg.userId,
@@ -682,9 +766,20 @@ export default class NcChannel {
                 readCount: msg.readCount,
                 updateTime: msg.updateTime,
             } as PastMessage
+            out.push(new NcMessage(pMsg, this.cafe, this.channelID, this.getUserById(pMsg.writerId)))
         }
-        const ncMsgs = messages.map(
-            (v:PastMessage) => new NcMessage(v, this.cafe, this.channelID, this.getUserById(v.writerId)))
+        return out
+    }
+    /**
+     * Push Socket.io's past messages to first
+     * @param messages Socket.io message_list_*** result
+     */
+    protected allocPastMessages(messages:PastMessage[]) {
+        if (messages == null || messages.length <= 0) {
+            return
+        }
+        const ncMsgs = this.parseMessages(messages)
+        const ln = ncMsgs.length
         if (this.messages.length >= 1) {
             if (this.messages[0].id === messages[ln - 1].id + 1) {
                 // append to start (all)
@@ -921,13 +1016,6 @@ export default class NcChannel {
         return nick == null ? fallback : nick.nickname
     }
 }
-export async function handleSuccess(req:string | Buffer):Promise<NcAPIStatus> {
-    if (typeof req !== "string") {
-        return NcAPIStatus.error(NcErrorType.system, "For coder: Wrong type")
-    }
-    const instance = new NcJson(req, (obj) => ({ msg: obj["msg"] }))
-    return NcAPIStatus.from(instance)
-}
 class Events {
     public onMessage = new EventDispatcher<NcChannel, NcMessage>()
     public onMemberJoin = new EventDispatcher<NcChannel, Join>()
@@ -1026,21 +1114,6 @@ export interface IChannelMember {
     channelManageable:boolean;
 }
 /**
- * Message event
- */
-export interface IEventMessage {
-    serialNumber:string;
-    typeCode:number;
-    userId:string;
-    contents:string;
-    memberCount:number;
-    createTime:string;
-    updateTime:string;
-    extras:string;
-    tempId:string;
-    readCount:number;
-}
-/**
  * Embed resposne
  */
 interface EmbedParsed {
@@ -1075,9 +1148,11 @@ export interface INcMessage {
     extras:string; // image:{width, url, height, is...} json
 }
 */
-interface PastMessage extends INcMessage {
-    channelNo:number;
-    memberCount:number;
-    readCount:number;
-    updateTime:number;
+/**
+ * Message check in fetchMessage
+ */
+export enum MessageCheck {
+    SKIP,
+    BREAK,
+    PASS,
 }
