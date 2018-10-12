@@ -361,6 +361,7 @@ export default class Ncc extends NcFetch {
         if (autoUpdate) {
             this.syncTask = setTimeout(bindFn(this.syncChannels, this), intervalNormal)
         }
+        this.leaveUnusedChannels()
         return Promise.resolve()
     }
     /**
@@ -415,7 +416,7 @@ export default class Ncc extends NcFetch {
                 }
                 const org = getFirst(original, (v) => v.channelID === channel.channelID)
                 if (org != null) {
-                    if (org.latestMessage.messageId !== channel.latestMessage.messageId ||
+                    if (org.latestMessage.id !== channel.latestMessage.id ||
                         JSON.stringify(org.channelInfo) !== JSON.stringify(channel.channelInfo)) {
                         modified.push(channel)
                     }
@@ -459,6 +460,20 @@ export default class Ncc extends NcFetch {
             this.syncTask = WebpackTimer.setTimeout(
                 bindFn(this.syncChannels, this), errored ? intervalError : intervalNormal)
         }
+    }
+    /**
+     * Leave Dummy channels.
+     */
+    public async leaveUnusedChannels() {
+        const unuses = this.joinedChannels.filter((v) => v.latestMessage.id == null && !this.shouldConnected(v))
+        for (const unused of unuses) {
+            try {
+                await this.leaveChannel(unused)
+            } catch (err) {
+                Log.e(err)
+            }
+        }
+        await this.syncChannels()
     }
     /**
      * List joinable cafes
@@ -549,7 +564,7 @@ export default class Ncc extends NcFetch {
         channel.hideACK = true
         channel.on(channel.events.onMessage, (ch, msg) => {
             if (!ch.hideACK) {
-                ch.sendAck(msg.messageId)
+                ch.sendAck(msg.id)
             }
             this.events.onMessage.dispatchAsync(ch, msg)
         })
@@ -562,7 +577,7 @@ export default class Ncc extends NcFetch {
      * @param channel 
      */
     protected shouldConnected(channel:NcJoinedChannel) {
-        const lastDate = channel.latestMessage.messageId == null ? channel.createdAt : channel.latestMessage.timestamp
+        const lastDate = channel.latestMessage.id == null ? channel.createdAt : channel.latestMessage.timestamp
         return Date.now() - lastDate <= 432000000 // 5 days
     }
     /**

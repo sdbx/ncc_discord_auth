@@ -40,7 +40,7 @@ export const CHATAPI_CHANNEL_JOIN = s(`${CHAT_API_URL}/channels/$/join`)
 
 /* global commands */
 export const CHATAPI_CAFES = s(`${CHAT_API_URL}/categories?channelTypeCode=$`)
-export const CHATAPI_CHANNELS = `${CHAT_API_URL}/channels?onlyVisible=true`
+export const CHATAPI_CHANNELS = `${CHAT_API_URL}/channels?onlyVisible=false`
 export const CHATAPI_CHANNEL_CREATE = s(`${CHAT_API_URL}/categories/$/channels`)
 export const CHATAPI_CHANNEL_OPENCREATE = s(`${CHAT_API_URL}/categories/$/openchannels`)
 export const CHATAPI_CHANNEL_CREATE_PERM = s(`${CHAT_API_URL}/categories/$/createChannelPrivileges?channelTypeCode=$`)

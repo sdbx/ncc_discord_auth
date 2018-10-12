@@ -75,6 +75,32 @@ export default class NcMessage {
             memberCount: m.memberCount,
         }
     }
+    /**
+     * Parse Message.
+     * @param m Naver's Message
+     * @param channelID Channel ID
+     */
+    public static from(m:IPastMessage | INowMessage | ILastMessage | INcMessage, channelID?:number):INcMessage {
+        let obj:INcMessage
+        if (m.hasOwnProperty("messageNo")) {
+            // IPastMessage
+            obj = NcMessage.fromPast(m as IPastMessage)
+        } else if (m.hasOwnProperty("id")) {
+            // ILastMessage
+            obj = NcMessage.fromLast(m as ILastMessage, channelID)
+        } else if (m.hasOwnProperty("serialNumber")) {
+            // INowMessage
+            obj = NcMessage.fromNow(m as INowMessage, channelID)
+        } else if (m.hasOwnProperty("messageId")) {
+            obj = m as INcMessage
+        } else {
+            throw new Error("Wrong Interface!")
+        }
+        return obj
+    }
+    public static getNaverID(m:IPastMessage | INowMessage | ILastMessage | INcMessage) {
+        return NcMessage.from(m, 53).authorId
+    }
     public static typeAsString(t:MessageType) {
         switch (t) {
             case MessageType.text: return "text"
@@ -95,8 +121,16 @@ export default class NcMessage {
      */
     private _author:Profile
     private instance:INcMessage
-    constructor(obj:INcMessage, cafe:Cafe, channelId:number, overrideUser:Profile = null) {
-        this.instance = obj
+    /**
+     * Create Well-Parsed Class
+     * @param obj Past / Last / Now Ncc's Message
+     * @param cafe Channel's Cafe.
+     * @param channelId Channel's Id (supportment for some message type)
+     * @param overrideUser Additional Info of user.
+     */
+    constructor(obj:INcMessage | IPastMessage | ILastMessage | INowMessage,
+        cafe:Cafe, channelId:number, overrideUser:Profile = null) {
+        this.instance = NcMessage.from(obj, channelId)
         this.cafe = cafe
         this.instance.channelId = channelId
         if (overrideUser != null) {
@@ -273,6 +307,9 @@ export default class NcMessage {
                 nick: this._author.nickname,
             }
         }
+    }
+    public get profile() {
+        return this._author
     }
     /**
      * timestamp (GMT, EpochTime)

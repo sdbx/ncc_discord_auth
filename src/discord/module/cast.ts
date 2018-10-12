@@ -9,7 +9,8 @@ import { NccEvents } from "../../ncc/ncc"
 import { cafePrefix } from "../../ncc/ncconstant"
 import NcChannel from "../../ncc/talk/ncchannel"
 import NcJoinedChannel from "../../ncc/talk/ncjoinedchannel"
-import NcMessage, { MessageType, NcImage, NcSticker, SystemType } from "../../ncc/talk/ncmessage"
+import NcMessage from "../../ncc/talk/ncmessage"
+import { MessageType, NcEmbed, NcImage, NcSticker, SystemType } from "../../ncc/talk/ncprotomsg"
 import Plugin from "../plugin"
 import { CmdParam, ParamType, UniqueID } from "../rundefine"
 import { CommandHelp, DiscordFormat } from "../runutil"
@@ -183,7 +184,7 @@ export default class Cast extends Plugin {
             Log.w("NccCast", "skip - wrong chat")
             return Promise.resolve()
         }
-        if (message.sendUser.userid === this.ncc.username) {
+        if (message.profile.userid === this.ncc.username) {
             return Promise.resolve()
         }
         if (!this.client.channels.has(roomCfg.channelID)) {
@@ -194,8 +195,8 @@ export default class Cast extends Plugin {
         let pImage = "https://ssl.pstatic.net/static/m/cafe/mobile/img_thumb_20180426.png"
         let nick = this.lang.cast.fallbackNick
         if (message.type !== MessageType.system) {
-            pImage = message.sendUser.profileurl
-            nick = message.sendUser.nickname
+            pImage = message.profile.profileurl
+            nick = message.profile.nickname
         }
         const webhook = await this.getWebhook(channel, nick, pImage).catch(Log.e)
         if (webhook == null) {
@@ -206,7 +207,7 @@ export default class Cast extends Plugin {
         switch (message.type) {
             case MessageType.text: {
                 let msg = message.content as string
-                const user = message.sendUser.userid
+                const user = message.profile.userid
                 const optout = roomCfg.optouts.indexOf(user)
                 if (msg.startsWith("!optout")) {
                     if (optout < 0) {
@@ -228,8 +229,8 @@ export default class Cast extends Plugin {
                 const isSticker = message.type === MessageType.sticker
                 // That type, naver sucks..
                 const url = isSticker ?
-                    (message.content as NcSticker).imageUrl + "?type=p50_50" : (message.content as NcImage).url
-                const optout = roomCfg.optouts.indexOf(message.sendUser.userid)
+                    message.sticker.imageUrl + "?type=p50_50" : message.image.url
+                const optout = roomCfg.optouts.indexOf(message.profile.userid)
                 let fn = url.substring(url.lastIndexOf("/") + 1)
                 if (fn.indexOf("?") >= 0) {
                     fn = fn.substring(0,fn.lastIndexOf("?"))
@@ -252,7 +253,7 @@ export default class Cast extends Plugin {
             case MessageType.system: {
                 const content = DiscordFormat.normalize(message.content as string, channel.guild)
                 if ([SystemType.quited, SystemType.kick, SystemType.joined].indexOf(message.systemType) >= 0) {
-                    const member = await this.ncc.getMemberById(message.cafe.cafeId, message.sendUser.userid)
+                    const member = await this.ncc.getMemberById(message.cafe.cafeId, message.author.naverId)
                     const desc = await this.getRichByNaver(member)
                     await webhook.send(content, desc)
                 } else {

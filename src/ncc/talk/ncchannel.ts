@@ -64,8 +64,10 @@ export default class NcChannel {
     public session:SocketIOClient.Socket
     /**
      * Fetched messages
+     * 
+     * Order: [0] *Recent* -> *Old* [length]
      */
-    public messages:INcMessage[] = []
+    public messages:NcMessage[] = []
     /**
      * events
      */
@@ -209,39 +211,32 @@ export default class NcChannel {
         // ["error", "connect_error", "reconnect_failed"].forEach((tag) => s.on(tag, () => this._connected = false))
         // fetch recent message
         s.on("connect", async () => {
-            if (this.messages.length === 0) {
-                // sendack need - message_list_recent return old message if not ACK;
-                await this.sendAck(this.latestMessageNo)
-                const {code, data, success} = await this.socketEmit("message_list_recent", {
-                    sessionKey: this.credit.accessToken,
-                })
-                if (success) {
-                    if (code !== "accessDenied" && data["resultCode"] === 0) {
-                        this.firstMsgNo = get(data, "data.firstMessageNo")
-                        const testArr = get(data, "data.messageList")
-                        this.allocPastMessages(testArr == null ? [] : testArr)
-                    }
-                } else {
-                    Log.w("NccSocket", "Recent message fetch failed.")
-                }
-            }
+            // awe-some fast naver speed, so this shouldn't be a problem.
+            this.messages = await this.fetchMessages(0, this.latestMessageNo)
         })
         // ping
         s.on("pong", async (latency) => {
             this.latency = latency
             const success = await this.updateConnection(true)
             if (!success) {
-                Log.w("NcChannel", "Pong - Unconnected.")
+                if (await this.credit.validateLogin() == null) {
+                    this.disconnect()
+                    Log.w("NcChannel", "Broken Credentials.")
+                } else {
+                    s.disconnect()
+                    s.connect()
+                    Log.w("NcChannel", "Reconnected.")
+                }
             }
         })
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
-            const message = this.serialMsg(eventmsg)
+            const message = this.serialNowMsg(eventmsg as any)
             if (message == null) {
                 return Promise.resolve()
             }
             Log.d("ChannelMessage", "Received - " + this.info.name)
-            this.appendMessages(message)
+            this.messages.unshift(message)
             this.events.onMessage.dispatchAsync(this, message)
         })
         // member join
@@ -263,7 +258,7 @@ export default class NcChannel {
         })
         s.on(ChannelEvent.KICK, async (eventmsg:object) => {
             const action = this.serialQueryMsg(eventmsg)
-            const sys = this.serialSysMsg(eventmsg)
+            const sys = this.serialSysMsg(eventmsg as any)
             // await this.syncChannel()
             const msg = {
                 message: sys.msg,
@@ -283,7 +278,7 @@ export default class NcChannel {
             if (sync) {
                 await this.syncChannel()
             }
-            const serialMsg = this.serialSysMsg(eventmsg)
+            const serialMsg = this.serialSysMsg(eventmsg as any)
             const message = serialMsg.msg
             if (message == null || message.type !== MessageType.system) {
                 return Promise.resolve()
@@ -591,11 +586,13 @@ export default class NcChannel {
     }
     /**
      * Get Messages from `start` to `end`
+     * 
+     * Order: [0] *New* -> *Old* [length]
      * @param start 
      * @param end 
      * @param checker 
      */
-    public async getMessages(start:number, end:number,
+    public async fetchMessages(start:number, end:number,
         checker?:(msg:NcMessage, arr:NcMessage[]) => MessageCheck) {
         // always start < end
         if (start > end) {
@@ -623,7 +620,7 @@ export default class NcChannel {
         end = Math.min(this.latestMessageNo, end)
         start = Math.max(firstNo, start)
         // fetch
-        const chunk = 50
+        const chunk = 500
         // Message queue, order by recent.
         const queue:NcMessage[] = []
         for (let i = end; i >= start; i -= chunk) {
@@ -637,7 +634,7 @@ export default class NcChannel {
                 break
             }
             // message order by msgNo (past.), so reverse push.
-            const messages:NcMessage[] = this.parseMessages(get(data, "data.messageList"))
+            const messages:NcMessage[] = (get(data, "messageList") as any[]).map((v) => this.parseMessage(v))
             let stop = false
             for (let k = messages.length - 1; k >= 0; k -= 1) {
                 const _msg = messages[k]
@@ -660,79 +657,6 @@ export default class NcChannel {
         }
         return queue
     }
-    public async fetchRecents() {
-
-    }
-    /**
-     * Fetch Past Messages
-     * 
-     * Count: number of message
-     * 
-     * At: from now to ID messages
-     * 
-     * All: all, in server
-     * 
-     * Date: Messages after timestamp
-     * @param mode Mode
-     * @param num Value
-     */
-    public async fetchMessages(mode:"COUNT" | "AT" | "ALL" | "DATE", num:number) {
-        if (!this.connected) {
-            return
-        }
-        const pasts = []
-        let nowFirst:number
-        if (this.messages.length === 0) {
-            nowFirst = this.latestMessageNo
-        } else {
-            nowFirst = this.messages[0].id
-        }
-        const dateMode = mode === "DATE"
-        let end:number
-        /*
-        if (mode === "ALL") {
-            this.messages = []
-            pasts.push(...await this.recentMessages(false))
-        }
-        */
-        switch (mode) {
-            case "COUNT" : {end = nowFirst - num + 1} break
-            case "AT" : {end = num} break
-            case "ALL": {end = -1} break
-            case "DATE": {end = -1} break
-        }
-        end = Math.min(Math.max(this.firstMsgNo, end),nowFirst)
-        for (let i = nowFirst - 1; i >= end; i -= 30) {
-            const {data, success} = await this.socketEmit("message_list_range", {
-                fromMessageNo: Math.max(end, i - 29),
-                toMessageNo: i,
-                sessionKey: this.credit.accessToken,
-            })
-            if (success) {
-                if (pasts.length === 0) {
-                    pasts.push(...get(data, "data.messageList"))
-                } else {
-                    pasts.unshift(...get(data, "data.messageList"))
-                }
-            }
-            if (dateMode && pasts.length >= 1 && pasts[0].createTime <= num) {
-                let k = 0
-                while (true) {
-                    if (k >= pasts.length - 1 || pasts[k].createTime >= num) {
-                        try {
-                            pasts.splice(0, k)
-                        } catch {
-                            // :)
-                        }
-                        break
-                    }
-                    k += 1
-                }
-                break
-            }
-        }
-        return this.allocPastMessages(pasts)
-    }
     /**
      * Clear Recent Messages
      */
@@ -745,80 +669,13 @@ export default class NcChannel {
      * Parse Message from Ncc's message response.
      * @param messages Ncc's response.
      */
-    protected parseMessages(messages:any[]):NcMessage[] {
-        if (messages == null || messages.length <= 0) {
-            return []
+    protected parseMessage(message:IPastMessage | INowMessage | ILastMessage | INcMessage):NcMessage {
+        const toNC = NcMessage.from(message)
+        if (toNC == null) {
+            return null
         }
-        const out:NcMessage[] = []
-        const ln = messages.length
-        for (let i = 0; i < ln; i += 1) {
-            const msg = messages[i]
-            const pMsg = {
-                id: msg.messageNo,
-                body: msg.content,
-                writerId: msg.userId,
-                writerName: null,
-                type: msg.messageTypeCode,
-                createdTime: msg.createTime,
-                extras: msg.extras,
-                channelNo: msg.channelNo,
-                memberCount: msg.memberCount,
-                readCount: msg.readCount,
-                updateTime: msg.updateTime,
-            } as PastMessage
-            out.push(new NcMessage(pMsg, this.cafe, this.channelID, this.getUserById(pMsg.writerId)))
-        }
-        return out
-    }
-    /**
-     * Push Socket.io's past messages to first
-     * @param messages Socket.io message_list_*** result
-     */
-    protected allocPastMessages(messages:PastMessage[]) {
-        if (messages == null || messages.length <= 0) {
-            return
-        }
-        const ncMsgs = this.parseMessages(messages)
-        const ln = ncMsgs.length
-        if (this.messages.length >= 1) {
-            if (this.messages[0].id === messages[ln - 1].id + 1) {
-                // append to start (all)
-                this.messages.unshift(...messages)
-            } else {
-                Log.w("MsgQueue Broken",
-                    `${this.channelID} Channel(${this.info.name}) message array are broken!\n` + 
-                    `${this.messages[0].id} <-> ${messages[ln - 1].id}`)
-                return ncMsgs
-            }
-        } else {
-            this.messages.push(...messages)
-        }
-        this.events.onPastMessage.dispatchAsync(this, ncMsgs)
-        return ncMsgs
-    }
-    /**
-     * Append Now messages to last
-     * @param messages That received Message.
-     */
-    protected appendMessages(...messages:NcMessage[]) {
-        const ln = messages.length
-        const iLn = this.messages.length
-
-        if (ln >= 1 && (iLn <= 0 || (messages[0].messageId === this.messages[iLn - 1].id + 1))) {
-            for (let i = 0; i < ln; i += 1) {
-                const msg = messages[i]["instance"]
-                this.messages.push({
-                    ...msg,
-                    channelNo: messages[i].channelID,
-                    memberCount: this.detail.userCount,
-                    updateTime: msg.createdTime,
-                } as PastMessage)
-            }
-        } else {
-            Log.w("MsgQueue Broken",
-                `${this.channelID} Channel(${this.info.name}) message array are broken!\n` +
-                `${this.messages[iLn - 1].id} <-> ${messages[0].messageId}`)
-        }
+        return new NcMessage(
+            NcMessage.from(message), this.cafe, this.channelID, this.getUserById(toNC.authorId))
     }
     /**
      * Connect session.
@@ -950,7 +807,7 @@ export default class NcChannel {
                 throw new Error("Result Message > " + rMessage)
             }
             obj.success = true
-            obj.data = result.data
+            obj.data = get(result.data, "data", {default: {}})
         } catch (err) {
             Log.w("NccSocket", "Code: " + type + " > Failed.\nError: " + err.toString())
         }
@@ -958,33 +815,19 @@ export default class NcChannel {
     }
     
     /**************** Utilities *************************/
-    private serialMsg(msg:object) {
-        if (get(msg, "channelNo") !== this.channelID) {
+    private serialNowMsg(msg:{channelNo:number, message:INowMessage}) {
+        if (msg.channelNo !== this.channelID) {
             Log.w("Message's channelID doesn't match.")
             return null
         }
-        const _message = get(msg, "message") as IEventMessage
-        if (_message.extras != null && _message.extras.length <= 0) {
-            _message.extras = null
-        }
-        const ncMsg = new NcMessage({
-            id: Number.parseInt(_message.serialNumber),
-            body: _message.contents,
-            writerId: _message.userId,
-            writerName: this.getNick(_message.userId, "Kicked User"),
-            type: _message.typeCode,
-            createdTime: Number.parseInt(_message.createTime),
-            extras: _message.extras,
-        }, this.cafe, this.channelID, this.getUserById(_message.userId))
-        ncMsg.readCount = Math.max(0, _message.readCount)
-        return ncMsg
+        return this.parseMessage(msg.message)
     }
-    private serialSysMsg(msg:object) {
-        const message = this.serialMsg(msg)
-        const modifier = this.getUserById(get(message.sender, "naverId"))
+    private serialSysMsg(msg:{channelNo:number, message:INowMessage}) {
+        const message = this.serialNowMsg(msg)
+        const modifier = this.getUserById(message.author.naverId)
         let actionDest = null
         try {
-            const extras = JSON.parse(get(msg, "message.extras"))
+            const extras = JSON.parse(message.info.extras)
             const _json = JSON.parse(get(extras, "cafeChatEventJson"))
             actionDest = get(_json, "actionItem", { default: null })
         } catch {
@@ -1093,6 +936,9 @@ export interface Master extends SysMsg {
 export interface RoomName extends SysMsg {
     before:string;
     after:string;
+}
+interface NcIDBase {
+    channelID:number;
 }
 /**
  * interface of chat members

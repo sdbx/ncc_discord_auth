@@ -6,7 +6,6 @@ import NCredit from "../credit/ncredit"
 import { CHAT_IMAGE_UPLOAD_URL, CHAT_IMAGE_UPLOADED_HOST, CHATAPI_PHOTO_SESSION_KEY } from "../ncconstant"
 import { getFirst, parseFile, withName } from "../nccutil"
 import NcJson from "./ncjson"
-import { NcImage } from "./ncmessage"
 
 /**
  * Upload image to the server. This doesn't send image to the chat, though.
