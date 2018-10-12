@@ -13,7 +13,7 @@ import NcMessage from "../../ncc/talk/ncmessage"
 import { MessageType, NcEmbed, NcImage, NcSticker, SystemType } from "../../ncc/talk/ncprotomsg"
 import Plugin from "../plugin"
 import { CmdParam, ParamType, UniqueID } from "../rundefine"
-import { CommandHelp, DiscordFormat } from "../runutil"
+import { CommandHelp, DiscordFormat, humanFileSize } from "../runutil"
 import { AuthConfig, getNaver } from "./auth"
 
 export default class Cast extends Plugin {
@@ -151,7 +151,9 @@ export default class Cast extends Plugin {
             await channel.send(this.lang.cast.authonly)
             return Promise.resolve()
         }
-        const nick = `${DiscordFormat.getNickname(msg.member)}(${n != null ? n : "미인증"})`
+        const _uname = DiscordFormat.getNickname(msg.member)
+        const nick = `${_uname}(${n != null ? n : "미인증"})`
+        const sendContent = msg.content.length >= 1 ? DiscordFormat.normalize(msg.content, msg.guild, false) : ""
         if (msg.attachments.size > 0) {
             for (const [key,attach] of msg.attachments) {
                 let url:string = attach.url
@@ -159,17 +161,36 @@ export default class Cast extends Plugin {
                     url = url.substring(0, url.lastIndexOf("?"))
                 }
                 if (url.endsWith(".png") || url.endsWith(".jpg") || url.endsWith(".gif")) {
-                    await room.sendText(
-                        `${nick}${hangul.endsWithConsonant(nick) ? "이" : "가"} 이미지를 올렸습니다.`)
                     const temp = await tmp.file({postfix: attach.filename.substr(attach.filename.lastIndexOf("."))})
                     const image = await request.get(attach.url, {encoding:null})
-                    await fs.writeFile(temp.path,image)
-                    await room.sendImage(temp.path)
+                    // await fs.writeFile(temp.path,image)
+                    await room.sendImage(image)
+                } else {
+                    await room.sendEmbed(sendContent, {
+                        title: attach.filename,
+                        description: `${humanFileSize(attach.filesize)} (${nick})`,
+                        domain: null,
+                        url: attach.url,
+                        type: null,
+                        image: null,
+                    })
+                    return Promise.resolve()
+                }
+                if (sendContent.length === 0) {
+                    await room.sendText(
+                        `${nick}${hangul.endsWithConsonant(_uname) ? "이" : "가"} 이미지를 올렸습니다.`)
                 }
             }
         }
-        if (msg.content.length >= 1) {
-            await room.sendText(`${nick} : ${DiscordFormat.normalize(msg.content, msg.guild, false)}`)
+        if (sendContent.length >= 1) {
+            await room.sendEmbed(sendContent, {
+                title: _uname,
+                description: n != null ? n : "미인증",
+                domain: null,
+                url: msg.url,
+                type: null,
+                image: null,
+            })
         }
     }
     protected async nccMsg(room:NcChannel, message:NcMessage) {
