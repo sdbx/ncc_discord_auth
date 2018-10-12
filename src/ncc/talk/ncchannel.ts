@@ -211,8 +211,12 @@ export default class NcChannel {
         // ["error", "connect_error", "reconnect_failed"].forEach((tag) => s.on(tag, () => this._connected = false))
         // fetch recent message
         s.on("connect", async () => {
-            // awe-some fast naver speed, so this shouldn't be a problem.
-            this.messages = await this.fetchMessages(0, this.latestMessageNo)
+            // awe-some fast naver speed, so this shouldn't be a problem.\
+            try {
+                this.messages = await this.fetchMessages(0, this.latestMessageNo)
+            } catch (err) {
+                Log.e(err)
+            }
         })
         // ping
         s.on("pong", async (latency) => {
@@ -620,7 +624,7 @@ export default class NcChannel {
         end = Math.min(this.latestMessageNo, end)
         start = Math.max(firstNo, start)
         // fetch
-        const chunk = 500
+        const chunk = 100
         // Message queue, order by recent.
         const queue:NcMessage[] = []
         for (let i = end; i >= start; i -= chunk) {
