@@ -114,6 +114,7 @@ export default class NcMessage {
      * Message's Cafe.
      */
     public cafe:Cafe
+    public valid:boolean
     /**
      * Message's Author. 
      * 
@@ -130,7 +131,13 @@ export default class NcMessage {
      */
     constructor(obj:INcMessage | IPastMessage | ILastMessage | INowMessage,
         cafe:Cafe, channelId:number, overrideUser:Profile = null) {
-        this.instance = NcMessage.from(obj, channelId)
+        try {
+            this.instance = NcMessage.from(obj, channelId)
+        } catch (err) {
+            this.valid = false
+            return
+        }
+        this.valid = true
         this.cafe = cafe
         this.instance.channelId = channelId
         if (overrideUser != null) {

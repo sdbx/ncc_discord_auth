@@ -8,7 +8,8 @@ import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
     CHAT_CHANNEL_URL, CHAT_HOME_URL, CHAT_URL_CRAWLER, CHATAPI_CHANNEL_BAN,
     CHATAPI_CHANNEL_CHGOWNER, CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE,
-    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_SITES } from "../ncconstant"
+    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_CORE_SITES,
+    COOKIE_EXT_SITES } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"
@@ -218,11 +219,15 @@ export default class NcChannel {
                 Log.e(err)
             }
         })
+        // auth exception
+        s.on("accessDenied", async () => {
+            Log.d("NcChannel", "access Denied\nCookie:" + this.credit.accessToken + "\nChannel:" + this.info.name)
+        })
         // ping
         s.on("pong", async (latency) => {
             this.latency = latency
             const success = await this.updateConnection(true)
-            if (!success) {
+            if (success !== ConnectedType.SUCCESS) {
                 if (await this.credit.validateLogin() == null) {
                     this.disconnect()
                     Log.w("NcChannel", "Broken Credentials.")
@@ -258,7 +263,9 @@ export default class NcChannel {
             await this.syncChannel()
             this.events.onMemberQuit.dispatchAsync(this, msg)
             const ncM = new NcMessage(eventmsg["message"], this.cafe, this.channelID)
-            this.events.onMessage.dispatchAsync(this, ncM)
+            if (ncM.valid) {
+                this.events.onMessage.dispatchAsync(this, ncM)
+            }
         })
         s.on(ChannelEvent.KICK, async (eventmsg:object) => {
             const action = this.serialQueryMsg(eventmsg)
@@ -583,10 +590,17 @@ export default class NcChannel {
      * @param connected Connected?
      */
     public async updateConnection(connected:boolean) {
-        return this.socketEmit("update_conn_status", {
+        const res = await this.socketEmit("update_conn_status", {
             type: connected ? 2 : 1,
             sessionKey: this.credit.accessToken,
-        }).then((v) => v.success)
+        })
+        if (!res.success && res.code === "accessDenied") {
+            return ConnectedType.AUTHBROKEN
+        } else if (res.success) {
+            return ConnectedType.SUCCESS
+        } else {
+            return ConnectedType.ERROR
+        }
     }
     /**
      * Get Messages from `start` to `end`
@@ -736,8 +750,8 @@ export default class NcChannel {
                 continue
             }
             this.session.on(naverE, (t) => {
-                Log.i(naverE)
-                Log.json("Object", t)
+                Log.i(naverE, "Name: " + this.info.name)
+                Log.json("Packet", t)
             })
         }
         // debug
@@ -784,7 +798,7 @@ export default class NcChannel {
             const result = await new Promise<{code:string | null, data:any}>((resolve, reject) => {
                 const tout = WebpackTimer.setTimeout(() => {
                     reject(new Error("Timeout."))
-                }, 3000)
+                }, 5000)
                 const eRes = (code:string | null, data:any) => {
                     WebpackTimer.clearTimeout(tout)
                     resolve({
@@ -798,9 +812,15 @@ export default class NcChannel {
                     this.session.emit(type, ...send, eRes)
                 }
             })
+            if (obj.code === "accessDenied") {
+                Log.w("NcChannel", "Response > Auth Failed.")
+                obj.success = false
+                obj.code = "accessDenied"
+                return obj
+            }
             obj.code = result.code
             if (result.data == null) {
-                throw new Error("Data > null")
+                throw new Error("Data > null, Code: " + result.code)
             }
             const rCode = get(result.data, "resultCode", {default: -1})
             if (rCode !== 0) {
@@ -817,7 +837,6 @@ export default class NcChannel {
         }
         return obj
     }
-    
     /**************** Utilities *************************/
     private serialNowMsg(msg:{channelNo:number, message:INowMessage}) {
         if (msg.channelNo !== this.channelID) {
@@ -1005,4 +1024,9 @@ export enum MessageCheck {
     SKIP,
     BREAK,
     PASS,
+}
+enum ConnectedType {
+    SUCCESS,
+    AUTHBROKEN,
+    ERROR,
 }

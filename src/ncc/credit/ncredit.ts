@@ -12,7 +12,7 @@ import { Cookie, CookieJar, parseDate } from "tough-cookie"
 import Cache from "../../cache"
 import Log from "../../log"
 import NCaptcha from "../ncaptcha"
-import { CHAT_HOME_URL, CHATAPI_PHOTO_SESSION_KEY, COOKIE_SITES } from "../ncconstant"
+import { CHAT_HOME_URL, CHATAPI_PHOTO_SESSION_KEY, COOKIE_CORE_SITES, COOKIE_EXT_SITES } from "../ncconstant"
 import { asJSON, parseURL } from "../nccutil"
 import encryptKey from "./loginencrypt"
 
@@ -30,6 +30,12 @@ export default class NCredit extends EventEmitter {
      * Naver id
      */
     public username:string
+    /**
+     * Keep-alive login state in cookie
+     * 
+     * as same as `로그인 상태 유지` in naver
+     */
+    public keepLogin = false
     /**
      * Naver password (This can be **null**)
      */
@@ -106,7 +112,8 @@ export default class NCredit extends EventEmitter {
             "enc_url": "http0X0.0000000000001P-10220.0000000.000000www.naver.com",
             url: "https://www.naver.com",
             "smart_level": 1,
-            encpw: key
+            encpw: key,
+            nvlong: this.keepLogin ? "on" : "off",
         }
         if (captcha != null) {
             form["smart_LEVEL"] = -1
@@ -121,7 +128,8 @@ export default class NCredit extends EventEmitter {
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
               "Accept": "text/plain",
-              "Referer": "https://nid.naver.com/nidlogin.login"
+              "Referer": "https://www.naver.com/",
+              "User-Agent": "Mozilla/5.0 (Nodejs) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.0.0 Safari/537.36",
             },
             method: "POST",
             form,
@@ -129,7 +137,7 @@ export default class NCredit extends EventEmitter {
         })
         this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
         // copy cookie to cookieJar
-        this.saveCookie(COOKIE_SITES, cookie)
+        this.saveCookie(COOKIE_CORE_SITES, cookie)
         // check cookie valid
         const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
@@ -179,9 +187,10 @@ export default class NCredit extends EventEmitter {
             viewtype: 0,
             locale: "ko_KR",
             smart_LEVEL: 1,
-            url: "https://www.naver.com",
+            url: "https://nid.naver.com/nidlogin.login?mode=number",
             mode: "number",
             key: code,
+            nvlong: this.keepLogin ? "on" : "off",
         }
         const cookie = this.reqCookie
         const body:string = await request({
@@ -198,7 +207,7 @@ export default class NCredit extends EventEmitter {
         this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
         this.cookieJar.setCookieSync(this.entcpCookie, "https://nid.naver.com/") // not need but..
         // copy cookie to cookieJar
-        this.saveCookie(COOKIE_SITES, cookie)
+        this.saveCookie(COOKIE_CORE_SITES, cookie)
         // check cookie valid
         const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
@@ -325,7 +334,11 @@ export default class NCredit extends EventEmitter {
      */
     public get reqCookie():orgrq.CookieJar {
         const cookie = request.jar()
-        for (const url of COOKIE_SITES) {
+        for (const url of COOKIE_CORE_SITES) {
+            this.cookieJar.getCookiesSync(url)
+                .forEach((value) => cookie.setCookie(value.toString(), url))
+        }
+        for (const url of COOKIE_EXT_SITES) {
             this.cookieJar.getCookiesSync(url)
                 .forEach((value) => cookie.setCookie(value.toString(), url))
         }
@@ -338,6 +351,17 @@ export default class NCredit extends EventEmitter {
      */
     public get accessToken():string {
         const cookies = this.cookieJar.getCookiesSync("https://naver.com/")
+        let nid_aut:string
+        let nid_ses:string
+        for (const cookie of cookies) {
+            const kp = `${cookie.key}=${cookie.value};`
+            if (cookie.key === "NID_AUT") {
+                nid_aut = kp
+            } else if (cookie.key === "NID_SES") {
+                nid_ses = kp
+            }
+        }
+        return nid_ses + " " + nid_aut
         const skey = cookies.filter((value) => value.key === "NID_AUT" || value.key === "NID_SES")
             .map((value) => `${value.key}=${value.value};`).join(" ")
         return skey
@@ -434,7 +458,7 @@ export default class NCredit extends EventEmitter {
         if (!this.httpsAgent.has(origin)) {
             this.httpsAgent.set(origin, {
                 using: false,
-                agent: new Agent({keepAlive: true, keepAliveMsecs: 60000}),
+                agent: new Agent({keepAlive: true, keepAliveMsecs: 120000}),
             })
         }
         const agent_pair = this.httpsAgent.get(origin)
@@ -457,33 +481,41 @@ export default class NCredit extends EventEmitter {
             },
             jar: cookie,
         }
+        const bf = Date.now()
+        agent_pair.using = true
+        let buffer:Buffer | string
         try {
-            const bf = Date.now()
-            agent_pair.using = true
-            const buffer:Buffer | string = await request(options)
-            agent_pair.using = false
-            if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 5000 < Date.now()) {
-                Log.url("Fetch URL", _url, from + " - " + (Date.now() - bf))
-                this.urlTimestamp.set(_url, Date.now())
-            }
-            this.saveCookie(COOKIE_SITES, cookie)
-            if (typeof buffer === "string") {
-                // utf-8 encoded
-                return Promise.resolve(buffer)
-            } else {
-                // binary test?
-                if (encoding != null) {
-                    // to string
-                    return iconv.convert(buffer, "utf-8", encoding).toString() as string
-                } else {
-                    // binary
-                    return buffer
-                }
-            }
+            buffer = await request(options)
         } catch (err) {
-            agent_pair.using = false
-            Log.e(err)
-            return Promise.resolve(null as string)
+            try {
+                options.agent = null
+                buffer = await request(options)
+            } catch (err2) {
+                Log.e(err2)
+                agent_pair.using = false
+                return Promise.resolve(null as string)
+            } finally {
+                Log.e(err)
+            }
+        }
+        agent_pair.using = false
+        if (!this.urlTimestamp.has(_url) || this.urlTimestamp.get(_url) + 5000 < Date.now()) {
+            Log.url("Fetch URL", _url, from + " - " + (Date.now() - bf))
+            this.urlTimestamp.set(_url, Date.now())
+        }
+        this.saveCookie(COOKIE_EXT_SITES, cookie)
+        if (typeof buffer === "string") {
+            // utf-8 encoded
+            return Promise.resolve(buffer)
+        } else {
+            // binary test?
+            if (encoding != null) {
+                // to string
+                return iconv.convert(buffer, "utf-8", encoding).toString() as string
+            } else {
+                // binary
+                return buffer
+            }
         }
     }
     /**

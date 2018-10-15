@@ -12,8 +12,8 @@ export enum CHAT_APIS {
     CHA2NNEL = "channels",
     CA2FE = "categories",
 }
-export const COOKIE_SITES = ["https://nid.naver.com", "https://naver.com",
-    CHAT_HOME_URL, cafePrefix, "https://www.naver.com"]
+export const COOKIE_CORE_SITES = ["https://nid.naver.com", "https://naver.com"]
+export const COOKIE_EXT_SITES = [CHAT_HOME_URL, cafePrefix]
 export const NID_CAPTCHA = `https://nid.naver.com/login/image/captcha`
 export const INSECURE_CAPTCHA = `http://captcha.naver.com`
 export const CAFE_LOGIN_CHECK = `${cafePrefix}/LoginCheck.nhn?m=check`
