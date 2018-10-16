@@ -45,6 +45,14 @@ export default class NCredit extends EventEmitter {
      */
     protected cookieJar:CookieJar
     /**
+     * Auth token.
+     */
+    protected authToken:string
+    /**
+     * Request Cookie
+     */
+    protected requestCookie:orgrq.CookieJar
+    /**
      * Https keep-Alive
      */
     private httpsAgent:Map<string, BAgent>
@@ -87,14 +95,13 @@ export default class NCredit extends EventEmitter {
     /**
      * Validate Naver logined.
      * 
-     * Recommend Caching value
+     * Recommend Catching value
      * @param captcha Naver captcha parameter(check other class for detail)
      * @returns resolve when SUCCESS / reject {@link LoginError} when error
      */
     public async login(captcha:{key:string, value:string} = null) {
         log("Starting logging in")
         log("Creating new cookie jar")
-        this.cookieJar = new CookieJar()
         const rsaKey = await this.reqGet("https://nid.naver.com/login/ext/keys.nhn")
             .catch((e) => {Log.e(e); return ""}) as string // RSA Key
         let keyO
@@ -135,17 +142,16 @@ export default class NCredit extends EventEmitter {
             form,
             jar: cookie,
         })
-        this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
-        // copy cookie to cookieJar
-        this.saveCookie(COOKIE_CORE_SITES, cookie)
         // check cookie valid
-        const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
+        const cookieText = cookie.getCookieString("https://naver.com/")
         if (cookieText.indexOf("NID_AUT") !== -1) {
             log("Successfully logged in")
             let userid:string
             try {
+                await this.updateLogin(true, cookie)
                 userid = await this.fetchUserID()
             } catch {
+                await this.updateLogin(false)
                 return Promise.reject({captcha: false} as LoginError)
             }
             this.emit("login")
@@ -204,14 +210,11 @@ export default class NCredit extends EventEmitter {
             form,
             jar: cookie,
         })
-        this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
-        this.cookieJar.setCookieSync(this.entcpCookie, "https://nid.naver.com/") // not need but..
-        // copy cookie to cookieJar
-        this.saveCookie(COOKIE_CORE_SITES, cookie)
         // check cookie valid
-        const cookieText = this.cookieJar.getCookieStringSync("https://naver.com/")
+        const cookieText = cookie.getCookieString("https://naver.com")
         if (cookieText.indexOf("NID_AUT") !== -1) {
             log("Successfully logged in")
+            await this.updateLogin(true, cookie)
             const uid = await this.fetchUserID()
             this.emit("login")
             return uid
@@ -243,7 +246,7 @@ export default class NCredit extends EventEmitter {
         const url = `https://nid.naver.com/nidlogin.logout?returl=https://talk.cafe.naver.com/`
         await this.reqGet(url) // useless maybe?
         // empty cookie
-        this.cookieJar = new CookieJar()
+        await this.updateLogin(false)
         log("Logging out")
         this.emit("logout")
         return Promise.resolve()
@@ -333,16 +336,11 @@ export default class NCredit extends EventEmitter {
      * get cookie for request-promise-native
      */
     public get reqCookie():orgrq.CookieJar {
-        const cookie = request.jar()
-        for (const url of COOKIE_CORE_SITES) {
-            this.cookieJar.getCookiesSync(url)
-                .forEach((value) => cookie.setCookie(value.toString(), url))
+        if (this.requestCookie == null) {
+            return request.jar()
+        } else {
+            return this.requestCookie
         }
-        for (const url of COOKIE_EXT_SITES) {
-            this.cookieJar.getCookiesSync(url)
-                .forEach((value) => cookie.setCookie(value.toString(), url))
-        }
-        return cookie
     }
     /**
      * get Naver-auth token for parameter
@@ -350,21 +348,7 @@ export default class NCredit extends EventEmitter {
      * NID_AUT & NID_SES
      */
     public get accessToken():string {
-        const cookies = this.cookieJar.getCookiesSync("https://naver.com/")
-        let nid_aut:string
-        let nid_ses:string
-        for (const cookie of cookies) {
-            const kp = `${cookie.key}=${cookie.value};`
-            if (cookie.key === "NID_AUT") {
-                nid_aut = kp
-            } else if (cookie.key === "NID_SES") {
-                nid_ses = kp
-            }
-        }
-        return nid_ses + " " + nid_aut
-        const skey = cookies.filter((value) => value.key === "NID_AUT" || value.key === "NID_SES")
-            .map((value) => `${value.key}=${value.value};`).join(" ")
-        return skey
+        return this.authToken
     }
     /**
      * request get
@@ -528,12 +512,28 @@ export default class NCredit extends EventEmitter {
      * Import from cookieJar JSON
      * @param cookieStr 
      */
-    public import(cookieStr:string) {
+    public async import(cookieStr:string) {
         try {
             this.cookieJar = CookieJar.deserializeSync(cookieStr)
+            const cookie = request.jar()
+            for (const url of COOKIE_CORE_SITES) {
+                this.cookieJar.getCookiesSync(url)
+                    .forEach((value) => cookie.setCookie(value.toString(), url))
+            }
+            for (const url of COOKIE_EXT_SITES) {
+                this.cookieJar.getCookiesSync(url)
+                    .forEach((value) => cookie.setCookie(value.toString(), url))
+            }
+            this.requestCookie = cookie
+            if (await this.validateLogin(false) == null) {
+                return this.updateLogin(false)
+            } else {
+                return this.updateLogin(true, cookie)
+            }
         } catch {
             log("Cookie parse:fail")
         }
+        return
     }
     /**
      * Check cookie exists.
@@ -553,6 +553,35 @@ export default class NCredit extends EventEmitter {
             }
         }
         return false
+    }
+    private async updateLogin(logined:boolean, cookie?:orgrq.CookieJar) {
+        if (logined) {
+            /**
+             * Case: Update cookie via this function.
+             */
+            if (cookie != null) {
+                if (await this.validateLogin(false) == null) {
+                    // logout first.
+                    await this.logout()
+                }
+                this.cookieJar = new CookieJar()
+                this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
+                this.cookieJar.setCookieSync(this.entcpCookie, "https://nid.naver.com/") // not need but..
+                // copy cookie to cookieJar
+                this.saveCookie(COOKIE_CORE_SITES, cookie)   
+            }
+            // for ncc-socket
+            const cookieNaver = this.cookieJar.getCookiesSync("https://naver.com/")
+            this.authToken = cookieNaver.filter(
+                (value) => value.key === "NID_AUT" || value.key === "NID_SES"
+            ).map((value) => `${value.key}=${value.value};`).join(" ")
+            this.requestCookie = cookie
+        } else if (!logined) {
+            this.cookieJar = new CookieJar()
+            this.authToken = null
+            this.requestCookie = null
+        }
+        return Promise.resolve()
     }
     /**
      * Generate NNB cookie

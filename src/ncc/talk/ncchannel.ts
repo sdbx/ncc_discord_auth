@@ -8,7 +8,9 @@ import NCaptcha from "../ncaptcha"
 import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
     CHAT_CHANNEL_URL, CHAT_HOME_URL, CHAT_URL_CRAWLER, CHATAPI_CHANNEL_BAN,
     CHATAPI_CHANNEL_CHGOWNER, CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE,
-    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC, COOKIE_CORE_SITES,
+    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC,
+    CHATAPI_CHANNEL_VALID, 
+    COOKIE_CORE_SITES, 
     COOKIE_EXT_SITES } from "../ncconstant"
 import { getFirst, parseMember } from "../nccutil"
 import Cafe from "../structure/cafe"
@@ -226,7 +228,6 @@ export default class NcChannel {
         // ping
         s.on("pong", async (latency) => {
             this.latency = latency
-            /*
             const success = await this.updateConnection(true)
             if (success !== ConnectedType.SUCCESS) {
                 if (await this.credit.validateLogin() == null) {
@@ -238,7 +239,6 @@ export default class NcChannel {
                     Log.w("NcChannel", "Reconnected.")
                 }
             }
-            */
         })
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
@@ -588,6 +588,24 @@ export default class NcChannel {
         }).then((v) => v.success)
     }
     /**
+     * Check Channel is syncable / usable.
+     */
+    public async checkState() {
+        const request = await this.credit.reqGet(CHATAPI_CHANNEL_VALID.get(this.channelID)) as string
+        const response = new NcJson(request, (obj) => ({
+            syncable: get(obj, "syncableStatus.syncable", {default: false}) as boolean,
+            resultMessage: get(obj, "syncableStatus.resultMessage", {default: ""}) as string,
+        }))
+        if (!response.valid) {
+            return {
+                syncable: false,
+                resultMessage: response.errorMsg,
+            }
+        } else {
+            return response.result
+        }
+    }
+    /**
      * I don't know what this does.
      * @param connected Connected?
      */
@@ -701,13 +719,12 @@ export default class NcChannel {
      * Connect session.
      * @param credit 
      */
-    public async connect(credit:NCredit) {
+    public async connect() {
         const channel = this.channelID
-        this.credit = credit
         this.session = io(`${CHAT_BACKEND_URL}/chat`, {
             multiplex: false,
             timeout: 5000,
-            host: `${CHAT_BACKEND_URL}/chat`,
+            host: CHAT_BACKEND_URL,
             reconnection: true,
             reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
@@ -715,7 +732,7 @@ export default class NcChannel {
             forceNew: true,
             // autoConnect: false,
             // forceJSONP: true,
-            transports: ["websocket", "polling"],
+            transports: ["polling", "websocket"],
             transportOptions: {
                 polling: {
                     extraHeaders: {
@@ -731,8 +748,8 @@ export default class NcChannel {
                 },
             },
             query: {
-                accessToken: credit.accessToken,
-                userId: credit.username,
+                accessToken: this.credit.accessToken,
+                userId: this.credit.username,
                 channelNo: channel,
             },
         })
@@ -815,7 +832,13 @@ export default class NcChannel {
                 }
             })
             if (obj.code === "accessDenied") {
-                Log.w("NcChannel", "Response > Auth Failed.")
+                // :thinking:
+                const accessable = await this.checkState()
+                if (accessable.syncable) {
+                    Log.w("NcChannel", "Response > Auth Fail / Unknown Error.")
+                } else {
+                    Log.w("NcChannel", "Response > Auth Fail / " + accessable.resultMessage)
+                }
                 obj.success = false
                 obj.code = "accessDenied"
                 return obj

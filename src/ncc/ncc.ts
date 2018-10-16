@@ -508,7 +508,7 @@ export default class Ncc extends NcFetch {
             channel = channel.channelID
         }
         const test = await NcChannel.from(this.credit, channel)
-        await test.connect(this.credit)
+        await test.connect()
         // message
         test.on(test.events.onMessage, (ch, msg) => {
             Log.d(NcMessage.typeAsString(msg.type), JSON.stringify(msg.content, null, 4))
@@ -665,7 +665,7 @@ export default class Ncc extends NcFetch {
             channel = await NcChannel.from(this.credit, id)
         }
         if (channel != null) {
-            await channel.connect(this.credit).catch(Log.e)
+            await channel.connect().catch(Log.e)
             // register event
             this.registerChannelEvents(channel)
             this.connectedChannels.push(channel)

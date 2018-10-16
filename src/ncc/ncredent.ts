@@ -197,14 +197,12 @@ export default class NcCredent extends EventEmitter {
                 await setTimeoutP(delay)
             }
             // logout
-            await this.logout()
+            // wait this.logout()
             // login with otp
             await this.loginOTP(otp.token)
             return Promise.resolve()
         } catch (err) {
             Log.e(err)
-            await this.logout().catch(Log.e)
-            await this.loadCredit(backupJar)
             // await this.credit.fetchUserID().catch(Log.e)
             return Promise.reject("Unknown")
         }
@@ -252,7 +250,7 @@ export default class NcCredent extends EventEmitter {
             cookieStr = manualCookie
         }
         try {
-            this.credit.import(cookieStr)
+            await this.credit.import(cookieStr)
         } catch (err) {
             await fs.remove(this.cookiePath) 
             Log.e(err)
