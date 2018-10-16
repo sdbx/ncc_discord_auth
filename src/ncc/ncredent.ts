@@ -197,7 +197,7 @@ export default class NcCredent extends EventEmitter {
                 await setTimeoutP(delay)
             }
             // logout
-            // wait this.logout()
+            await this.logout()
             // login with otp
             await this.loginOTP(otp.token)
             return Promise.resolve()

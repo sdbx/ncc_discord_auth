@@ -528,7 +528,7 @@ export default class NCredit extends EventEmitter {
             if (await this.validateLogin(false) == null) {
                 return this.updateLogin(false)
             } else {
-                return this.updateLogin(true, cookie)
+                return this.updateLogin(true)
             }
         } catch {
             log("Cookie parse:fail")
@@ -560,7 +560,7 @@ export default class NCredit extends EventEmitter {
              * Case: Update cookie via this function.
              */
             if (cookie != null) {
-                if (await this.validateLogin(false) == null) {
+                if (await this.validateLogin(false) != null) {
                     // logout first.
                     await this.logout()
                 }
@@ -576,6 +576,7 @@ export default class NCredit extends EventEmitter {
                 (value) => value.key === "NID_AUT" || value.key === "NID_SES"
             ).map((value) => `${value.key}=${value.value};`).join(" ")
             this.requestCookie = cookie
+            Log.d("Cookie Set!")
         } else if (!logined) {
             this.cookieJar = new CookieJar()
             this.authToken = null
