@@ -47,6 +47,12 @@ export default class NcCredent extends EventEmitter {
         return this.credit.username
     }
     /**
+     * Keep login state? (naver option)
+     */
+    public set keepLogin(value:boolean) {
+        this.credit.keepLogin = value
+    }
+    /**
      * Check logined (Cached or fetch)
      */
     public async availableAsync():Promise<boolean> {

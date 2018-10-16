@@ -99,6 +99,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
         this.lastSaved = Date.now()
         // ncc register event
         this.ncc.useNcc = true
+        this.ncc.keepLogin = false
         /*
         this.ncc.on("login", async () => {
             Log.d("Connect", "connect")

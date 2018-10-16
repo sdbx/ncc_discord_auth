@@ -46,6 +46,9 @@ export default class Ncc extends NcFetch {
      * Auto update tasker
      */
     protected syncTask:TimerID
+    /**
+     * Internal events
+     */
     protected events:Events
     constructor() {
         super()

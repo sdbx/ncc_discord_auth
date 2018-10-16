@@ -226,6 +226,7 @@ export default class NcChannel {
         // ping
         s.on("pong", async (latency) => {
             this.latency = latency
+            /*
             const success = await this.updateConnection(true)
             if (success !== ConnectedType.SUCCESS) {
                 if (await this.credit.validateLogin() == null) {
@@ -237,6 +238,7 @@ export default class NcChannel {
                     Log.w("NcChannel", "Reconnected.")
                 }
             }
+            */
         })
         // message
         s.on(ChannelEvent.MESSAGE, async (eventmsg:object) => {
@@ -703,15 +705,15 @@ export default class NcChannel {
         const channel = this.channelID
         this.credit = credit
         this.session = io(`${CHAT_BACKEND_URL}/chat`, {
-            multiplex: true,
-            timeout: 12000,
-            host:CHAT_BACKEND_URL,
+            multiplex: false,
+            timeout: 5000,
+            host: `${CHAT_BACKEND_URL}/chat`,
             reconnection: true,
             reconnectionAttempts: Infinity,
-            reconnectionDelay: 500,
-            reconnectionDelayMax: 10000,
-            forceNew: false,
-            autoConnect: false,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 1000,
+            forceNew: true,
+            // autoConnect: false,
             // forceJSONP: true,
             transports: ["websocket", "polling"],
             transportOptions: {
