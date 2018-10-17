@@ -24,6 +24,8 @@ import { ILastMessage, INcMessage, INowMessage, IPastMessage,
     MessageType, NcEmbed, NcImage, NcSticker, NcTvCast, SystemType } from "./ncprotomsg"
 import uploadImage from "./uploadphoto"
 
+const urlRegex = /(http(s)?:\/\/)[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)/ig
+
 /* tslint:disable:member-ordering */
 export default class NcChannel {
     /**
@@ -432,8 +434,7 @@ export default class NcChannel {
      * @param autoEmbed Detect link and parse embed?
      */
     public async sendText(text:string, autoEmbed = true) {
-        const regex = /(http(s)?:\/\/)[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&\/\/=]*)/ig
-        const url = getFirst(text.match(regex))
+        const url = getFirst(text.match(urlRegex))
         if (!autoEmbed && url != null) {
             return this.sendEmbed(text, await this.getURLEmbed(url))
         } else {
@@ -448,6 +449,10 @@ export default class NcChannel {
      * @param extra Raw Extra data.
      */
     public async sendTextWithExtra(text:string, extra:object) {
+        const url = getFirst(text.match(urlRegex))
+        if (url != null) {
+            extra["snippet"] = await this.getURLEmbed(url)
+        }
         const extras = JSON.stringify(extra)
         return this.socketEmit("send", {
             extras,
