@@ -152,7 +152,7 @@ export default class Cast extends Plugin {
             return Promise.resolve()
         }
         const _uname = DiscordFormat.getNickname(msg.member)
-        const nick = `${_uname}(${n != null ? n : "미인증"})`
+        const nick = `${_uname} (${n != null ? n : "미인증"})`
         const sendContent = msg.content.length >= 1 ? DiscordFormat.normalize(msg.content, msg.guild, false) : ""
         if (msg.attachments.size > 0) {
             for (const [key,attach] of msg.attachments) {
@@ -161,7 +161,7 @@ export default class Cast extends Plugin {
                     url = url.substring(0, url.lastIndexOf("?"))
                 }
                 if (url.endsWith(".png") || url.endsWith(".jpg") || url.endsWith(".gif")) {
-                    const temp = await tmp.file({postfix: attach.filename.substr(attach.filename.lastIndexOf("."))})
+                    // const temp = await tmp.file({postfix: attach.filename.substr(attach.filename.lastIndexOf("."))})
                     const image = await request.get(attach.url, {encoding:null})
                     // await fs.writeFile(temp.path,image)
                     await room.sendImage(image)
@@ -183,14 +183,18 @@ export default class Cast extends Plugin {
             }
         }
         if (sendContent.length >= 1) {
-            await room.sendEmbed(sendContent, {
-                title: _uname,
-                description: n != null ? n : "미인증",
-                domain: null,
-                url: msg.url,
-                type: null,
-                image: null,
-            })
+            if (sendContent.startsWith(">") && sendContent.length >= 2) {
+                await room.sendSys(sendContent.substr(1))
+            } else {
+                await room.sendTextWithExtra(nick + " : " + sendContent, {
+                    discordInfo: {
+                        senderName: _uname,
+                        senderId: msg.author.id,
+                        senderImage: DiscordFormat.getAvatarImage(msg.member),
+                        fromChannel: msg.url,
+                    }
+                })
+            }
         }
     }
     protected async nccMsg(room:NcChannel, message:NcMessage) {

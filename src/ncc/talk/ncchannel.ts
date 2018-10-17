@@ -21,7 +21,7 @@ import NcJoinedChannel, { parseFromJoined } from "./ncjoinedchannel"
 import NcJson from "./ncjson"
 import NcMessage from "./ncmessage"
 import { ILastMessage, INcMessage, INowMessage, IPastMessage,
-    MessageType, NcEmbed, NcImage, NcSticker, SystemType } from "./ncprotomsg"
+    MessageType, NcEmbed, NcImage, NcSticker, NcTvCast, SystemType } from "./ncprotomsg"
 import uploadImage from "./uploadphoto"
 
 /* tslint:disable:member-ordering */
@@ -441,6 +441,22 @@ export default class NcChannel {
         }
     }
     /**
+     * Send text with secret extra
+     * 
+     * Maybe fun.
+     * @param text Send Text 
+     * @param extra Raw Extra data.
+     */
+    public async sendTextWithExtra(text:string, extra:object) {
+        const extras = JSON.stringify(extra)
+        return this.socketEmit("send", {
+            extras,
+            message: text,
+            messageTypeCode: 1,
+            sessionKey: this.credit.accessToken,
+        }).then((v) => v.success)
+    }
+    /**
      * Send text with custom embed
      * 
      * How about XSS-Atack?
@@ -487,6 +503,34 @@ export default class NcChannel {
             extras,
             message: text,
             messageTypeCode: 1,
+            sessionKey: this.credit.accessToken,
+        }).then((v) => v.success)
+    }
+    /**
+     * Send anycast system message
+     * 
+     * It isn't official api.
+     * @param text Send Text
+     */
+    public async sendSys(text:string) {
+        return this.socketEmit("send", {
+            message: text,
+            messageTypeCode: 121,
+            sessionKey: this.credit.accessToken,
+        }).then((v) => v.success)
+    }
+    /**
+     * Send TvCast Type message
+     * 
+     * @description I don't know why it exists. *Naver?*
+     * @param cast NcTvCast json
+     */
+    public async sendTvCast(cast:NcTvCast) {
+        const extras = JSON.stringify({tvcast: cast})
+        return this.socketEmit("send", {
+            extras,
+            message: "",
+            messageTypeCode: 82,
             sessionKey: this.credit.accessToken,
         }).then((v) => v.success)
     }

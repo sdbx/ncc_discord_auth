@@ -520,10 +520,6 @@ export default class NCredit extends EventEmitter {
                 this.cookieJar.getCookiesSync(url)
                     .forEach((value) => cookie.setCookie(value.toString(), url))
             }
-            for (const url of COOKIE_EXT_SITES) {
-                this.cookieJar.getCookiesSync(url)
-                    .forEach((value) => cookie.setCookie(value.toString(), url))
-            }
             this.requestCookie = cookie
             if (await this.validateLogin(false) == null) {
                 return this.updateLogin(false)
@@ -568,14 +564,14 @@ export default class NCredit extends EventEmitter {
                 this.cookieJar.setCookieSync(this.nnbCookie, "https://naver.com/")
                 this.cookieJar.setCookieSync(this.entcpCookie, "https://nid.naver.com/") // not need but..
                 // copy cookie to cookieJar
-                this.saveCookie(COOKIE_CORE_SITES, cookie)   
+                this.saveCookie(COOKIE_CORE_SITES, cookie)  
+                this.requestCookie = cookie 
             }
             // for ncc-socket
             const cookieNaver = this.cookieJar.getCookiesSync("https://naver.com/")
             this.authToken = cookieNaver.filter(
                 (value) => value.key === "NID_AUT" || value.key === "NID_SES"
             ).map((value) => `${value.key}=${value.value};`).join(" ")
-            this.requestCookie = cookie
             Log.d("Cookie Set!")
         } else if (!logined) {
             this.cookieJar = new CookieJar()

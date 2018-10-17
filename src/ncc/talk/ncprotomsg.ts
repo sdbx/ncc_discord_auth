@@ -153,6 +153,37 @@ export interface NcEmbed {
     image:NcImage;
 }
 /*
+ * {
+            url: "https://kkiro.kr/",
+            playtimeText: "PlayTime_Text",
+            thumbnailSecure: "https://cdn.discordapp.com/attachments/152746825806381056/501937755518140417/unknown.png",
+            title: "Title",
+            description: "Desc",
+        }
+ */
+export interface NcTvCast {
+    /**
+     * Embed title
+     */
+    title?:string;
+    /**
+     * Embed description
+     */
+    description?:string;
+    /**
+     * Tvcast link
+     */
+    url:string;
+    /**
+     * Tvcast preview image url
+     */
+    thumbnailSecure?:string;
+    /**
+     * Text bottom of play icon.
+     */
+    playtimeText?:string;
+}
+/*
 
 extras - rich
 "extras":"{\"snippet\":{\"title\":\"kkiro.kr\",\"url\":\"https://kkiro.kr/\",
