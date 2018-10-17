@@ -823,7 +823,20 @@ export default class NcChannel {
                 Log.d(this.info.name, "Connected: " + this.connected + " / Latency: " + this.latency + "ms")
             }
         }, 60000)
-        this.session.open()
+        return new Promise<void>((res, rej) => {
+            this.session.open()
+            const tout = WebpackTimer.setTimeout(() => {
+                rej(new Error("Timeout."))
+            }, 5000)
+            this.session.once("connect", () => {
+                WebpackTimer.clearTimeout(tout)
+                res()
+            })
+            this.session.once("connect_error", () => {
+                WebpackTimer.clearTimeout(tout)
+                rej(new Error("Conn Failed."))
+            })
+        })
     }
     /**
      * Disconnect Channel

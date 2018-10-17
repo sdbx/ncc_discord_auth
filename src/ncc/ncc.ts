@@ -41,7 +41,7 @@ export default class Ncc extends NcFetch {
     /**
      * Auto connect to ncc.
      */
-    public useNcc = false
+    public autoConnect = false
     /**
      * Auto update tasker
      */
@@ -398,7 +398,7 @@ export default class Ncc extends NcFetch {
      * Sync Channels and fetch auto
      * @param autoConnect should auto connect to chat
      */
-    public async syncChannels(autoConnect = true) {
+    public async syncChannels() {
         let errored = false
         const original = [...this.joinedChannels]
         try {
@@ -433,24 +433,22 @@ export default class Ncc extends NcFetch {
                 }
             }
             this.joinedChannels = now
-            if (added.length + modified.length + removed.length >= 1) {
+            if (added.length + modified.length + removed.length >= 1 && this.autoConnect) {
                 const eventChUpdate = {
                     added,
                     modified,
                     removed,
                 } as ChannelListEvent
                 // ensure joined new chat~~
-                if (autoConnect) {
-                    for (let i = 0; i < this.connectedChannels.length; i += 1) {
-                        const chConnected = this.connectedChannels[i]
-                        if (!this.shouldConnected(chConnected.detail)) {
-                            chConnected.disconnect()
-                            this.connectedChannels.splice(i, 1)
-                            i -= 1
-                        }
+                for (let i = 0; i < this.connectedChannels.length; i += 1) {
+                    const chConnected = this.connectedChannels[i]
+                    if (!this.shouldConnected(chConnected.detail)) {
+                        chConnected.disconnect()
+                        this.connectedChannels.splice(i, 1)
+                        i -= 1
                     }
-                    await this.syncConnectedChannels(eventChUpdate)
                 }
+                await this.syncConnectedChannels(eventChUpdate)
                 this.events.onChatUpdated.dispatchAsync(eventChUpdate)
             }
         } catch (err) {
@@ -540,7 +538,7 @@ export default class Ncc extends NcFetch {
     }
     protected async onLogin(username:string):Promise<void> {
         await super.onLogin(username)
-        if (this.useNcc) {
+        if (this.autoConnect) {
             await this.connect(true).catch(Log.e)
         }
         return Promise.resolve()
@@ -665,7 +663,12 @@ export default class Ncc extends NcFetch {
             channel = await NcChannel.from(this.credit, id)
         }
         if (channel != null) {
-            await channel.connect().catch(Log.e)
+            try {
+                await channel.connect()
+            } catch (err) {
+                Log.e(err)
+                return null
+            }
             // register event
             this.registerChannelEvents(channel)
             this.connectedChannels.push(channel)

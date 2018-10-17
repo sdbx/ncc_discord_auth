@@ -39,19 +39,16 @@ async function init() {
     await run.start();
     */
     const ncc = new Ncc()
-    const otpcode = await Log.read("OTP")
-    const loaded = await ncc.loginOTP(otpcode)
-    // const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole())
+    ncc.autoConnect = false
+    // const otpcode = await Log.read("OTP")
+    // const loaded = await ncc.loginOTP(otpcode)
+    const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole())
     if (loaded != null) {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            try {
-                Log.d("OTP", (await ncc["credit"].genOTP()).token.toString())
-            } catch (err) {
-                Log.e(err)
-            }
-            const cafe = await ncc.parseNaverDetail(26686242)
+            const chat = await ncc.getConnectedChannel(5353)
+            await chat.sendText("안녕~")
         }
     }
 }
