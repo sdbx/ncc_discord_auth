@@ -152,7 +152,7 @@ export default class NcCredent extends EventEmitter {
         // this.credit.password = "__";
         if (name != null) {
             this.credit.username = name
-            await this.onLogin(name)
+            this.onLogin(name)
         } else {
             this.logined.revoke(false)
         }
@@ -261,7 +261,7 @@ export default class NcCredent extends EventEmitter {
         if (valid != null) {
             userid = await this.credit.fetchUserID().catch(Log.e)
             if (userid != null) {
-                await this.onLogin(userid)
+                this.onLogin(userid)
                 return userid
             }
         }

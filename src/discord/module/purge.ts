@@ -1,5 +1,9 @@
 import * as Discord from "discord.js"
+import * as fs from "fs-extra"
+import * as path from "path"
+import * as request from "request-promise-native"
 import { sprintf } from "sprintf-js"
+import * as tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
@@ -24,6 +28,8 @@ export default class Purge extends Plugin {
     private working:string[] = []
     private caching = false
     private filterRegex = new RegExp(`(${filterSimple.join("|")})`, "ig")
+    private tempDir:tmp.DirectoryResult
+    private cacheFiles:Map<string, AttachmentBackup> = new Map()
     /**
      * Initialize command
      */
@@ -59,12 +65,30 @@ export default class Purge extends Plugin {
                 const cloned = cloneMessage(msg)
                 cloned.content = DiscordFormat.normalizeMention(cloned.content, msg.guild)
                 if (cloned.embeds.length <= 0) {
+                    const deletes:string[] = []
                     const rich = new Discord.RichEmbed()
-                    for (const file of cloned.attaches) {
-                        rich.addField("첨부했던 파일", file.name)
+                    const attaches:Discord.Attachment[] = []
+                    for (const [key, org_attach] of msg.attachments) {
+                        const file = await this.getCachedFile(key)
+                        if (file != null) {
+                            deletes.push(file.path)
+                            attaches.push(file.attach)
+                        } else {
+                            rich.addField("첨부했던 파일", org_attach.filename)
+                        }
                     }
                     rich.setDescription("사용자: " + DiscordFormat.mentionUser(msg.author.id))
-                    await webhook.send(cloned.content, rich)
+                    await webhook.send(cloned.content, {
+                        embeds: [rich],
+                        files: attaches,
+                    })
+                    for (const dl of deletes) {
+                        try {
+                            await fs.remove(dl)
+                        } catch (err) {
+                            Log.e(err)
+                        }
+                    }
                 } else {
                     let sendFirst = false
                     for (const embed of cloned.embeds) {
@@ -145,6 +169,9 @@ export default class Purge extends Plugin {
                 await webhook.send(newM.url, rich)
             }
         })
+        this.tempDir = await tmp.dir({
+            unsafeCleanup: true,
+        })
         return Promise.resolve()
     }
     public async onMessage(msg:Discord.Message) {
@@ -160,6 +187,14 @@ export default class Purge extends Plugin {
                     await msg.delete()
                 }
             }
+        }
+        if (msg.attachments.size >= 1 && msg.guild.channels.find((v) => v.id === sub.backupChannel)) {
+            await this.addFileCache(msg.attachments, msg.createdTimestamp)
+        }
+        const lastM = this.getLastMsg(msg.channel.id)
+        if (lastM == null || Date.now() - lastM.timestamp >= 43200000) {
+            // slient & no await.
+            this.updateCache(msg.channel, msg.id, false)
         }
         return
     }
@@ -264,7 +299,9 @@ export default class Purge extends Plugin {
             */
             // check cache
             const caching = this.caching
-            const progress = await this.updateCache(msg.channel, msg.id, caching)
+            const lastM = this.getLastMsg(msg.channel.id)
+            const progress = await this.updateCache(msg.channel, msg.id,
+                (lastM == null) || (Date.now() - lastM.timestamp >= 600000))
             if (caching) {
                 await progress.delete(2000)
                 return Promise.resolve()
@@ -287,8 +324,11 @@ export default class Purge extends Plugin {
                 if (timestamp < allowTime) {
                     // old time: pass
                     del = true
-                }else if (gConfig.allowLast && multiplySelf) {
+                } else if (gConfig.allowLast && multiplySelf) {
                     // solo said: pass
+                    del = true
+                } else if (deleteALL) {
+                    // admin: pass
                     del = true
                 }
                 if (deleteALL || self) {
@@ -315,7 +355,10 @@ export default class Purge extends Plugin {
                 startMsg = await msg.channel.send(
                     sprintf(this.lang.purge.deleting, { total: deleteIDs.length })) as Discord.Message
             }
-            deleteIDs.unshift(msg.id, progress.id)
+            deleteIDs.unshift(msg.id)
+            if (progress != null) {
+                deleteIDs.unshift(progress.id)
+            }
             // remove
             while (deleteIDs.length > 0) {
                 const del = deleteIDs.splice(0, Math.min(deleteIDs.length, 100))
@@ -334,6 +377,78 @@ export default class Purge extends Plugin {
         }
         return Promise.resolve()
     }
+    public async onDestroy() {
+        this.tempDir.cleanup()
+        return super.onDestroy()
+    }
+    private async getCachedFile(fileid:string) {
+        if (!this.cacheFiles.has(fileid)) {
+            return null
+        }
+        const c = this.cacheFiles.get(fileid)
+        if (await fs.pathExists(c.filePath)) {
+            this.cacheFiles.delete(fileid)
+            return {
+                path: c.filePath,
+                attach: new Discord.Attachment(fs.createReadStream(c.filePath, {encoding: null}), c.fileName)
+            }
+        } else {
+            return null
+        }
+    }
+    private async addFileCache(files:Discord.Collection<string, Discord.MessageAttachment>, time:number) {
+        const now = Date.now()
+        for (const [key, attach] of files) {
+            const attachFile = path.resolve(this.tempDir.path, key)
+            try {
+                await fs.writeFile(attachFile, await request.get(attach.url, {encoding: null}))
+            } catch (err) {
+                Log.e(err)
+                continue
+            }
+            this.cacheFiles.set(attach.id, {
+                id: attach.id,
+                fileName: attach.filename,
+                fileSize: attach.filesize,
+                filePath: attachFile,
+                timestamp: time,
+            })
+        }
+        const fmaps:Array<{fsize:number, fkey:string}> = []
+        let totalSize:number = 0
+        for (const [key, cache] of this.cacheFiles) {
+            fmaps.push({
+                fsize: cache.fileSize,
+                fkey: key,
+            })
+            totalSize += cache.fileSize
+        }
+        for (const sizei of fmaps) {
+            const m = this.cacheFiles.get(sizei.fkey)
+            // total cache size: 209715200 (200MB)
+            // timestamp limit: one day
+            if (totalSize < 209715200 && now - m.timestamp <= 86400000) {
+                break
+            }
+            try {
+                await fs.remove(m.filePath)
+                this.cacheFiles.delete(sizei.fkey)
+                totalSize -= sizei.fsize
+            } catch (err) {
+                Log.e(err)
+            }
+        }
+    }
+    private getLastMsg(channelId:string) {
+        if (!this.listMessage.has(channelId)) {
+            return null
+        }
+        const ar = this.listMessage.get(channelId)
+        if (ar.length === 0) {
+            return null
+        }
+        return ar[0]
+    }
     /**
      * Ensure cache is up to date (or error)
      * 
@@ -343,14 +458,14 @@ export default class Purge extends Plugin {
      * @param caching override caching value
      * @returns State Message
      */
-    private async updateCache(channel:Discord.TextChannel, lastID:string, caching:boolean) {
+    private async updateCache(channel:Discord.TextChannel, lastID:string, useMsg = true) {
         // check cache
         const key = channel.id
-        if (!caching) {
+        if (!this.caching) {
             this.caching = true
             let rich:Discord.RichEmbed = null
             let lid:string = null
-            if (this.listMessage.has(key)) {
+            if (useMsg && this.listMessage.has(key)) {
                 const data = this.listMessage.get(key)
                 if (data.length >= 1) {
                     rich = this.defaultRich
@@ -366,7 +481,10 @@ export default class Purge extends Plugin {
                     rich.setDescription(url)
                 }
             }
-            const msg = await channel.send(this.lang.purge.fetchStart, rich).catch(() => null) as Discord.Message
+            let msg:Discord.Message
+            if (useMsg) {
+                msg = await channel.send(this.lang.purge.fetchStart, rich).catch(() => null) as Discord.Message
+            }
             // takes long!
             const msgIDs:MessageID[] = await this.fetchMessages(channel, lastID, lid).catch(() => [])
             this.caching = false
@@ -382,9 +500,13 @@ export default class Purge extends Plugin {
                 await msg.delete()
             }
             */
-            return msg
+            return useMsg ? msg : null
         } else {
-            return channel.send(this.lang.purge.fetching).catch(() => null) as Promise<Discord.Message>
+            if (useMsg) {
+                return channel.send(this.lang.purge.fetching).catch(() => null) as Promise<Discord.Message>
+            } else {
+                return null
+            }
         }
     }
     private cleanLinear(key:string, time:number) {
@@ -465,4 +587,11 @@ interface MessageID {
     authorId:string;
     msgId:string;
     timestamp:number;
+}
+interface AttachmentBackup {
+    id:string;
+    timestamp:number;
+    fileName:string;
+    filePath:string;
+    fileSize:number;
 }
