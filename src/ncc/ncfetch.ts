@@ -183,6 +183,27 @@ export default class NcFetch extends NcCredent {
                 }
             }
         }).get()
+        // new skin
+        if (members.length === 0) {
+            members = $(".tbl_cafe_info > tbody > tr").map((index, element) => {
+                const o = $(element).find("td")
+                switch (index) {
+                    case 0:
+                    return o.find(".cafe_name").text()
+                    case 1:
+                    return o.text()
+                    case 2:
+                    return o.find("img").length >= 1 ? o.find("img")[0].attribs["src"] : ""
+                    default: {
+                        const query = o.text().match(/카페멤버\s+:\s+\d+/i)
+                        if (query != null) {
+                            return query[0].match(/\d+/i)[0]
+                        }
+                        return null
+                    }
+                }
+            }).get()
+        }
         members = members.filter((_v) => _v != null)
         const cafe = {
             cafeId: cafeid,
