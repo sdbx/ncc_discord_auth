@@ -192,7 +192,7 @@ export default class Purge extends Plugin {
             await this.addFileCache(msg.attachments, msg.createdTimestamp)
         }
         const lastM = this.getLastMsg(msg.channel.id)
-        if (lastM == null || Date.now() - lastM.timestamp >= 43200000) {
+        if (lastM == null || Date.now() - lastM.timestamp >= 0) {
             // slient & no await.
             this.updateCache(msg.channel, msg.id, false)
         }
@@ -300,11 +300,17 @@ export default class Purge extends Plugin {
             // check cache
             const caching = this.caching
             const lastM = this.getLastMsg(msg.channel.id)
-            const progress = await this.updateCache(msg.channel, msg.id,
-                (lastM == null) || (Date.now() - lastM.timestamp >= 600000))
+            const progress = await this.updateCache(msg.channel, msg.id, true)
             if (caching) {
                 await progress.delete(2000)
                 return Promise.resolve()
+            }
+            const cacheArr = this.listMessage.get(msg.channel.id)
+            if (cacheArr == null || cacheArr.length === 0 || 
+                this.listMessage.get(msg.channel.id)[0].msgId !== msg.id) {
+                // reset cache
+                this.listMessage.delete(msg.channel.id)
+                await this.updateCache(msg.channel, msg.id, false)
             }
             // add queue
             this.working.push(msg.author.id)
@@ -355,7 +361,7 @@ export default class Purge extends Plugin {
                 startMsg = await msg.channel.send(
                     sprintf(this.lang.purge.deleting, { total: deleteIDs.length })) as Discord.Message
             }
-            deleteIDs.unshift(msg.id)
+            // deleteIDs.unshift(msg.id)
             if (progress != null) {
                 deleteIDs.unshift(progress.id)
             }
@@ -486,8 +492,8 @@ export default class Purge extends Plugin {
                 msg = await channel.send(this.lang.purge.fetchStart, rich).catch(() => null) as Discord.Message
             }
             // takes long!
-            const msgIDs:MessageID[] = await this.fetchMessages(channel, lastID, lid).catch(() => [])
-            this.caching = false
+            const msgIDs:MessageID[] = await this.fetchMessages(channel,
+                msg == null ? lastID : msg.id, lid).catch(() => [])
             if (lid == null) {
                 this.listMessage.set(key, msgIDs)
             } else {
@@ -495,6 +501,8 @@ export default class Purge extends Plugin {
                 this.cleanLinear(key, timeout)
                 this.listMessage.get(key).unshift(...msgIDs)
             }
+            Log.d("After", (Date.now() - this.listMessage.get(key)[0].timestamp) / 1000 + "")
+            this.caching = false
             /*
             if (msg != null) {
                 await msg.delete()
@@ -540,6 +548,7 @@ export default class Purge extends Plugin {
             })
             let i = 0
             for (const [k, fMsg] of fetch) {
+                msgid = fMsg.id
                 if (end != null && Number.isNaN(Number.parseInt(end))) {
                     Log.d("NaN", end)
                 }
@@ -556,11 +565,6 @@ export default class Purge extends Plugin {
                         msgId:fMsg.id,
                         timestamp: fMsg.createdTimestamp
                     })
-                }
-                if (i === fetch.size - 1) {
-                    // Log.d("Timestamp", (fMsg.createdTimestamp - timeout).toString())
-                    msgid = fMsg.id
-                    break
                 }
                 i += 1
             }
