@@ -34,14 +34,18 @@ export default class EventNotifier extends Plugin {
                 name: member.user.username,
                 mention: DiscordFormat.mentionUser(member.user.id),
             }))
+            await this.sendContent(guild, cfg.botCh, sprintf(this.lang.events.inUser, {
+                name: DiscordFormat.getNickname(member),
+            }), this.getUserInfo(member))
         }).bind(this))
         this.client.on("guildMemberRemove", (async (member:Discord.GuildMember) => {
             const guild = member.guild
             const cfg = await this.sub(this.config, guild.id)
             const nick = member.nickname != null ? member.nickname : member.user.username
+            
             await this.sendContent(guild, cfg.botCh, sprintf(this.lang.events.exitUser, {
-                name: nick,
-            }))
+                name: DiscordFormat.mentionUser(member.user.id),
+            }), this.getUserInfo(member))
         }).bind(this))
         this.client.on("guildMemberUpdate", (async (oldMember:Discord.GuildMember, newMember:Discord.GuildMember) => {
             const guild = newMember.guild

@@ -103,7 +103,7 @@ class PresenseConfig extends Config {
         super("presense")
     }
 }
-enum PresensePlaying {
+export enum PresensePlaying {
     playing = "playing",
     watching = "watching",
     streaming = "streaming",

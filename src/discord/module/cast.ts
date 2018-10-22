@@ -183,8 +183,8 @@ export default class Cast extends Plugin {
             }
         }
         if (sendContent.length >= 1) {
-            if (sendContent.startsWith(">") && sendContent.length >= 2) {
-                await room.sendSys(sendContent.substr(1))
+            if (sendContent.startsWith(">") && sendContent.length >= 2 && this.global.isAdmin(msg.author.id)) {
+                await room.sendSys(sendContent.substr(1).trim())
             } else {
                 await room.sendTextWithExtra(nick + " : " + sendContent, {
                     discordInfo: {

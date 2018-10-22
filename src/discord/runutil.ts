@@ -10,7 +10,7 @@ import { MainCfg } from "./runtime"
 const safeCmd = /(".+?")|('.+?')/i
 const seperator = "/"
 // tslint:disable-next-line
-class AcceptRegex {
+export class AcceptRegex {
     public static check(type:ParamAccept, str:string):string | null {
         if (type === ParamAccept.ANY) {
             return str
@@ -18,7 +18,7 @@ class AcceptRegex {
         let regex
         switch (type) {
             case ParamAccept.NUMBER: regex = /[0-9]+/i; break
-            case ParamAccept.USER: regex = /<@[0-9]+>/i; break
+            case ParamAccept.USER: regex = /<(@|@!)[0-9]+>/i; break
             case ParamAccept.CHANNEL: regex = /<#[0-9]+>/i; break
         }
         if (regex != null && regex.test(str)) {
@@ -921,6 +921,21 @@ export function humanFileSize(bytes:number, si:boolean = true):string {
         ++u
     } while (Math.abs(bytes) >= thresh && u < units.length - 1)
     return bytes.toFixed(1) + ' ' + units[u]
+}
+export function decodeDate(timestamp:number | Date, showHms = false) {
+    if (typeof timestamp === "number") {
+        timestamp = new Date(timestamp)
+    }
+    let out = `${timestamp.getFullYear()}년 ${timestamp.getMonth() + 1}월 ${timestamp.getDate()}일`
+    out += ` (${"일월화수목금토".charAt(timestamp.getDay())}요일)`
+    if (showHms) {
+        out += " " + (timestamp.getHours() >= 12 ? "오후" : "오전")
+        const hour = timestamp.getHours() % 12
+        out += ` ${hour <= 0 ? 12 : hour}시`
+        out += ` ${timestamp.getMinutes().toString(10).padStart(2, "0")}분`
+        out += ` ${timestamp.getSeconds().toString(10).padStart(2, "0")}초`
+    }
+    return out
 }
 /**
  * Clone message

@@ -12,10 +12,11 @@ import Ncc from "../ncc/ncc"
 import Profile from "../ncc/structure/profile"
 import { IRuntime } from "./iruntime"
 import Lang from "./lang"
+import { PresensePlaying } from "./module/presense"
 import { blankChar, ChainData, CmdParam, UniqueID } from "./rundefine"
 import { MainCfg } from "./runtime"
 import { cloneMessage, CommandHelp,
-    getFirst, getFirstMap, getRichTemplate } from "./runutil"
+    decodeDate, DiscordFormat, getFirst, getFirstMap, getRichTemplate } from "./runutil"
 /**
  * The base of bot command executor
  * @class 플러그인
@@ -634,6 +635,61 @@ export default abstract class Plugin {
         }
         webhook.client.options.disableEveryone = true
         return webhook
+    }
+    /**
+     * Get user's info like other bot.
+     * @param member Guild's member or dm member?
+     */
+    protected getUserInfo(member:Discord.GuildMember | Discord.User) {
+        const rich = new Discord.RichEmbed()
+        let user:Discord.User
+        if (member instanceof Discord.GuildMember) {
+            user = member.user
+            if (member.displayColor !== 0x000000) {
+                rich.setColor(member.displayColor)
+                rich.addField("색상", member.displayHexColor.toUpperCase())
+            }
+        } else {
+            user = member
+        }
+        rich.setTitle(DiscordFormat.getNickname(member))
+        rich.setDescription(DiscordFormat.mentionUser(member.id))
+        rich.setThumbnail(DiscordFormat.getAvatarImage(member))
+        rich.addField("아이디", user.tag, true)
+        if (member instanceof Discord.GuildMember && member.nickname != null) {
+            rich.addField("길드 별명", member.nickname, true)
+        }
+        rich.addField("디스코드 가입일", decodeDate(user.createdAt, true))
+        if (member instanceof Discord.GuildMember) {
+            rich.addField(member.guild.name + " 서버 가입일", decodeDate(member.joinedAt, true))
+            if (member.roles.size <= 1) {
+                rich.addField("그룹", "기본")
+            } else {
+                rich.addField("그룹", member.roles
+                    .filter((v) => v.position >= 1).map((v) => v.name).join(","))
+            }
+        }
+        let state:string
+        switch (member.presence.status) {
+            case "online": state = "온라인"; break
+            case "offline": state = "오프라인"; break
+            case "idle": state = "자리비움"; break
+            case "dnd": state = "바쁨"; break
+            default: state = "모름"; break // jam
+        }
+        if (member.presence.game != null && member.presence.game.name != null) {
+            let type:string
+            switch (member.presence.game.type) {
+                case 0: type = "플레이 중"; break
+                case 1: type = "방송 중"; break
+                case 2: type = "듣는 중"; break
+                case 3: type = "보는 중"; break
+                default: type = "중"; break
+            }
+            state += `, \`${member.presence.game.name}\` ${type}`
+        }
+        rich.addField("상태", state)
+        return rich
     }
     /**
      * Filter editable configs

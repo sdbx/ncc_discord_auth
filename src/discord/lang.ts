@@ -49,6 +49,7 @@ export default class Lang extends Config {
         setBotCh: "봇 채널 설정 완료!",
         exitUser: "%(name)s님이 나갔습니다.",
         changeNick: "닉네임이 바뀌었습니다.",
+        inUser: "%(name)s님이 들어왔습니다."
     }
     /*
      * Module: gather
@@ -79,6 +80,8 @@ export default class Lang extends Config {
         authed: "인증 완료!",
         already_auth: "이미 인증 완료된 아이디입니다.",
         expiredAuth: "이미 유효 기간이 지났습니다.",
+        notFoundU: "유저를 찾을 수 없습니다.",
+        banned: "%(id)s 아이디를 밴했습니다.",
     }
     public color = {
         colorSuccess: "색상이 적용됐습니다.",

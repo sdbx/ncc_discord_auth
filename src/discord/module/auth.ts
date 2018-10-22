@@ -9,8 +9,8 @@ import { ChannelType } from "../../ncc/talk/ncbasechannel"
 import NcChannel from "../../ncc/talk/ncchannel"
 import NcMessage from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
-import { CmdParam, ParamType, UniqueID } from "../rundefine"
-import { CommandHelp, DiscordFormat, getFirst } from "../runutil"
+import { CmdParam, ParamAccept, ParamType, UniqueID } from "../rundefine"
+import { AcceptRegex, CommandHelp, DiscordFormat, getFirst } from "../runutil"
 
 export default class Auth extends Plugin {
     protected defaultConfig = {
@@ -23,6 +23,7 @@ export default class Auth extends Plugin {
     // declare command.
     private authNaver:CommandHelp
     private infoNaver:CommandHelp
+    private banNaver:CommandHelp
     /**
      * Initialize command
      */
@@ -34,9 +35,12 @@ export default class Auth extends Plugin {
         this.authNaver.addField(ParamType.to, "계정", true, {code: [PType.ID, PType.NICK]})
         this.authNaver.complex = true
         // info
-        this.infoNaver = new CommandHelp("알려", "네이버 아이디의 정보가 필요할 때", true)
+        this.infoNaver = new CommandHelp("알려/cafe", "네이버 아이디의 정보가 필요할 때", true)
         this.infoNaver.addField(ParamType.dest, "유저 혹은 아이디", true, {code: [PType.ID, PType.NICK, PType.DISCORD]})
         this.infoNaver.complex = true
+        // ban
+        this.banNaver = new CommandHelp("밴/ban", "아이디를 밴 합니다.", false)
+        this.banNaver.addField(ParamType.dest, "유저 혹은 아이디", true, {code: [PType.ID, PType.DISCORD]})
         // ncc-listen
         this.ncc_listen = this.onNccMessage.bind(this)
         this.ncc.on(NccEvents.message, this.ncc_listen)
@@ -60,6 +64,7 @@ export default class Auth extends Plugin {
         const channel = msg.channel
         const testAuth = this.authNaver.check(this.global,command, state)
         const testInfo = this.infoNaver.check(this.global,command, state)
+        const testBan = this.banNaver.check(this.global, command, state)
         if (testAuth.match) {
             // check naver
             if (!await this.ncc.availableAsync()) {
@@ -263,6 +268,40 @@ export default class Auth extends Plugin {
                 }
                 await channel.send(rich)
             }
+        } else if (testBan.match) {
+            const dest = testBan.get(ParamType.dest)
+            const code = testBan.code(ParamType.dest)
+            const cfg = await this.subUnique(this.config, msg, UniqueID.guild)
+            if (code === PType.ID) {
+                const validID = /[0-9A-Za-z_-]+/i
+                if (validID.test(dest)) {
+                    await msg.channel.send(sprintf(this.lang.auth.banned, {id: dest}))
+                    cfg.banusers.push(dest)
+                }
+            } else if (code === PType.DISCORD) {
+                let banUid:string
+                const mention = AcceptRegex.check(ParamAccept.USER, dest)
+                if (mention != null) {
+                    const banU = this.client.users.find((v) => v.id === mention)
+                    if (banU != null) {
+                        banUid = banU.id
+                    }
+                } else {
+                    const banU = msg.guild.members.find((v) => DiscordFormat.getNickname(v) === dest)
+                    if (banU != null) {
+                        banUid = banU.id
+                    }
+                }
+                if (banUid != null) {
+                    const uid = getFirst(cfg.users.filter((v) => v.userID === banUid))
+                    if (uid != null) {
+                        cfg.banusers.push(uid.naverID)
+                        await msg.channel.send(sprintf(this.lang.auth.banned, {id: uid.naverID}))
+                        return
+                    }
+                }
+                await msg.channel.send(this.lang.auth.notFoundU)
+            }
         }
         return Promise.resolve()
     }
@@ -321,6 +360,15 @@ export default class Auth extends Plugin {
             await channel.sendText(this.lang.auth.authed)
         }
         await this.break(queue, channel.channelID)
+    }
+    protected async haveBanned(guildID:string, nID:string) {
+        const guildCfg = await this.sub(this.config, guildID)
+        for (const u of guildCfg.banusers) {
+            if (u === nID) {
+                return true
+            }
+        }
+        return false
     }
     protected async haveAuthed(guildID:string, nID:string, uID:string):Promise<boolean> {
         let out = false
@@ -453,6 +501,7 @@ export class AuthConfig extends Config {
     public timeout = 600
     public commentURL = "cafeURL"
     public destRole = "destRole"
+    public banusers:string[] = []
     public users:AuthUser[] = []
     public proxyChannel = "1234"
     // proxy oauth
