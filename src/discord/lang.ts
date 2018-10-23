@@ -80,8 +80,11 @@ export default class Lang extends Config {
         authed: "인증 완료!",
         already_auth: "이미 인증 완료된 아이디입니다.",
         expiredAuth: "이미 유효 기간이 지났습니다.",
-        notFoundU: "유저를 찾을 수 없습니다.",
-        banned: "%(id)s 아이디를 밴했습니다.",
+        notFoundU: "%(id)s 유저를 찾을 수 없습니다.",
+        banned: "%(id)s 아이디를 %(date)s 밴했습니다.",
+        unbanned: "%(id)s 아이디의 밴을 해제했습니다.",
+        blockedAuth: "%(id)s 아이디는 %(date)s 금지됐습니다.",
+        noPerm: "밴 권한이 없습니다.",
     }
     public color = {
         colorSuccess: "색상이 적용됐습니다.",

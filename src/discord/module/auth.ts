@@ -10,7 +10,7 @@ import NcChannel from "../../ncc/talk/ncchannel"
 import NcMessage from "../../ncc/talk/ncmessage"
 import Plugin from "../plugin"
 import { CmdParam, ParamAccept, ParamType, UniqueID } from "../rundefine"
-import { AcceptRegex, CommandHelp, DiscordFormat, getFirst } from "../runutil"
+import { AcceptRegex, CommandHelp, decodeDate, DiscordFormat, getFirst } from "../runutil"
 
 export default class Auth extends Plugin {
     protected defaultConfig = {
@@ -24,6 +24,7 @@ export default class Auth extends Plugin {
     private authNaver:CommandHelp
     private infoNaver:CommandHelp
     private banNaver:CommandHelp
+    private unbanNaver:CommandHelp
     /**
      * Initialize command
      */
@@ -39,8 +40,12 @@ export default class Auth extends Plugin {
         this.infoNaver.addField(ParamType.dest, "유저 혹은 아이디", true, {code: [PType.ID, PType.NICK, PType.DISCORD]})
         this.infoNaver.complex = true
         // ban
-        this.banNaver = new CommandHelp("밴/ban", "아이디를 밴 합니다.", false)
+        this.banNaver = new CommandHelp("밴/ban", "아이디를 밴 합니다.", true, {chatType: "guild"})
         this.banNaver.addField(ParamType.dest, "유저 혹은 아이디", true, {code: [PType.ID, PType.DISCORD]})
+        this.banNaver.addField(ParamType.period, "밴 할 시간", false)
+        // unban
+        this.unbanNaver = new CommandHelp("밴 해제/unban", "아이디의 밴을 해제합니다.", true, {chatType: "guild"})
+        this.unbanNaver.addField(ParamType.dest, "아이디", true, {code: [PType.ID]})
         // ncc-listen
         this.ncc_listen = this.onNccMessage.bind(this)
         this.ncc.on(NccEvents.message, this.ncc_listen)
@@ -65,6 +70,7 @@ export default class Auth extends Plugin {
         const testAuth = this.authNaver.check(this.global,command, state)
         const testInfo = this.infoNaver.check(this.global,command, state)
         const testBan = this.banNaver.check(this.global, command, state)
+        const testUnban = this.unbanNaver.check(this.global, command, state)
         if (testAuth.match) {
             // check naver
             if (!await this.ncc.availableAsync()) {
@@ -121,9 +127,21 @@ export default class Auth extends Plugin {
                 return Promise.resolve()
             }
             /**
+             * Check banned
+             */
+            const baninfo = await this.haveBanned(msg.guild.id, member.userid)
+            if (baninfo.banned) {
+                const sender = DiscordFormat.getUserProfile(msg.member)
+                await channel.send(sprintf(this.lang.auth.blockedAuth, {
+                    id: member.userid,
+                    date: baninfo.expired >= 0 ? `\`${decodeDate(baninfo.expired, true)}\`까지` : "영원히",
+                }), await this.getRichByNaver(member, ...sender))
+                return Promise.resolve()
+            }
+            /**
              * Check authed
              */
-            if (await this.haveAuthed(msg.guild.id,member.userid, msg.author.id)) {
+            if (await this.haveAuthed(msg.guild.id, member.userid, msg.author.id)) {
                 await channel.send(this.lang.auth.already_auth)
                 return Promise.resolve()
             }
@@ -269,14 +287,22 @@ export default class Auth extends Plugin {
                 await channel.send(rich)
             }
         } else if (testBan.match) {
+            if (!await this.ncc.availableAsync()) {
+                await channel.send(this.lang.noNaver)
+                return Promise.resolve()
+            }
+            if (!msg.member.hasPermission("BAN_MEMBERS") && !this.global.isAdmin(msg.member.id)) {
+                await msg.channel.send(this.lang.auth.noPerm)
+                return Promise.resolve()
+            }
             const dest = testBan.get(ParamType.dest)
             const code = testBan.code(ParamType.dest)
             const cfg = await this.subUnique(this.config, msg, UniqueID.guild)
+            let banUser:string
             if (code === PType.ID) {
                 const validID = /[0-9A-Za-z_-]+/i
                 if (validID.test(dest)) {
-                    await msg.channel.send(sprintf(this.lang.auth.banned, {id: dest}))
-                    cfg.banusers.push(dest)
+                    banUser = dest
                 }
             } else if (code === PType.DISCORD) {
                 let banUid:string
@@ -295,12 +321,74 @@ export default class Auth extends Plugin {
                 if (banUid != null) {
                     const uid = getFirst(cfg.users.filter((v) => v.userID === banUid))
                     if (uid != null) {
-                        cfg.banusers.push(uid.naverID)
-                        await msg.channel.send(sprintf(this.lang.auth.banned, {id: uid.naverID}))
-                        return
+                        banUser = uid.naverID
                     }
                 }
-                await msg.channel.send(this.lang.auth.notFoundU)
+            }
+            let period = 0
+            const periodStr = testBan.get(ParamType.period)
+            if (periodStr != null) {
+                const safeGet = (arr:RegExpMatchArray) => {
+                    if (arr == null) {
+                        return 0
+                    }
+                    const str = getFirst(arr)
+                    const n = Number.parseInt(getFirst(str.match(/\d+/i)))
+                    if (Number.isNaN(n)) {
+                        return 0
+                    }
+                    return n
+                }
+                const sec = safeGet(periodStr.match(/\d+초/i))
+                const min = safeGet(periodStr.match(/\d+분/i)) * 60
+                const hour = safeGet(periodStr.match(/\d+시간/i)) * 3600
+                const day = safeGet(periodStr.match(/\d+일/i)) * 86400
+                period = sec + min + hour + day
+            }
+            if (banUser != null) {
+                const expire = (period <= 0 ? -1 : Date.now() + period * 1000)
+                let found = false
+                for (const bu of cfg.banusers) {
+                    if (bu.userid === banUser) {
+                        found = true
+                        bu.expire = expire
+                        break
+                    }
+                }
+                if (!found) {
+                    cfg.banusers.push({
+                        userid: banUser,
+                        expire,
+                    })
+                }
+                await cfg.export()
+                await msg.channel.send(sprintf(this.lang.auth.banned, {
+                    id: banUser,
+                    date: expire >= 0 ? `\`${decodeDate(expire, true)}\`까지` : "영원히",
+                }))
+            } else {
+                await msg.channel.send(sprintf(this.lang.auth.notFoundU, {id: dest}))
+            }
+        } else if (testUnban.match) {
+            if (!msg.member.hasPermission("BAN_MEMBERS") && !this.global.isAdmin(msg.member.id)) {
+                await msg.channel.send(this.lang.auth.noPerm)
+                return Promise.resolve()
+            }
+            const dest = testUnban.get(ParamType.dest)
+            const guildCfg = await this.subUnique(this.config, msg, UniqueID.guild)
+            let changed:string = null
+            for (let i = 0; i < guildCfg.banusers.length; i += 1) {
+                const id = guildCfg.banusers[i].userid
+                if (dest === id) {
+                    guildCfg.banusers.splice(i, 1)
+                    changed = id
+                    break
+                }
+            }
+            if (changed != null) {
+                await msg.channel.send(sprintf(this.lang.auth.unbanned, {id: changed}))
+            } else {
+                await msg.channel.send(sprintf(this.lang.auth.notFoundU, {id: dest}))
             }
         }
         return Promise.resolve()
@@ -361,14 +449,20 @@ export default class Auth extends Plugin {
         }
         await this.break(queue, channel.channelID)
     }
-    protected async haveBanned(guildID:string, nID:string) {
+    protected async haveBanned(guildID:string, nID:string):Promise<{banned:boolean, expired?:number}> {
         const guildCfg = await this.sub(this.config, guildID)
-        for (const u of guildCfg.banusers) {
-            if (u === nID) {
-                return true
+        for (let i = 0; i < guildCfg.banusers.length; i += 1) {
+            const u = guildCfg.banusers[i]
+            if (u.userid === nID) {
+                if (u.expire > 0 && Date.now() > u.expire) {
+                    guildCfg.banusers.splice(i, 1)
+                    return {banned: false}
+                } else {
+                    return {banned: true, expired: u.expire}
+                }
             }
         }
-        return false
+        return {banned: false}
     }
     protected async haveAuthed(guildID:string, nID:string, uID:string):Promise<boolean> {
         let out = false
@@ -496,12 +590,16 @@ class AuthInfo extends AuthUser {
     public uInviteCode:string // unique
     public proxyID:string
 }
+interface BanInfo {
+    userid:string
+    expire?:number
+}
 export class AuthConfig extends Config {
     public guildName = "Sample"
     public timeout = 600
     public commentURL = "cafeURL"
     public destRole = "destRole"
-    public banusers:string[] = []
+    public banusers:BanInfo[] = []
     public users:AuthUser[] = []
     public proxyChannel = "1234"
     // proxy oauth

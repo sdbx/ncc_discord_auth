@@ -49,6 +49,10 @@ export enum ParamType {
      * 숫자? (만큼)
      */
     much = "만큼",
+    /**
+     * 기간? (동안)
+     */
+    period = "동안",
 }
 /**
  * Dummy, When to use?

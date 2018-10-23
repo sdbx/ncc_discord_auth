@@ -192,7 +192,7 @@ export default class Purge extends Plugin {
             await this.addFileCache(msg.attachments, msg.createdTimestamp)
         }
         const lastM = this.getLastMsg(msg.channel.id)
-        if (lastM == null || Date.now() - lastM.timestamp >= 0) {
+        if (lastM == null || Date.now() - lastM.timestamp >= 600000) {
             // slient & no await.
             this.updateCache(msg.channel, msg.id, false)
         }
