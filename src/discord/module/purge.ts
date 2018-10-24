@@ -312,6 +312,8 @@ export default class Purge extends Plugin {
                 this.listMessage.delete(msg.channel.id)
                 await this.updateCache(msg.channel, msg.id, false)
             }
+            // add one more count
+            deleteCount += 1
             // add queue
             this.working.push(msg.author.id)
             // add
