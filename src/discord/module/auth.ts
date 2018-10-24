@@ -442,7 +442,7 @@ export default class Auth extends Plugin {
         return Promise.resolve(null)
     }
     protected async onNccMessage(channel:NcChannel, message:NcMessage) {
-        const roomID = message.id
+        const roomID = message.channelId
         const queue = this.getFirst(this.authQueue.filter((_v) => _v.uChatID === roomID))
         if (queue == null || queue.naverID !== message.author.naverId) {
             return Promise.resolve()
