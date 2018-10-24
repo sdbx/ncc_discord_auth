@@ -315,8 +315,6 @@ export default class Purge extends Plugin {
                 this.listMessage.delete(msg.channel.id)
                 await this.updateCache(msg.channel, msg.id, false)
             }
-            // add one more count
-            deleteCount += 1
             // add queue
             this.working.push(msg.author.id)
             // add
@@ -332,7 +330,7 @@ export default class Purge extends Plugin {
                     multiplySelf = false
                 }
                 let del = false
-                if (timestamp < allowTime) {
+                if (timestamp <= allowTime) {
                     // old time: pass
                     del = true
                 } else if (gConfig.allowLast && multiplySelf) {
@@ -366,7 +364,7 @@ export default class Purge extends Plugin {
                 startMsg = await msg.channel.send(
                     sprintf(this.lang.purge.deleting, { total: deleteIDs.length })) as Discord.Message
             }
-            // deleteIDs.unshift(msg.id)
+            deleteIDs.unshift(msg.id)
             if (progress != null) {
                 deleteIDs.unshift(progress.id)
             }
@@ -472,25 +470,26 @@ export default class Purge extends Plugin {
     private async updateCache(channel:Discord.TextChannel, lastID:string, useMsg = true) {
         // check cache
         const key = channel.id
-        Log.d("Caching", this.caching ? "true" : "false")
         if (!this.caching) {
             this.caching = true
             let rich:Discord.RichEmbed = null
             let lid:string = null
-            if (useMsg && this.listMessage.has(key)) {
+            if (this.listMessage.has(key)) {
                 const data = this.listMessage.get(key)
                 if (data.length >= 1) {
-                    rich = this.defaultRich
                     lid = data[0].msgId
-                    const snowC = SnowFlake.from(lid)
-                    const snowN = SnowFlake.from(lastID)
-                    rich.addField("캐시 크기", data.length)
-                    rich.addField("캐시 ID", snowC.increment, true)
-                    rich.addField("현재 ID", snowN.increment, true)
-                    rich.addField("캐시 Timestamp", snowC.timestamp)
-                    rich.addField("현재 Timestamp", snowN.timestamp)
-                    const url = "https://discordapp.com/channels/" + [channel.guild.id, channel.id, lid].join("/")
-                    rich.setDescription(url)
+                    if (useMsg) {
+                        rich = this.defaultRich
+                        const snowC = SnowFlake.from(lid)
+                        const snowN = SnowFlake.from(lastID)
+                        rich.addField("캐시 크기", data.length)
+                        rich.addField("캐시 ID", snowC.increment, true)
+                        rich.addField("현재 ID", snowN.increment, true)
+                        rich.addField("캐시 Timestamp", snowC.timestamp)
+                        rich.addField("현재 Timestamp", snowN.timestamp)
+                        const url = "https://discordapp.com/channels/" + [channel.guild.id, channel.id, lid].join("/")
+                        rich.setDescription(url)
+                    }
                 }
             }
             let msg:Discord.Message
@@ -499,7 +498,7 @@ export default class Purge extends Plugin {
             }
             // takes long!
             const msgIDs:MessageID[] = await this.fetchMessages(channel,
-                msg == null ? lastID : msg.id, lid).catch(() => [])
+                msg == null ? lastID : lastID, lid).catch(() => [])
             if (lid == null) {
                 this.listMessage.set(key, msgIDs)
             } else {
@@ -507,8 +506,6 @@ export default class Purge extends Plugin {
                 this.cleanLinear(key, timeout)
                 this.listMessage.get(key).unshift(...msgIDs)
             }
-            // Log.d("After", (Date.now() - this.listMessage.get(key)[0].timestamp) / 1000 + "")
-            Log.d("Cache", "Updated!")
             this.caching = false
             /*
             if (msg != null) {

@@ -199,7 +199,13 @@ export default class Auth extends Plugin {
              * Send text to ncc room
              */
             const profile = DiscordFormat.getUserProfile(msg.member)
-            await room.sendCustomEmbed(sprintf(this.lang.auth.nccmessage, {
+            let nccmessage:string
+            if (guildCfg.nccmsg.length === 0 || guildCfg.nccmsg === "기본") {
+                nccmessage = this.lang.auth.nccmessage
+            } else {
+                nccmessage = guildCfg.nccmsg.replace(/\\n/ig, "\n")
+            }
+            await room.sendCustomEmbed(sprintf(nccmessage, {
                 link: invite.url,
                 user: profile[0],
             }), {
@@ -602,6 +608,7 @@ export class AuthConfig extends Config {
     public banusers:BanInfo[] = []
     public users:AuthUser[] = []
     public proxyChannel = "1234"
+    public nccmsg = ""
     // proxy oauth
     // https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=35
     constructor() {
