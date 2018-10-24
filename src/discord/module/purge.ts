@@ -191,10 +191,12 @@ export default class Purge extends Plugin {
         if (msg.attachments.size >= 1 && msg.guild.channels.find((v) => v.id === sub.backupChannel)) {
             await this.addFileCache(msg.attachments, msg.createdTimestamp)
         }
-        const lastM = this.getLastMsg(msg.channel.id)
-        if (lastM == null || Date.now() - lastM.timestamp >= 600000) {
-            // slient & no await.
-            this.updateCache(msg.channel, msg.id, false)
+        if (msg.content.length >= 1 && !this.purge.check(this.global, msg.content).match) {
+            const lastM = this.getLastMsg(msg.channel.id)
+            if (lastM == null || Date.now() - lastM.timestamp >= 600000) {
+                // slient & no await.
+                this.updateCache(msg.channel, msg.id, false)
+            }
         }
         return
     }
@@ -302,7 +304,8 @@ export default class Purge extends Plugin {
             const lastM = this.getLastMsg(msg.channel.id)
             const progress = await this.updateCache(msg.channel, msg.id, true)
             if (caching) {
-                await progress.delete(2000)
+                await msg.delete()
+                await progress.delete(5000)
                 return Promise.resolve()
             }
             const cacheArr = this.listMessage.get(msg.channel.id)
@@ -469,6 +472,7 @@ export default class Purge extends Plugin {
     private async updateCache(channel:Discord.TextChannel, lastID:string, useMsg = true) {
         // check cache
         const key = channel.id
+        Log.d("Caching", this.caching ? "true" : "false")
         if (!this.caching) {
             this.caching = true
             let rich:Discord.RichEmbed = null
@@ -504,6 +508,7 @@ export default class Purge extends Plugin {
                 this.listMessage.get(key).unshift(...msgIDs)
             }
             // Log.d("After", (Date.now() - this.listMessage.get(key)[0].timestamp) / 1000 + "")
+            Log.d("Cache", "Updated!")
             this.caching = false
             /*
             if (msg != null) {

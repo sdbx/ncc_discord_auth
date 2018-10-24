@@ -102,7 +102,7 @@ export default class Lang extends Config {
         deletedMsg: "메세지를 삭제했습니다.",
         editedMsg: "메세지를 수정했습니다.",
         working: "진행중입니다.",
-        fetching: "메세지 목록을 받아오고 있습니다.",
+        fetching: "이미 메시지 목록을 동기화 중입니다. 잠시만 기다려주세요.",
     }
     public perm = {
         noPermMangeRole: "Role을 관리하는 권한이 없습니다.",

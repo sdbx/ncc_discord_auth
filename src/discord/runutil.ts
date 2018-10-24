@@ -89,6 +89,13 @@ export class CommandHelp {
             command: "",
         }
         const encoded = this.encode(content)
+        if (state === undefined) {
+            state = {
+                isAdmin: false,
+                isDM: true,
+                isSimple: false,
+            }
+        }
         let message = encoded.encoded
         if ((this.reqAdmin && !state.isAdmin) || this.chatType === (!state.isDM ? "dm" : "guild")) {
             return new CommandStatus(output.match, output.reqParam, output.requires,
