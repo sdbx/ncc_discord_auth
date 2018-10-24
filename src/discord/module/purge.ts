@@ -541,15 +541,18 @@ export default class Purge extends Plugin {
     private async fetchMessages(channel:Discord.TextChannel, lastID:string, end:string = null) {
         // limit of bulkdelete
         const timeout = Date.now() - timeLimit
-        let msgid = lastID
+        let msgid// = lastID
         const messages:MessageID[] = []
+        let limiter = 30
         while (true) {
             let breakL = false
             const fetch = await channel.fetchMessages({
-                limit: bulkLimit,
+                limit: limiter,
                 before: msgid,
                 // after: end,
             })
+            limiter = Math.min(100, limiter + 20)
+            Log.d("Length", fetch.size + "")
             let i = 0
             for (const [k, fMsg] of fetch) {
                 msgid = fMsg.id
@@ -572,6 +575,7 @@ export default class Purge extends Plugin {
                 }
                 i += 1
             }
+            Log.d("Breaker", "Breaker? " + breakL)
             if (fetch.size < bulkLimit) {
                 breakL = true
             }
