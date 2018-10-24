@@ -503,7 +503,7 @@ export default class Purge extends Plugin {
                 this.cleanLinear(key, timeout)
                 this.listMessage.get(key).unshift(...msgIDs)
             }
-            Log.d("After", (Date.now() - this.listMessage.get(key)[0].timestamp) / 1000 + "")
+            // Log.d("After", (Date.now() - this.listMessage.get(key)[0].timestamp) / 1000 + "")
             this.caching = false
             /*
             if (msg != null) {
