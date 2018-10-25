@@ -531,14 +531,18 @@ export default class Purge extends Plugin {
         const list = this.listMessage.get(key)
         const length = list.length
         // tslint:disable-next-line
-        let i;
-        for (i = length - 1; i >= 0; --i) {
+        let deletes = 0
+        for (let i = length - 1; i >= 0; --i) {
             const msg = list[i]
             if (msg.timestamp > time) {
                 break
+            } else {
+                deletes += 1
             }
         }
-        list.splice(i,length - i)
+        if (deletes >= 1) {
+            list.splice(length - deletes, deletes)
+        }
     }
     /**
      * Fetch Messages from channel
@@ -562,7 +566,7 @@ export default class Purge extends Plugin {
                 fetches = [await channel.fetchMessage(start)]
             } else {
                 fetches = (await channel.fetchMessages({
-                    limit: 100,
+                    limit: bulkLimit,
                     before: msgid,
                 })).array()
             }
