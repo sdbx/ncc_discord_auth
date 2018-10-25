@@ -1013,13 +1013,13 @@ export class SnowFlake {
         const L = Long.fromString(snowflake, true, 10)
         const th = new SnowFlake()
         
-        th.timestamp = new Date(L.shiftRight(22).toNumber() + 1420070400000)
+        th.timestamp = L.shiftRight(22).toNumber() + 1420070400000
         th.increment = L.and(0xFFF).toNumber()
         th.iWorkerID = L.and(0x3E0000).shiftRight(17).toNumber()
         th.iProcessID = L.and(0x1F000).shiftRight(12).toNumber()
         return th
     }
-    public timestamp:Date
+    public timestamp:number
     public increment:number
     private iWorkerID:number
     private iProcessID:number

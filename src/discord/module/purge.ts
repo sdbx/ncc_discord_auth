@@ -355,7 +355,7 @@ export default class Purge extends Plugin {
                     i -= 1
                     deleteIDs.push(msgId.toString())
                 }
-                if (!all && deleteIDs.length >= deleteCount) {
+                if (!all && deleteIDs.length > deleteCount) {
                     break
                 }
             }
@@ -364,7 +364,7 @@ export default class Purge extends Plugin {
                 startMsg = await msg.channel.send(
                     sprintf(this.lang.purge.deleting, { total: deleteIDs.length })) as Discord.Message
             }
-            deleteIDs.unshift(msg.id)
+            // deleteIDs.unshift(msg.id)
             if (progress != null) {
                 deleteIDs.unshift(progress.id)
             }
@@ -497,11 +497,13 @@ export default class Purge extends Plugin {
                 msg = await channel.send(this.lang.purge.fetchStart, rich).catch(() => null) as Discord.Message
             }
             // takes long!
-            const msgIDs:MessageID[] = await this.fetchMessages(channel,
-                msg == null ? lastID : lastID, lid).catch(() => [])
+            const msgIDs:MessageID[] = await this.fetchMessages(channel, lastID, lid).catch(() => [])
             if (lid == null) {
                 this.listMessage.set(key, msgIDs)
             } else {
+                if (msgIDs.length >= 1 && msgIDs[msgIDs.length - 1].msgId === lid) {
+                    msgIDs.splice(msgIDs.length - 1, 1)
+                }
                 const timeout = Date.now() - timeLimit
                 this.cleanLinear(key, timeout)
                 this.listMessage.get(key).unshift(...msgIDs)
@@ -538,52 +540,76 @@ export default class Purge extends Plugin {
         }
         list.splice(i,length - i)
     }
-    private async fetchMessages(channel:Discord.TextChannel, lastID:string, end:string = null) {
+    /**
+     * Fetch Messages from channel
+     * @param channel Channel
+     * @param start The last message of parse (recent)
+     * @param breaker The Breaker.
+     */
+    private async fetchMessages(channel:Discord.TextChannel, start:string, end?:string,
+        incStart = true) {
         // limit of bulkdelete
         const timeout = Date.now() - timeLimit
-        let msgid// = lastID
+        let msgid:string
         const messages:MessageID[] = []
-        let limiter = 30
-        while (true) {
-            let breakL = false
-            const fetch = await channel.fetchMessages({
-                limit: limiter,
-                before: msgid,
-                // after: end,
-            })
-            limiter = Math.min(100, limiter + 20)
-            Log.d("Length", fetch.size + "")
-            let i = 0
-            for (const [k, fMsg] of fetch) {
-                msgid = fMsg.id
-                if (end != null && Number.isNaN(Number.parseInt(end))) {
-                    Log.d("NaN", end)
+        if (!incStart) {
+            msgid = start
+        }
+        let breakL = false
+        while (!breakL) {
+            let fetches:Discord.Message[]
+            if (msgid === undefined) {
+                fetches = [await channel.fetchMessage(start)]
+            } else {
+                fetches = (await channel.fetchMessages({
+                    limit: 100,
+                    before: msgid,
+                })).array()
+            }
+            for (const msg of fetches) {
+                if (end != null) {
+                    if (Number.isNaN(Number.parseInt(end))) {
+                        throw new Error("Wrong Coding.")
+                    } else if (msg.createdTimestamp < SnowFlake.from(end).timestamp) {
+                        breakL = true
+                    }
                 }
-                if (end != null && Number.parseInt(fMsg.id) <= Number.parseInt(end)) {
+                if (msg.createdTimestamp < timeout) {
                     breakL = true
-                    break
                 }
-                if (fMsg.createdTimestamp < timeout) {
-                    breakL = true
-                    break
+                if (!breakL) {
+                    messages.push(this.asSimple(msg))
                 } else {
-                    messages.push({
-                        authorId:fMsg.author.id,
-                        msgId:fMsg.id,
-                        timestamp: fMsg.createdTimestamp
-                    })
+                    break
                 }
-                i += 1
             }
-            Log.d("Breaker", "Breaker? " + breakL)
-            if (fetch.size < bulkLimit) {
+            if (fetches.length >= 1) {
+                msgid = fetches[fetches.length - 1].id
+            } else {
                 breakL = true
-            }
-            if (breakL) {
-                break
             }
         }
         return messages
+    }
+    private asSimple(msg:Discord.Message):MessageID {
+        let content = msg.content
+        if (msg.attachments.size >= 1) {
+            for (const [, attach] of msg.attachments) {
+                if (content.length >= 1) {
+                    content += `\n${attach.filename} (${attach.url})`
+                } else {
+                    content += `${attach.filename} (${attach.url})`
+                }
+                break
+            }
+        }
+        return {
+            authorId: msg.author.id,
+            authorName: DiscordFormat.getNickname(msg.member),
+            content,
+            msgId: msg.id,
+            timestamp: msg.createdTimestamp,
+        }
     }
 }
 class PurgeConfig extends Config {
@@ -597,7 +623,9 @@ class PurgeConfig extends Config {
 }
 interface MessageID {
     authorId:string;
+    authorName:string;
     msgId:string;
+    content:string;
     timestamp:number;
 }
 interface AttachmentBackup {
@@ -606,4 +634,9 @@ interface AttachmentBackup {
     fileName:string;
     filePath:string;
     fileSize:number;
+}
+enum MessageCheck {
+    SKIP,
+    BREAK,
+    PASS,
 }
