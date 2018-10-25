@@ -63,6 +63,7 @@ export default class NcJson<T> {
         if (msg == null) {
             return "Unknown."
         }
+        return msg
     }
 }
 interface NcError {
