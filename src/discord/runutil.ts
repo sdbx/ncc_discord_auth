@@ -1,6 +1,6 @@
 import * as Discord from "discord.js"
 import { MessageMentions } from "discord.js"
-import * as Long from "long"
+import Long from "long"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
 import { blankChar, blankChar2, ClonedMessage, CmdParam, ParamAccept, ParamType } from "./rundefine"

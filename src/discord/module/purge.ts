@@ -1,7 +1,7 @@
 import * as Discord from "discord.js"
 import * as fs from "fs-extra"
 import * as path from "path"
-import * as request from "request-promise-native"
+import request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import * as tmp from "tmp-promise"
 import Config from "../../config"

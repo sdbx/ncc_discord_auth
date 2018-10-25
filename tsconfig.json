@@ -7,7 +7,7 @@
     "module": "commonjs",
     "declaration": true,
     "inlineSourceMap": true,
-    "esModuleInterop": false /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */,
+    "esModuleInterop": true /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */,
 
     // "strict": true /* Enable all strict type-checking options. */,
 
@@ -22,8 +22,8 @@
     /* Additional Checks */
     "noUnusedLocals": false /* Report errors on unused locals. */,
     "noUnusedParameters": false /* Report errors on unused parameters. */,
-    "noImplicitReturns": false /* Report error when not all code paths in function return a value. */,
-    "noFallthroughCasesInSwitch": false /* Report errors for fallthrough cases in switch statement. */,
+    "noImplicitReturns": true /* Report error when not all code paths in function return a value. */,
+    "noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
 
     /* Debugging Options */
     "traceResolution": false /* Report module resolution log messages. */,

@@ -1,5 +1,5 @@
 import * as fs from "fs-extra"
-import * as Long from "long"
+import Long from "long"
 import * as path from "path"
 import Log from "./log"
 

@@ -1,12 +1,12 @@
-import * as caller from "caller"
+import caller from "caller"
 import * as cheerio from "cheerio"
 import * as encoding from "encoding"
 import * as fs from 'fs-extra'
-import * as get from "get-value"
+import get from "get-value"
 import * as Entities from "html-entities"
 import { Agent } from "https"
 import * as querystring from "querystring"
-import * as request from "request-promise-native"
+import request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,

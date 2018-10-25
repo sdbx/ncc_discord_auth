@@ -17,7 +17,7 @@ export default class ExportMessages extends Plugin {
         // super: load config
         await super.ready()
         // CommandHelp: suffix, description
-        this.keep = new CommandHelp("메세지 저장", this.lang.sample.hello)
+        this.keep = new CommandHelp("메시지 저장", this.lang.sample.hello)
         // get parameter as complex
         this.keep.addField(ParamType.much, "갯수..(최대 100000)", true, {accept: ParamAccept.NUMBER})
         this.keep.complex = true

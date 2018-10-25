@@ -1,4 +1,4 @@
-import * as get from "get-value"
+import get from "get-value"
 /**
  * JSON response from talkAPI
  */
@@ -63,6 +63,7 @@ export default class NcJson<T> {
         if (msg == null) {
             return "Unknown."
         }
+        return msg
     }
 }
 interface NcError {
