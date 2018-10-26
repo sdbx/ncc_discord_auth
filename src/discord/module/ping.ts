@@ -2,7 +2,7 @@ import Discord from "discord.js"
 import Log from "../../log"
 import Plugin from "../plugin"
 import { ChainData, CmdParam } from "../rundefine"
-import { CommandHelp } from "../runutil"
+import { CommandHelp, decodeDate, decodeTime } from "../runutil"
 /**
  * Ping & debug module.
  * 
@@ -23,7 +23,11 @@ export default class Ping extends Plugin {
         const user = msg.author
         const check = this.ping.check(this.global, command, state)
         if (check.match) {
-            await msg.reply(`퐁! \`${this.client.ping}\` <:GWchinaSakuraThinking:398950680217255977>`)
+            await msg.reply(`퐁! (\`${
+                Math.round(this.client.ping)
+            }\`ms, 가동시간 \`${
+                decodeTime(Date.now() - this.client.readyTimestamp)
+            }\`)`)
         }
         const checkLog = this.logget.check(this.global, command, state)
         if (checkLog.match) {

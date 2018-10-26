@@ -669,27 +669,38 @@ export default abstract class Plugin {
                     .filter((v) => v.position >= 1).map((v) => v.name).join(","))
             }
         }
+        rich.addField("상태", this.getPresenseInfo(member.presence).state)
+        return rich
+    }
+    /**
+     * Decode Presense info
+     * @param presence Presense
+     */
+    protected getPresenseInfo(presence:Discord.Presence) {
         let state:string
-        switch (member.presence.status) {
-            case "online": state = "온라인"; break
-            case "offline": state = "오프라인"; break
-            case "idle": state = "자리비움"; break
-            case "dnd": state = "바쁨"; break
-            default: state = "모름"; break // jam
+        let color:number
+        switch (presence.status) {
+            case "online": state = "온라인"; color = 0x43B581; break
+            case "offline": state = "오프라인"; color = 0x747F8D; break
+            case "idle": state = "자리비움"; color = 0xFAA61A; break
+            case "dnd": state = "바쁨"; color = 0xf04747; break
+            default: state = "모름"; color = 0x000000; break // jam
         }
-        if (member.presence.game != null && member.presence.game.name != null) {
+        if (presence.game != null && presence.game.name != null) {
             let type:string
-            switch (member.presence.game.type) {
+            switch (presence.game.type) {
                 case 0: type = "플레이 중"; break
                 case 1: type = "방송 중"; break
                 case 2: type = "듣는 중"; break
                 case 3: type = "보는 중"; break
                 default: type = "중"; break
             }
-            state += `, \`${member.presence.game.name}\` ${type}`
+            state += `, \`${presence.game.name}\` ${type}`
         }
-        rich.addField("상태", state)
-        return rich
+        return {
+            state,
+            color,
+        }
     }
     /**
      * Filter editable configs

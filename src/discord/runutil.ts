@@ -944,6 +944,23 @@ export function decodeDate(timestamp:number | Date, showHms = false) {
     }
     return out
 }
+export function decodeTime(period:number) {
+    // sec, devide
+    period = Math.floor(period / 1000)
+    const roundM = (size:number, max:number) => Math.floor(period / size) % max
+    const outs = []
+    outs.push(`${roundM(1, 60)}초`)
+    if (period >= 60) {
+        outs.push(`${roundM(60, 60)}분`)
+    }
+    if (period >= 3600) {
+        outs.push(`${roundM(3600, 24)}시간`)
+    }
+    if (period >= 86400) {
+        outs.push(`${Math.floor(period / 86400)}일`)
+    }
+    return outs.reverse().join(" ")
+}
 /**
  * Clone message
  * 

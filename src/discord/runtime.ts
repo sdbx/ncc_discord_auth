@@ -282,6 +282,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
         adminCmd.addField(ParamType.to, "토큰 앞 5자리", true)
         const saveCmd = new CommandHelp("저장", "저장", true,{reqAdmin:true})
         const rebootCmd = new CommandHelp("재부팅", "재부팅합니다.", true, {reqAdmin:true})
+        const shutdownCmd = new CommandHelp("종료", "종료합니다.", true, {reqAdmin: true})
         /*
             Rebooting
         */
@@ -289,6 +290,11 @@ export default class Runtime extends EventEmitter implements IRuntime {
        if (_reboot.match) {
            this.emit("restart")
            return Promise.resolve(true)
+       }
+       const _shutdown = shutdownCmd.check(this.global, cmd, status)
+       if (_shutdown.match) {
+           this.destroy()
+           return true
        }
         /*
             Help Command
