@@ -1,8 +1,8 @@
-import * as Discord from "discord.js"
-import * as fs from "fs-extra"
-import * as hangul from 'hangul-js'
-import * as request from "request-promise-native"
-import * as tmp from "tmp-promise"
+import Discord from "discord.js"
+import fs from "fs-extra"
+import hangul from 'hangul-js'
+import request from "request-promise-native"
+import tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import { NccEvents } from "../../ncc/ncc"

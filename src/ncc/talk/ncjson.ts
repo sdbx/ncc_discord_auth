@@ -1,4 +1,4 @@
-import * as get from "get-value"
+import get from "get-value"
 /**
  * JSON response from talkAPI
  */

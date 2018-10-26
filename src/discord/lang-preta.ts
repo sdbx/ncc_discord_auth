@@ -1,4 +1,4 @@
-import * as hangul from 'hangul-js'
+import hangul from 'hangul-js'
 import Config from "../config"
 
 export default class LangPreta extends Config {

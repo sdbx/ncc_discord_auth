@@ -1,5 +1,5 @@
-import * as colorConvert from "color-convert"
-import * as Discord from "discord.js"
+import colorConvert from "color-convert"
+import Discord from "discord.js"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"

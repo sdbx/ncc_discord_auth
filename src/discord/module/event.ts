@@ -1,4 +1,4 @@
-import * as Discord from "discord.js"
+import Discord, { RichEmbed } from "discord.js"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
@@ -57,9 +57,26 @@ export default class EventNotifier extends Plugin {
                 rich.setTitle(this.lang.events.changeNick)
                 rich.addField("예전 닉네임", oldNick)
                 rich.addField("바뀐 닉네임", newNick)
+                rich.setThumbnail(DiscordFormat.getAvatarImage(newMember))
                 await this.sendContent(guild, cfg.botCh, DiscordFormat.mentionUser(newMember.user.id), rich)
             }
         }).bind(this))
+        this.client.on("presenceUpdate", async (oldMember:Discord.GuildMember, newMember:Discord.GuildMember) => {
+            const guild = newMember.guild
+            const cfg = await this.sub(this.config, guild.id)
+            const rich = new RichEmbed()
+            // rich.setTitle(DiscordFormat.getNickname(newMember))
+            rich.setThumbnail(DiscordFormat.getAvatarImage(newMember))
+            rich.setDescription(DiscordFormat.mentionUser(newMember.user.id))
+            rich.setTimestamp(new Date(Date.now()))
+            const oldPresense = this.getPresenseInfo(oldMember.presence)
+            const newPresense = this.getPresenseInfo(newMember.presence)
+            rich.addField("변경 전", oldPresense.state, true)
+            rich.addField("변경 후", newPresense.state, true)
+            rich.setColor(newPresense.color)
+            await this.sendContent(guild, cfg.botCh,
+                DiscordFormat.getNickname(newMember)  + "님의 상태가 바뀌었습니다.", rich)
+        })
         this.lastWatchers = new Map()
         this.cafeWatchT = WebpackTimer.setInterval(bindFn(this.syncWatcher, this), 10000)
         return Promise.resolve()

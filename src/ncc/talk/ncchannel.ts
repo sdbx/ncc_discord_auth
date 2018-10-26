@@ -1,5 +1,5 @@
-import * as get from "get-value"
-import * as io from "socket.io-client"
+import get from "get-value"
+import io from "socket.io-client"
 import { EventDispatcher, IEventHandler } from "strongly-typed-events"
 import Log from "../../log"
 import { TimerID, WebpackTimer } from "../../webpacktimer"

@@ -1,8 +1,8 @@
 import chalk from "chalk"
-import * as Discord from "discord.js"
-import * as readline from "readline"
-import * as request from "request-promise-native"
-import Runtime from "./discord/runtime"
+import Discord from "discord.js"
+import readline from "readline"
+import request from "request-promise-native"
+import Runtime, { MainCfg } from "./discord/runtime"
 import { getFirst } from "./discord/runutil"
 import Log from "./log"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
@@ -27,9 +27,22 @@ async function start() {
         setTimeout(start, 10000)
     })
 }
+async function checkEnv() {
+    if (process.env.tokenKey !== undefined) {
+        try {
+            const global = new MainCfg()
+            await global.import(true).catch((err) => null)
+            global.token = process.env.tokenKey
+            await global.export()
+        } catch {
+            // :)
+        }
+    }
+}
 // Log.hook()
 Log.enable = true
-start()
+checkEnv().then(() => start())
+// start()
 // init()
 // client()
 
@@ -109,6 +122,7 @@ async function client() {
             // :(
         }
     }
+    return 0
 }
 async function parseMessage(msg:NcMessage) {
     const title = `${

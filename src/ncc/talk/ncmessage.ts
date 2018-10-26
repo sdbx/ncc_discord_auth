@@ -1,4 +1,4 @@
-import * as get from "get-value"
+import get from "get-value"
 import { allocInterface } from "../nccutil"
 import Cafe from "../structure/cafe"
 import Profile from "../structure/profile"

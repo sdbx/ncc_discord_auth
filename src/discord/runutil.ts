@@ -1,6 +1,6 @@
-import * as Discord from "discord.js"
+import Discord from "discord.js"
 import { MessageMentions } from "discord.js"
-import * as Long from "long"
+import Long from "long"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
 import { blankChar, blankChar2, ClonedMessage, CmdParam, ParamAccept, ParamType } from "./rundefine"
@@ -943,6 +943,23 @@ export function decodeDate(timestamp:number | Date, showHms = false) {
         out += ` ${timestamp.getSeconds().toString(10).padStart(2, "0")}초`
     }
     return out
+}
+export function decodeTime(period:number) {
+    // sec, devide
+    period = Math.floor(period / 1000)
+    const roundM = (size:number, max:number) => Math.floor(period / size) % max
+    const outs = []
+    outs.push(`${roundM(1, 60)}초`)
+    if (period >= 60) {
+        outs.push(`${roundM(60, 60)}분`)
+    }
+    if (period >= 3600) {
+        outs.push(`${roundM(3600, 24)}시간`)
+    }
+    if (period >= 86400) {
+        outs.push(`${Math.floor(period / 86400)}일`)
+    }
+    return outs.reverse().join(" ")
 }
 /**
  * Clone message
