@@ -1,4 +1,4 @@
-import * as Discord from "discord.js"
+import Discord from "discord.js"
 import { MessageMentions } from "discord.js"
 import Long from "long"
 import Log from "../log"

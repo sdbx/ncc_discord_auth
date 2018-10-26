@@ -4,7 +4,7 @@
 
 import { Ber } from "asn1"
 import { RSA_PKCS1_PADDING } from "constants"
-import * as crypto from "crypto"
+import crypto from "crypto"
 
 function linebrk(str, maxLen) {
   let res = ""

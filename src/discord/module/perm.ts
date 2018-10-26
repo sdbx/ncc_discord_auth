@@ -1,5 +1,5 @@
-import * as Discord from "discord.js"
-import * as Reverser from "esrever"
+import Discord from "discord.js"
+import Reverser from "esrever"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"

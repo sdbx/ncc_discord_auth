@@ -1,4 +1,4 @@
-import * as Discord from "discord.js"
+import Discord from "discord.js"
 import { sprintf } from "sprintf-js"
 import Cache from "../../cache"
 import Config from "../../config"

@@ -1,5 +1,5 @@
-import * as fs from "fs-extra"
-import * as path from "path"
+import fs from "fs-extra"
+import path from "path"
 import request from "request-promise-native"
 import { Stream } from "stream"
 import NCredit from "../credit/ncredit"

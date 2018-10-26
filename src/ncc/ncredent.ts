@@ -1,11 +1,11 @@
 import chalk, { Chalk } from "chalk"
 import { EventEmitter } from "events"
-import * as fs from "fs-extra"
-import * as path from "path"
-import * as read from "read"
+import fs from "fs-extra"
+import path from "path"
+import read from "read"
 import request from "request-promise-native"
 import { CookieJar } from "tough-cookie"
-import * as util from "util"
+import util from "util"
 import Cache from "../cache"
 import Config from "../config"
 import Log from "../log"
@@ -145,6 +145,7 @@ export default class NcCredent extends EventEmitter {
             this.credit.set(username, password)
             uname = await this.credit.login(captcha).catch((err:LoginError) => { errorCode = err; return null})
         }
+        // 172.217.161.46
         if (errorCode != null) {
             return Promise.reject(errorCode)
         }

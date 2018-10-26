@@ -1,11 +1,11 @@
 import caller from "caller"
-import * as cheerio from "cheerio"
-import * as encoding from "encoding"
-import * as fs from 'fs-extra'
+import cheerio from "cheerio"
+import encoding from "encoding"
+import fs from 'fs-extra'
 import get from "get-value"
-import * as Entities from "html-entities"
+import Entities from "html-entities"
 import { Agent } from "https"
-import * as querystring from "querystring"
+import querystring from "querystring"
 import request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"

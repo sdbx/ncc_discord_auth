@@ -1,4 +1,4 @@
-import * as Discord from "discord.js"
+import Discord from "discord.js"
 import Log from "../../log"
 import Plugin from "../plugin"
 import { ChainData, CmdParam } from "../rundefine"

@@ -1,4 +1,4 @@
-import * as Discord from "discord.js"
+import Discord from "discord.js"
 import request from "request-promise-native"
 import Config from "../../config"
 import Log from "../../log"

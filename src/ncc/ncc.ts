@@ -1,6 +1,6 @@
 import { EventEmitter } from "events"
 import get from "get-value"
-import * as io from "socket.io-client"
+import io from "socket.io-client"
 import { EventDispatcher, IEventHandler, ISimpleEventHandler, SimpleEventDispatcher } from "strongly-typed-events"
 import Log from "../log"
 import { bindFn, TimerID, WebpackTimer } from "../webpacktimer"

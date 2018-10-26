@@ -1,9 +1,9 @@
-import * as Discord from "discord.js"
+import Discord from "discord.js"
 import get from "get-value"
-import * as Hangul from "hangul-js"
+import Hangul from "hangul-js"
 import Long from "long"
 const set = require("set-value")
-import * as fs from "fs-extra"
+import fs from "fs-extra"
 import { sprintf } from "sprintf-js"
 import Cache from "../cache"
 import Config from "../config"

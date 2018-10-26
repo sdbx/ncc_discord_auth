@@ -1,6 +1,6 @@
 import chalk from "chalk"
-import * as Discord from "discord.js"
-import * as readline from "readline"
+import Discord from "discord.js"
+import readline from "readline"
 import request from "request-promise-native"
 import Runtime from "./discord/runtime"
 import { getFirst } from "./discord/runutil"

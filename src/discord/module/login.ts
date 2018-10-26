@@ -1,5 +1,5 @@
-import * as Discord from "discord.js"
-import * as Hangul from "hangul-js"
+import Discord from "discord.js"
+import Hangul from "hangul-js"
 import request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
