@@ -381,6 +381,9 @@ export default class Runtime extends EventEmitter implements IRuntime {
                     case "말머리" : {
                         this.global.prefix = new RegExp(_set.get(ParamType.to),"i")
                     } break
+                    case "간단말머리" : {
+                        this.global.simplePrefix = _set.get(ParamType.to)
+                    } break
                     case "색깔" : {
                         this.global.embedColor = _set.get(ParamType.to)
                     } break
