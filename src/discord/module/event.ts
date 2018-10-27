@@ -61,6 +61,7 @@ export default class EventNotifier extends Plugin {
                 await this.sendContent(guild, cfg.botCh, DiscordFormat.mentionUser(newMember.user.id), rich)
             }
         }).bind(this))
+        /*
         this.client.on("presenceUpdate", async (oldMember:Discord.GuildMember, newMember:Discord.GuildMember) => {
             const guild = newMember.guild
             const cfg = await this.sub(this.config, guild.id)
@@ -77,6 +78,7 @@ export default class EventNotifier extends Plugin {
             await this.sendContent(guild, cfg.botCh,
                 DiscordFormat.getNickname(newMember)  + "님의 상태가 바뀌었습니다.", rich)
         })
+        */
         this.lastWatchers = new Map()
         this.cafeWatchT = WebpackTimer.setInterval(bindFn(this.syncWatcher, this), 10000)
         return Promise.resolve()
