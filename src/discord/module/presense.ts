@@ -35,20 +35,20 @@ export default class Presense extends Plugin {
                 default: type = "하는 중"; break
             }
             name = game.name
-            if (game.state !== undefined) {
+            if (game.state != null) {
                 state = game.state
             }
-            if (game.details !== undefined) {
+            if (game.details != null) {
                 details = game.details
             }
-            if (game.timestamps !== undefined && game.timestamps.start !== undefined) {
+            if (game.timestamps != null && game.timestamps.start != null) {
                 playedTime = decodeTime(Date.now() - game.timestamps.start.getTime())
             }
-            if (game.assets !== undefined) {
-                if (game.assets.largeText !== undefined) {
+            if (game.assets != null) {
+                if (game.assets.largeText != null) {
                     largeDesc = game.assets.largeText
                 }
-                if (game.assets.smallText !== undefined) {
+                if (game.assets.smallText != null) {
                     smallDesc = game.assets.smallText
                 }
             }
