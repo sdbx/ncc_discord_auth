@@ -64,10 +64,11 @@ export default class EventNotifier extends Plugin {
             if (oldNick !== newNick) {
                 const rich = this.defaultRich
                 rich.setTitle(this.lang.events.changeNick)
+                rich.setDescription(DiscordFormat.mentionUser(newMember.user.id))
                 rich.addField("예전 닉네임", oldNick)
                 rich.addField("바뀐 닉네임", newNick)
                 rich.setThumbnail(DiscordFormat.getAvatarImage(newMember))
-                await this.sendContent(guild, cfg.botCh, DiscordFormat.mentionUser(newMember.user.id), rich)
+                await this.sendContent(guild, cfg.botCh, null, rich)
             }
         }).bind(this))
         this.client.on("presenceUpdate", async (oldMember:Discord.GuildMember, newMember:Discord.GuildMember) => {
@@ -191,10 +192,14 @@ export default class EventNotifier extends Plugin {
         WebpackTimer.clearInterval(this.cafeWatchT)
         return Promise.resolve()
     }
-    protected async sendContent(guild:Discord.Guild, channelID:string, text:string, rich:Discord.RichEmbed = null) {
+    protected async sendContent(guild:Discord.Guild, channelID:string, text:string, rich?:Discord.RichEmbed) {
         if (this.client.channels.has(channelID)) { 
             const channel = this.client.channels.get(channelID) as Discord.TextChannel
-            await channel.send(text, rich)
+            if (text != null) {
+                await channel.send(text, rich)
+            } else if (rich != null) {
+                await channel.send(rich)
+            }
         }
         return Promise.resolve()
     }
