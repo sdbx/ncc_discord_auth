@@ -12,8 +12,7 @@ import Ncc from "../ncc/ncc"
 import Profile from "../ncc/structure/profile"
 import { IRuntime } from "./iruntime"
 import Lang from "./lang"
-import { PresensePlaying } from "./module/presense"
-import { blankChar, ChainData, CmdParam, UniqueID } from "./rundefine"
+import { blankChar, ChainData, CmdParam, PresensePlaying, UniqueID } from "./rundefine"
 import { MainCfg } from "./runtime"
 import { cloneMessage, CommandHelp,
     decodeDate, DiscordFormat, getFirst, getFirstMap, getRichTemplate } from "./runutil"
@@ -692,8 +691,8 @@ export default abstract class Plugin {
                 case 0: type = "플레이 중"; break
                 case 1: type = "방송 중"; break
                 case 2: type = "듣는 중"; break
-                case 3: type = "보는 중"; break
-                default: type = "중"; break
+                case 3: type = "시청 중"; break
+                default: type = "하는 중"; break
             }
             state += `, \`${presence.game.name}\` ${type}`
         }

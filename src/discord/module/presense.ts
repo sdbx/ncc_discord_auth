@@ -3,12 +3,67 @@ import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import { ChainData, CmdParam, ParamAccept, ParamType } from "../rundefine"
-import { cloneMessage, CommandHelp, CommandStatus, DiscordFormat,
-    getFirstMap, getRichTemplate, SnowFlake } from "../runutil"
-
-
+import { CmdParam, PresensePlaying, PresenseState } from "../rundefine"
+import { decodeTime } from "../runutil"
+/**
+ * Presen`s`e jam.
+ */
 export default class Presense extends Plugin {
+    public static getPresenceInfo(presence:Discord.Presence) {
+        let status:string
+        switch (presence.status) {
+            case "online": status = "온라인";break
+            case "offline": status = "오프라인"; break
+            case "idle": status = "자리비움"; break
+            case "dnd": status = "바쁨"; break
+            default: status = "모름"; break // jam
+        }
+        let type:string = ""
+        let name:string = ""
+        let state:string = ""
+        let details:string = ""
+        let playedTime:string = ""
+        let largeDesc:string = ""
+        let smallDesc:string = ""
+        if (presence.game != null) {
+            const game = presence.game
+            switch (game.type) {
+                case 0: type = "플레이 중"; break
+                case 1: type = "방송 중"; break
+                case 2: type = "듣는 중"; break
+                case 3: type = "시청 중"; break
+                default: type = "하는 중"; break
+            }
+            name = game.name
+            if (game.state !== undefined) {
+                state = game.state
+            }
+            if (game.details !== undefined) {
+                details = game.details
+            }
+            if (game.timestamps !== undefined && game.timestamps.start !== undefined) {
+                playedTime = decodeTime(Date.now() - game.timestamps.start.getTime())
+            }
+            if (game.assets !== undefined) {
+                if (game.assets.largeText !== undefined) {
+                    largeDesc = game.assets.largeText
+                }
+                if (game.assets.smallText !== undefined) {
+                    smallDesc = game.assets.smallText
+                }
+            }
+        }
+        return {
+            status,
+            type,
+            name,
+            state,
+            details,
+            playedTime,
+            largeDesc,
+            smallDesc,
+        }
+    }
     // declare config file: use save data
     protected config = new PresenseConfig()
     /**
@@ -102,16 +157,4 @@ class PresenseConfig extends Config {
     public constructor() {
         super("presense")
     }
-}
-export enum PresensePlaying {
-    playing = "playing",
-    watching = "watching",
-    streaming = "streaming",
-    listening = "listening",
-}
-enum PresenseState {
-    ONLINE = "온라인",
-    IDLE = "자리비움",
-    BUSY = "다른 용무 중",
-    INVISIBLE = "오프라인",
 }

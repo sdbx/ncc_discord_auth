@@ -7,7 +7,7 @@ export default class NcJson<T> {
         return new NcJson(response, (obj) => obj)
     }
     public static fail(errormsg:string) {
-        return new NcJson<undefined>({
+        return new NcJson<void>({
             message: {
                 status: "-1",
                 error: {

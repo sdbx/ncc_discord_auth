@@ -936,12 +936,21 @@ export function decodeDate(timestamp:number | Date, showHms = false) {
     let out = `${timestamp.getFullYear()}년 ${timestamp.getMonth() + 1}월 ${timestamp.getDate()}일`
     out += ` (${"일월화수목금토".charAt(timestamp.getDay())}요일)`
     if (showHms) {
-        out += " " + (timestamp.getHours() >= 12 ? "오후" : "오전")
-        const hour = timestamp.getHours() % 12
-        out += ` ${hour <= 0 ? 12 : hour}시`
-        out += ` ${timestamp.getMinutes().toString(10).padStart(2, "0")}분`
-        out += ` ${timestamp.getSeconds().toString(10).padStart(2, "0")}초`
+        out += " "
+        out += decodeHMS(timestamp)
     }
+    return out
+}
+export function decodeHMS(timestamp:number | Date) {
+    if (typeof timestamp === "number") {
+        timestamp = new Date(timestamp)
+    }
+    let out = ""
+    out += timestamp.getHours() >= 12 ? "오후" : "오전"
+    const hour = timestamp.getHours() % 12
+    out += ` ${hour <= 0 ? 12 : hour}시`
+    out += ` ${timestamp.getMinutes().toString(10).padStart(2, "0")}분`
+    out += ` ${timestamp.getSeconds().toString(10).padStart(2, "0")}초`
     return out
 }
 export function decodeTime(period:number) {

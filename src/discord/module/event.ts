@@ -1,11 +1,15 @@
-import Discord, { RichEmbed } from "discord.js"
+import Discord, { MessageOptions } from "discord.js"
+import fs from "fs-extra"
 import { sprintf } from "sprintf-js"
+import tmp from "tmp-promise"
 import Config from "../../config"
 import Log from "../../log"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
+import XlsxUtil from "../../xlsxutil"
 import Plugin from "../plugin"
-import { ChainData, CmdParam, ParamType } from "../rundefine"
-import { CommandHelp, DiscordFormat } from "../runutil"
+import { ChainData, CmdParam, ParamType, PresensePlaying, PresenseState } from "../rundefine"
+import { CommandHelp, decodeDate, decodeHMS, DiscordFormat } from "../runutil"
+import Presense from "./presense"
 
 export default class EventNotifier extends Plugin {
     // declare config file: use save data
@@ -14,8 +18,12 @@ export default class EventNotifier extends Plugin {
     private welcome:CommandHelp
     private eventR:CommandHelp
     private watchAct:CommandHelp
+    private presenceExp:CommandHelp
     private cafeWatchT:TimerID
     private lastWatchers:Map<number, ActiveUser[]>
+    // 0~365 day
+    private lastDay:Map<string, number>
+    private presenseStates:Map<string, object[]>
     /**
      * Initialize command
      */
@@ -27,6 +35,7 @@ export default class EventNotifier extends Plugin {
         this.eventR = new CommandHelp("이벤트 수신", this.lang.events.descBotCh, true, {reqAdmin: true})
         this.watchAct = new CommandHelp("접속자 체크", "카페 접속자 체크", true, {reqAdmin: true})
         this.watchAct.addField(ParamType.dest, "카페URL", false)
+        this.presenceExp = new CommandHelp("게임 체크", "Presence 체크", true, {chatType: "guild"})
         this.client.on("guildMemberAdd",(async (member:Discord.GuildMember) => {
             const guild = member.guild
             const cfg = await this.sub(this.config, guild.id)
@@ -61,27 +70,60 @@ export default class EventNotifier extends Plugin {
                 await this.sendContent(guild, cfg.botCh, DiscordFormat.mentionUser(newMember.user.id), rich)
             }
         }).bind(this))
-        /*
         this.client.on("presenceUpdate", async (oldMember:Discord.GuildMember, newMember:Discord.GuildMember) => {
             const guild = newMember.guild
             const cfg = await this.sub(this.config, guild.id)
-            const rich = new RichEmbed()
-            // rich.setTitle(DiscordFormat.getNickname(newMember))
-            rich.setThumbnail(DiscordFormat.getAvatarImage(newMember))
-            rich.setDescription(DiscordFormat.mentionUser(newMember.user.id))
-            rich.setTimestamp(new Date(Date.now()))
-            const oldPresense = this.getPresenseInfo(oldMember.presence)
-            const newPresense = this.getPresenseInfo(newMember.presence)
-            rich.addField("변경 전", oldPresense.state, true)
-            rich.addField("변경 후", newPresense.state, true)
-            rich.setColor(newPresense.color)
-            await this.sendContent(guild, cfg.botCh,
-                DiscordFormat.getNickname(newMember)  + "님의 상태가 바뀌었습니다.", rich)
+            const today = new Date(Date.now()).getDay()
+            if (!this.lastDay.has(guild.id)) {
+                this.lastDay.set(guild.id, today)
+            }
+            if (!this.presenseStates.has(guild.id)) {
+                this.presenseStates.set(guild.id, [])
+            }
+            const preArr = this.presenseStates.get(guild.id)
+            preArr.push({
+                stack: preArr.length,
+                sender: DiscordFormat.getNickname(newMember),
+                senderID: newMember.id,
+                timestamp: decodeHMS(Date.now()),
+                ...Presense.getPresenceInfo(newMember.presence),
+            })
+            // export
+            if (today !== this.lastDay.get(guild.id) && preArr.length >= 1) {
+                this.lastDay.set(guild.id, today)
+                if (this.client.channels.has(cfg.botCh)) {
+                    const exp = await this.exportLog(guild.id)
+                    const channel = this.client.channels.get(cfg.botCh) as Discord.TextChannel
+                    await channel.send({
+                        embed: exp.embed,
+                        files: [new Discord.Attachment(fs.createReadStream(exp.file), "presence" + today + ".xlsx")],
+                        disableEveryone: true,
+                    } as MessageOptions)
+                    await fs.remove(exp.file)
+                }
+                preArr.splice(0, preArr.length)
+            }
         })
-        */
         this.lastWatchers = new Map()
+        this.presenseStates = new Map()
+        this.lastDay = new Map()
         this.cafeWatchT = WebpackTimer.setInterval(bindFn(this.syncWatcher, this), 10000)
         return Promise.resolve()
+    }
+    public async exportLog(gid:string) {
+        const preArr = this.presenseStates.get(gid)
+        const path = await tmp.tmpName({postfix: ".xlsx"})
+        const xlsxU = new XlsxUtil()
+        xlsxU.addCells(preArr, "Presences")
+        xlsxU.exportXLSX(path)
+        const rich = this.defaultRich
+        rich.setTitle("상태 로그")
+        rich.setDescription(decodeDate(Date.now(), false) + "의 Presence 변화입니다.")
+        rich.addField("수집된 로그 갯수", preArr.length + "개")
+        return {
+            embed: rich,
+            file: path,
+        }
     }
     /**
      * on Command Received.
@@ -128,6 +170,19 @@ export default class EventNotifier extends Plugin {
                 rich.addField("카페 ID", cafeI.cafeId)
                 await msg.channel.send("구독 완료.", rich)
             }
+        }
+        const testPreExport = this.presenceExp.check(this.global, command, state)
+        if (testPreExport.match) {
+            if (this.presenseStates.has(msg.guild.id) && this.presenseStates.get(msg.guild.id).length >= 1) {
+                const exp = await this.exportLog(msg.guild.id)
+                await msg.channel.send({
+                    embed: exp.embed,
+                    files: [new Discord.Attachment(fs.createReadStream(exp.file), "presence.xlsx")],
+                    disableEveryone: true,
+                } as MessageOptions)
+                await fs.remove(exp.file)
+            }
+            return Promise.resolve()
         }
         return Promise.resolve()
     }

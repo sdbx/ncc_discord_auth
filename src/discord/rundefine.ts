@@ -123,3 +123,21 @@ export interface ClonedMessage {
     embeds:Discord.RichEmbed[];
     content:string;
 }
+/**
+ * Presense's type
+ */
+export enum PresensePlaying {
+    playing = "playing",
+    watching = "watching",
+    streaming = "streaming",
+    listening = "listening",
+}
+/**
+ * Presense's state
+ */
+export enum PresenseState {
+    ONLINE = "온라인",
+    IDLE = "자리비움",
+    BUSY = "다른 용무 중",
+    INVISIBLE = "오프라인",
+}
