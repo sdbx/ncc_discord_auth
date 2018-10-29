@@ -9,8 +9,8 @@ export const CHAT_HOME_URL = "https://talk.cafe.naver.com"
 export const CHAT_API_URL = `${CHAT_HOME_URL}/talkapi/v1`
 export const CAFE_DEFAULT_IMAGE = `https://ssl.pstatic.net/static/cafe/chatting/default_cafe.png`
 export enum CHAT_APIS {
-    CHA2NNEL = "channels",
-    CA2FE = "categories",
+    CHANNEL = "channels",
+    CAFE = "categories",
 }
 export const COOKIE_CORE_SITES = ["https://nid.naver.com", "https://naver.com"]
 export const COOKIE_EXT_SITES = [CHAT_HOME_URL, cafePrefix]
