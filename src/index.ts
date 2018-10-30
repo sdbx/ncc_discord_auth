@@ -1,3 +1,4 @@
+import { decode, encode } from "bencodex"
 import chalk from "chalk"
 import Discord from "discord.js"
 import readline from "readline"
@@ -60,8 +61,10 @@ async function init() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const chat = await ncc.getConnectedChannel(5353)
-            await chat.sendText("안녕~")
+            const a = encode({a: 1, b: 2})
+            const b = encode({a: 1, b: 2}).toString()
+            const c = decode(Buffer.from("du1:ai1eu1:bi2ee"))
+            Log.d("a")
         }
     }
 }

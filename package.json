@@ -60,14 +60,15 @@
     "@types/inquirer": "0.0.42",
     "@types/long": "^4.0.0",
     "@types/mime-types": "^2.1.0",
-    "@types/node": "^10.12.0",
+    "@types/node": "^10.12.1",
     "@types/read": "0.0.28",
-    "@types/request": "^2.47.1",
+    "@types/request": "^2.48.0",
     "@types/request-promise-native": "^1.0.15",
     "@types/set-value": "^2.0.0",
     "@types/socket.io-client": "^1.4.32",
     "@types/sprintf-js": "^1.1.1",
     "asn1": "^0.2.4",
+    "bencodex": "0.0.0",
     "caller": "^1.0.1",
     "chalk": "^2.4.1",
     "cheerio": "^1.0.0-rc.2",
@@ -114,7 +115,7 @@
     "tslint-immutable": "^4.8.0",
     "tslint-server": "^0.1.0",
     "typedoc": "^0.11.1",
-    "typescript": "^3.1.3"
+    "typescript": "^3.1.4"
   },
   "ava": {
     "failFast": true,
