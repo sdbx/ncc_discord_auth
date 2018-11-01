@@ -170,7 +170,7 @@ export class ParamStr {
     }
     public get(...args:Array<string | number | boolean>) {
         let value = this.content
-        args.map((v) => encodeURIComponent(v.toString())).forEach((v) => value = value.replace("$",v))
+        args.map((v) => v == null ? "" : encodeURIComponent(v.toString())).forEach((v) => value = value.replace("$",v))
         return value
     }
     public get origin() {

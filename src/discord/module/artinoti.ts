@@ -1,4 +1,4 @@
-import Discord from "discord.js"
+import Discord, { MessageOptions } from "discord.js"
 import request from "request-promise-native"
 import Config from "../../config"
 import Log from "../../log"
@@ -96,6 +96,11 @@ export default class ArtiNoti extends Plugin {
                             rich.attachFile(new Discord.Attachment(image, "image.png"))
                             rich.setImage("attachment://image.png")
                         }
+                        const attaches:Discord.Attachment[] = []
+                        for (const attach of article.attaches) {
+                            const fname = attach.substring(attach.lastIndexOf("/") + 1, attach.lastIndexOf("?"))
+                            attaches.push(new Discord.Attachment(attach, fname))
+                        }
                         const contents = article.contents.filter(
                             (v) => ["newline","image"].indexOf(v.type) < 0)
                             .map((v) => v.data)
@@ -121,7 +126,10 @@ export default class ArtiNoti extends Plugin {
                         }
                         for (const _v of cfg.toPostChannel) {
                             if (this.client.channels.has(_v)) {
-                                await (this.client.channels.get(_v) as Discord.TextChannel).send(rich)
+                                await (this.client.channels.get(_v) as Discord.TextChannel).send({
+                                    embed: rich,
+                                    files: attaches,
+                                } as MessageOptions)
                             }
                         }
                     } catch (err2) {

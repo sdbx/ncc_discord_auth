@@ -1,7 +1,7 @@
 import caller from "caller"
 import cheerio from "cheerio"
 import encoding from "encoding"
-import fs from 'fs-extra'
+import xmlparser from "fast-xml-parser"
 import get from "get-value"
 import Entities from "html-entities"
 import { Agent } from "https"
@@ -10,13 +10,15 @@ import request from "request-promise-native"
 import Cache from "../cache"
 import Log from "../log"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
-    cafePrefix, CHATAPI_MEMBER_SEARCH, mCafePrefix,
-    naverRegex, whitelistDig } from "./ncconstant"
+    CAFE_VOTE_SITE, cafePrefix, CHATAPI_MEMBER_SEARCH,
+    mCafePrefix, naverRegex, VIDEO_PLAYER_PREFIX, VIDEO_PLAYER_URL,
+    VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDig } from "./ncconstant"
 import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
-import Article from "./structure/article"
+import Article, { ArticleContent, ContentType } from "./structure/article"
 import Cafe from "./structure/cafe"
 import Comment from "./structure/comment"
+import NaverVideo, { forceTimestamp, parseVideo } from "./structure/navervideo"
 import Profile from "./structure/profile"
 import NcJson from "./talk/ncjson"
 import uploadImage from "./talk/uploadphoto"
@@ -331,10 +333,6 @@ export default class NcFetch extends NcCredent {
                 profileurl,
             } as Comment
         }).get() as any
-
-        for (const comment of comments) {
-            Log.json("Comment", comment)
-        }
         return Promise.resolve<Comment[]>(comments)
         // https://m.cafe.naver.com/CommentView.nhn?search.clubid=#cafeID&search.articleid=#artiID&search.orderby=desc";
     }
@@ -358,17 +356,44 @@ export default class NcFetch extends NcCredent {
         const infos = $(".etc-box .p-nick a").attr("onclick").split(",")
         const link = $(".etc-box #linkUrl").text()
         const title = $(".tit-box span").text()
+        // parse attaches
+        const attaches = $(".download_opt").map((i, el) => {
+            return getFirst($(el).children("a").map((i2, el2) => {
+                const q2 = $(el2)
+                const dest = q2.attr("href")
+                Log.d("URL", dest)
+                if (dest === "#") {
+                    return null
+                } else {
+                    return dest
+                }
+            }).get(), (v) => v != null)
+        }).get()
         // parse article names
         const tbody = $("#tbody")
-        const contents = []
-        const whitelist = ["img","iframe", "embed", "br"]
-        tbody.children().map((i,el) => {
-            const parsedContent = this.getTextsR(el, [])
+        const contents:ArticleContent[] = []
+        const whitelist = ["img","iframe", "embed", "br", "a"]
+        // that first strange structure;
+        let rawHTML = this.parser.decode(tbody.html()).trim()
+        if (rawHTML.startsWith("\"") && rawHTML.endsWith("\"")) {
+            rawHTML = rawHTML.substring(1, rawHTML.length - 1)
+        }
+        if (rawHTML.length >= 1 && rawHTML.charAt(0) !== "<") {
+            const content = rawHTML.substring(0, rawHTML.indexOf("<"))
+            if (content.length >= 1) {
+                contents.push({type: "text", data: content})
+            }
+            Log.d("First Head", content)
+        }
+        const elements:ArticleContent[] = tbody.children().map((i,el) => {
+            const parsedContent:ArticleContent[] = this.getTextsR(el, [])
             .filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
+                let type:ContentType
+                let data:string = ""
+                let info:any
                 if (whitelist.indexOf(value.tagName) >= 0) {
-                    let type = "embed"
-                    let data:any = value.attribs["src"]
                     if (value.tagName === "img") {
+                        // image
                         let width:number = -1
                         let height:number = -1
                         let style = value.attribs["style"]
@@ -399,33 +424,72 @@ export default class NcFetch extends NcCredent {
                             height = -1
                         }
                         type = "image"
-                        data = {
+                        data = value.attribs["src"]
+                        info = {
                             src: value.attribs["src"],
                             width,
                             height,
                         }
                     } else if (value.tagName === "br") {
+                        // newline
                         type = "newline"
                         data = "br"
+                    } else if (value.tagName === "a") {
+                        // hyperlink
+                        type = "url"
+                        data = value.data
+                        info = {
+                            url: value.attribs.href
+                        }
+                    } else {
+                        // embed, iframe
+                        const src = value.attribs.src
+                        if (src == null) {
+                            type = "embed"
+                            data = ""
+                        } else if (src.startsWith(CAFE_VOTE_SITE)) {
+                            type = "vote"
+                            data = src
+                        } else if (src.startsWith(VIDEO_PLAYER_PREFIX)) {
+                            type = "nvideo"
+                            data = src
+                        } else {
+                            type = "embed"
+                            data = src
+                        }
                     }
                     if (data == null) {
                         data = ""
                     }
-                    return {type,data:data.src, info:data}
                 } else {
-                    return {type:"text",data:value.data}
+                    type = "text"
+                    data = value.data
                 }
+                return {type, data, info}
             })
             .filter((value) => (value.type !== "text") || (value.data.replace(/\s+/igm, "").length >= 1))
-            parsedContent.forEach((value) => contents.push(value))
             if (i >= 1 && parsedContent.filter((value) => value.type === "newline").length <= 0) {
-                contents.push({type: "newline", data: "div"})
+                parsedContent.push({type: "newline", data: "div"})
             }
-        })
+            return parsedContent
+        }).get() as any
+        // use async here
+        for (const element of elements) {
+            if (element.type === "nvideo") {
+                const video = await this.getVideoFromURL(element.data)
+                element.data = video.title
+                element.info = video
+            }
+            contents.push(element)
+        }
         const images = contents.filter((value) => value.type === "image")
         let image = null
         if (images.length >= 1) {
-            images.sort((a, b) => Math.abs(b.info.width * b.info.width) - Math.abs(a.info.width * a.info.width))
+            images.sort((a, b) => {
+                const ainfo = a.info as {width:number, height:number}
+                const binfo = b.info as {width:number, height:number}
+                return Math.abs(binfo.width * binfo.width) - Math.abs(ainfo.width * ainfo.width)
+            })
             image = images[0].data
         }
         // name
@@ -442,9 +506,9 @@ export default class NcFetch extends NcCredent {
             articleId: Number.parseInt(link.substr(link.lastIndexOf("/") + 1)),
             articleTitle: title,
             flags: {
-                file: false,
+                file: attaches.length >= 1,
                 image: images.length >= 1,
-                video: false,
+                video: contents.filter((v) => v.type === "embed").length >= 1,
                 question: false,
                 vote: false,
             },
@@ -454,10 +518,110 @@ export default class NcFetch extends NcCredent {
             comments,
             contents,
             imageURL: image,
-        } as Article
-        return Promise.resolve(out)
+            attaches: attaches == null ? [] : attaches,
+        }
+        return out
         // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&
         // page=1&boardtype=L&articleid=7446&referrerAllArticles=true
+    }
+    /**
+     * Get Video Info from url
+     * 
+     * Auto-parse inKey and gen outKey
+     * @param url ugcPlayer URL
+     * @returns Video Info
+     */
+    public async getVideoFromURL(url:string) {
+        Log.url("Link",url)
+        if (!url.startsWith(VIDEO_PLAYER_PREFIX)) {
+            return null
+        }
+        const parseQuery = (u:string) => {
+            return querystring.parse(u.substr(u.indexOf("?") + 1), null, null, {decodeURIComponent: (v) => v})
+        }
+            
+        const q = parseQuery(url)
+        const vid = q.vid as string
+        // outkey parse.
+        const shareData = await this.credit.reqGet(VIDEO_SHARE_URL, {
+            vid,
+            inKey: q.inKey as string,
+        }) as string
+        const shareOpt:Partial<xmlparser.X2jOptions> = {
+            attributeNamePrefix: "_",
+            textNodeName : "content",
+            ignoreAttributes: false,
+        }
+        const shareObj = xmlparser.convertToJson(xmlparser.getTraversalObj(shareData, shareOpt), shareOpt)
+        const social:object[] = get(shareObj, "result.socialNetworks.social", {default: []})
+        let outKey:string
+        for (const obj of social) {
+            if (get(obj, "_name") === "url") {
+                outKey = parseQuery(get(obj, "content")).outKey as string
+                break
+            }
+        }
+        Log.d("OutKey", outKey)
+        if (outKey == null) {
+            return null
+        }
+        const videoI = await this.getVideoFromId(vid, null, outKey)
+        videoI.share = VIDEO_PLAYER_PREFIX + "?" + querystring.stringify({
+            vid,
+            outKey,
+            wmode: "opaque",
+        }, "&", "=", {encodeURIComponent: (v) => v})
+        return videoI
+    }
+    /**
+     * Get Video info from Vid / inKey or outKey
+     * 
+     * Timestamp won't forever.
+     * @param vid Video ID
+     * @param inKey Timestmap-based generated key
+     * @param outKey Permanent-key from share
+     */
+    public async getVideoFromId(vid:string, inKey:string, outKey:string) {
+        const keyPair = {
+            inKey,
+            outKey,
+        }
+        // referer filtering A-G-A-I-N.
+        // with strong!
+        let referer:string
+        if (outKey != null) {
+            referer = querystring.stringify({
+                vid,
+                outKey,
+            }, "&", "=", {encodeURIComponent: (v) => v})
+            delete keyPair.inKey
+        } else if (inKey != null) {
+            referer = querystring.stringify({
+                vid,
+                inKey,
+            }, "&", "=", {encodeURIComponent: (v) => v})
+            delete keyPair.outKey
+        } else {
+            return null
+        }
+        referer = VIDEO_PLAYER_PREFIX + "?" + referer
+        const json = await this.credit.reqGet(VIDEO_REQUEST, {
+            videoId: vid,
+            ...keyPair,
+            playerId: "rmcPlayer_" + Date.now() + Math.floor(Math.random() * 1000),
+            ptc: "https",
+            playerType: "html5_mo",
+            sid: 5,
+            cft: "free-resolution",
+            ctls: JSON.stringify(videoOpt),
+        }, referer) as string
+        try {
+            const response = JSON.parse(json)
+            return parseVideo(response)
+        } catch (err) {
+            Log.e(err)
+            return null
+        }
     }
     /**
      * 네이버 카페의 회원을 네이버 ID로 검색하여 받아옵니다.

@@ -20,6 +20,11 @@ export const CAFE_LOGIN_CHECK = `${cafePrefix}/LoginCheck.nhn?m=check`
 export const CAFE_PROFILE_UPDATE = `${cafePrefix}/CafeMemberInfoUpdate.nhn`
 export const CAFE_NICKNAME_CHECK = `${cafePrefix}/CafeMemberNicknameCheckAjax.nhn`
 export const CAFE_UPLOAD_FILE = `https://up.cafe.naver.com/AttachFile.nhn`
+export const CAFE_VOTE_SITE = "https://cafe.poll.naver.com/vote.nhn"
+export const VIDEO_REQUEST = `https://serviceapi.nmv.naver.com/mobile/getVideoInfoV2.nhn`
+export const VIDEO_PLAYER_PREFIX = `https://serviceapi.nmv.naver.com/view/ugcPlayer.nhn`
+export const VIDEO_PLAYER_URL = s(`${VIDEO_PLAYER_PREFIX}?vid=$&inKey=$&outKey=$`)
+export const VIDEO_SHARE_URL = `https://serviceapi.nmv.naver.com/flash/getShareInfo.nhn`
 
 export const CHAT_BACKEND_URL = "https://talkwss.cafe.naver.com"
 export const CHAT_SOCKET_IO = `${CHAT_BACKEND_URL}/socket.io/`
@@ -59,3 +64,32 @@ export const CHAT_URL_CRAWLER = `${CHAT_HOME_URL}/crawler`
 // 120000 ms
 export const intervalNormal = 30000
 export const intervalError = 10000
+
+export const videoOpt = {
+    "visible":{
+       "fullscreen":true,
+       "logo":true,
+       "playbackRate":false,
+       "scrap":true,
+       "playCount":true,
+       "commentCount":true,
+       "title":true,
+       "writer":true,
+       "expand":false,
+       "subtitles":true,
+       "thumbnails":true,
+       "quality":true,
+       "setting":true,
+       "script":false,
+       "logoDimmed":true,
+       "badge":true,
+       "seekingTime":true,
+       "linkCount":true,
+       "createTime":true,
+       "thumbnail":true
+    },
+    "clicked":{
+       "expand":false,
+       "subtitles":false
+    }
+}
