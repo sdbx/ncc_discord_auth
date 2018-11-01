@@ -40,14 +40,14 @@ async function checkEnv() {
         }
     }
 }
-// Log.hook()
+Log.hook()
 Log.enable = true
-checkEnv().then(() => start())
+// checkEnv().then(() => start())
 // start()
-// init()
+test()
 // client()
 
-async function init() {
+async function test() {
     /*
     run = new Runtime();
     await run.start();
@@ -61,10 +61,7 @@ async function init() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const a = encode({a: 1, b: 2})
-            const b = encode({a: 1, b: 2}).toString()
-            const c = decode(Buffer.from("du1:ai1eu1:bi2ee"))
-            Log.d("a")
+            const article = await ncc.getArticleDetail(26686242, 7658)
         }
     }
 }
