@@ -7,12 +7,13 @@ import Entities from "html-entities"
 import { Agent } from "https"
 import querystring from "querystring"
 import request from "request-promise-native"
+import ytdl from "ytdl-core"
 import Cache from "../cache"
 import Log from "../log"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
     CAFE_VOTE_SITE, cafePrefix, CHATAPI_MEMBER_SEARCH,
     mCafePrefix, naverRegex, VIDEO_PLAYER_PREFIX, VIDEO_PLAYER_URL,
-    VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDig } from "./ncconstant"
+    VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDeco, whitelistDig } from "./ncconstant"
 import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
 import Article, { ArticleContent, ContentType } from "./structure/article"
@@ -372,7 +373,7 @@ export default class NcFetch extends NcCredent {
         // parse article names
         const tbody = $("#tbody")
         const contents:ArticleContent[] = []
-        const whitelist = ["img","iframe", "embed", "br", "a"]
+        const whitelist = ["img","iframe", "embed", "br", "a", ...whitelistDeco]
         // that first strange structure;
         let rawHTML = this.parser.decode(tbody.html()).trim()
         if (rawHTML.startsWith("\"") && rawHTML.endsWith("\"")) {
@@ -386,6 +387,7 @@ export default class NcFetch extends NcCredent {
             Log.d("First Head", content)
         }
         const elements:ArticleContent[] = tbody.children().map((i,el) => {
+            const test = this.getTextsR(el, [])
             const parsedContent:ArticleContent[] = this.getTextsR(el, [])
             .filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
                 let type:ContentType
@@ -444,18 +446,17 @@ export default class NcFetch extends NcCredent {
                     } else {
                         // embed, iframe
                         const src = value.attribs.src
+                        data = src
                         if (src == null) {
                             type = "embed"
-                            data = ""
                         } else if (src.startsWith(CAFE_VOTE_SITE)) {
                             type = "vote"
-                            data = src
                         } else if (src.startsWith(VIDEO_PLAYER_PREFIX)) {
                             type = "nvideo"
-                            data = src
+                        } else if (src.startsWith("https://www.youtube.com/embed/")) {
+                            type = "youtube"
                         } else {
                             type = "embed"
-                            data = src
                         }
                     }
                     if (data == null) {
@@ -472,12 +473,18 @@ export default class NcFetch extends NcCredent {
                 parsedContent.push({type: "newline", data: "div"})
             }
             return parsedContent
-        }).get() as any
+        }).get() as any[]
         // use async here
         for (const element of elements) {
-            if (element.type === "nvideo") {
+            const type = element.type
+            if (type === "nvideo") {
+                // permanent
                 const video = await this.getVideoFromURL(element.data)
-                element.data = video.title
+                element.data = video.share
+                element.info = video
+            } else if (type === "youtube") {
+                const video = await ytdl.getBasicInfo(element.data)
+                element.data = video.video_url
                 element.info = video
             }
             contents.push(element)
@@ -917,10 +924,17 @@ export default class NcFetch extends NcCredent {
      */
     private getTextsR(el:CheerioElement,arr:CheerioElement[] = []):CheerioElement[] {
         if (el.children != null && el.children.length >= 1) {
+            let onlyDeco = true
             for (const _el of el.children) {
+                if (whitelistDeco.indexOf(el.tagName) < 0) {
+                    onlyDeco = false
+                }
                 if (whitelistDig.indexOf(el.tagName) >= 0) {
                     arr = this.getTextsR(_el, arr)
                 }
+            }
+            if (onlyDeco) {
+                arr.push(el)
             }
         } else {
             arr.push(el)

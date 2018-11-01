@@ -98,7 +98,8 @@
     "tmp-promise": "^1.0.5",
     "tough-cookie": "^2.4.3",
     "typesafe-get": "^2.0.1",
-    "xlsx": "^0.14.0"
+    "xlsx": "^0.14.0",
+    "ytdl-core": "^0.27.1"
   },
   "devDependencies": {
     "ava": "^1.0.0-rc.1",

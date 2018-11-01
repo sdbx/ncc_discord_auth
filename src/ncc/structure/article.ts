@@ -62,4 +62,4 @@ export interface ArticleContent {
     data:string,
     info?:unknown,
 }
-export type ContentType = "embed" | "image" | "text" | "newline" | "url" | "vote" | "nvideo"
+export type ContentType = "embed" | "image" | "text" | "newline" | "url" | "vote" | "nvideo" | "youtube"

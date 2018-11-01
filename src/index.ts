@@ -61,7 +61,10 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7658)
+            const article = await ncc.getArticleDetail(26686242, 7678)
+            for (const content of article.contents) {
+                Log.json("Info",content)
+            }
         }
     }
 }
