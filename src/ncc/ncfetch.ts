@@ -373,7 +373,7 @@ export default class NcFetch extends NcCredent {
         // parse article names
         const tbody = $("#tbody")
         const contents:ArticleContent[] = []
-        const whitelist = ["img","iframe", "embed", "br", "a", ...whitelistDeco]
+        const whitelist = ["img","iframe", "embed", "br"]
         // that first strange structure;
         let rawHTML = this.parser.decode(tbody.html()).trim()
         if (rawHTML.startsWith("\"") && rawHTML.endsWith("\"")) {
@@ -387,13 +387,14 @@ export default class NcFetch extends NcCredent {
             Log.d("First Head", content)
         }
         const elements:ArticleContent[] = tbody.children().map((i,el) => {
-            const test = this.getTextsR(el, [])
             const parsedContent:ArticleContent[] = this.getTextsR(el, [])
-            .filter((_el) => _el.data != null || whitelist.indexOf(_el.tagName) >= 0).map((value) => {
+            .filter((_el) => _el.data != null ||
+            whitelist.indexOf(_el.tagName) >= 0 || whitelistDeco.indexOf(_el.tagName) >= 0).map((value) => {
                 let type:ContentType
                 let data:string = ""
                 let info:any
                 if (whitelist.indexOf(value.tagName) >= 0) {
+                    // whitelist of external
                     if (value.tagName === "img") {
                         // image
                         let width:number = -1
@@ -462,6 +463,10 @@ export default class NcFetch extends NcCredent {
                     if (data == null) {
                         data = ""
                     }
+                } else if (whitelistDeco.indexOf(value.tagName) >= 0) {
+                    // whitelist of decoration
+                    const test = this.parser.decode($(value).html())
+                    Log.d("HTML", test)
                 } else {
                     type = "text"
                     data = value.data
