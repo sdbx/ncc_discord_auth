@@ -74,6 +74,9 @@ export default class EventNotifier extends Plugin {
         this.client.on("presenceUpdate", async (oldMember:Discord.GuildMember, newMember:Discord.GuildMember) => {
             const guild = newMember.guild
             const cfg = await this.sub(this.config, guild.id)
+            if (!cfg.analyticsPresence) {
+                return
+            }
             const today = new Date(Date.now()).getDay()
             if (!this.lastDay.has(guild.id)) {
                 this.lastDay.set(guild.id, today)
@@ -282,6 +285,7 @@ export class EventConfig extends Config {
     public botCh = "bot"
     public welcomeMsg = "Hello!"
     public subCafes:SubCafe[] = []
+    public analyticsPresence = false
     constructor() {
         super("event")
     }
