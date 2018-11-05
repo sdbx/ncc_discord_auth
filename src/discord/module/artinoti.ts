@@ -7,7 +7,7 @@ import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { UniqueID } from "../rundefine"
 import { CmdParam } from "../rundefine"
-import { CommandHelp, DiscordFormat } from "../runutil"
+import { articleMarkdown, CommandHelp, DiscordFormat } from "../runutil"
 import { AuthConfig } from "./auth"
 
 export default class ArtiNoti extends Plugin {
@@ -101,14 +101,7 @@ export default class ArtiNoti extends Plugin {
                             const fname = attach.substring(attach.lastIndexOf("/") + 1, attach.lastIndexOf("?"))
                             attaches.push(new Discord.Attachment(attach, fname))
                         }
-                        const contents = article.contents.filter(
-                            (v) => ["newline","image"].indexOf(v.type) < 0)
-                            .map((v) => v.data)
-                        if (contents.length > 15) {
-                            contents.splice(10,contents.length - 10)
-                            contents.push("...")
-                        }
-                        rich.setDescription(contents.join("\n").replace(/\n[\n\s]*/igm, "\n"))
+                        rich.setDescription(articleMarkdown(article.contents))
                         rich.setURL(`${cafePrefix}/${cafe.cafeName}/${article.articleId}`)
                         try {
                             const authlist = await this.sub(new AuthConfig(), guild.id, false)

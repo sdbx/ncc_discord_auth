@@ -16,7 +16,7 @@ import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
     VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDeco, whitelistDig } from "./ncconstant"
 import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
-import Article, { ArticleContent, ContentType } from "./structure/article"
+import Article, { ArticleContent, ContentType, InfoType, TextStyle, TextType } from "./structure/article"
 import Cafe from "./structure/cafe"
 import Comment from "./structure/comment"
 import NaverVideo, { forceTimestamp, parseVideo } from "./structure/navervideo"
@@ -375,16 +375,19 @@ export default class NcFetch extends NcCredent {
         const contents:ArticleContent[] = []
         const whitelist = ["img","iframe", "embed", "br"]
         // that first strange structure;
-        let rawHTML = this.parser.decode(tbody.html()).trim()
-        if (rawHTML.startsWith("\"") && rawHTML.endsWith("\"")) {
-            rawHTML = rawHTML.substring(1, rawHTML.length - 1)
-        }
+        const rawHTML = tbody.html().trim()
         if (rawHTML.length >= 1 && rawHTML.charAt(0) !== "<") {
             const content = rawHTML.substring(0, rawHTML.indexOf("<"))
             if (content.length >= 1) {
-                contents.push({type: "text", data: content})
+                contents.push({type: "text", data: this.parser.decode(content), info: {
+                    bold: false,
+                    italic: false,
+                    namu: false,
+                    underline: false,
+                    url: null,
+                }})
+                contents.push({type: "newline", data: "none"})
             }
-            Log.d("First Head", content)
         }
         const elements:ArticleContent[] = tbody.children().map((i,el) => {
             const parsedContent:ArticleContent[] = this.getTextsR(el, [])
@@ -392,7 +395,7 @@ export default class NcFetch extends NcCredent {
             whitelist.indexOf(_el.tagName) >= 0 || whitelistDeco.indexOf(_el.tagName) >= 0).map((value) => {
                 let type:ContentType
                 let data:string = ""
-                let info:any
+                let info:InfoType
                 if (whitelist.indexOf(value.tagName) >= 0) {
                     // whitelist of external
                     if (value.tagName === "img") {
@@ -434,16 +437,10 @@ export default class NcFetch extends NcCredent {
                             height,
                         }
                     } else if (value.tagName === "br") {
-                        // newline
+                        // hmm.
+                        // return null
                         type = "newline"
                         data = "br"
-                    } else if (value.tagName === "a") {
-                        // hyperlink
-                        type = "url"
-                        data = value.data
-                        info = {
-                            url: value.attribs.href
-                        }
                     } else {
                         // embed, iframe
                         const src = value.attribs.src
@@ -464,19 +461,93 @@ export default class NcFetch extends NcCredent {
                         data = ""
                     }
                 } else if (whitelistDeco.indexOf(value.tagName) >= 0) {
+                    const flags:TextStyle = {
+                        bold: false,
+                        italic: false,
+                        namu: false,
+                        underline: false,
+                        url: null,
+                    }
+                    // <\/?(b|u|i|strike)>
+                    const setStyle = (code:string, modify:boolean, url?:string) => {
+                        switch (code) {
+                            case "b": flags.bold = modify; break
+                            case "u": flags.underline = modify; break
+                            case "i": flags.italic = modify; break
+                            case "strike":
+                            case "s": flags.namu = modify; break // strike
+                            case "a": {
+                                if (url != null) {
+                                    flags.url = url
+                                } else {
+                                    // undefined -> null.
+                                    flags.url = null
+                                }
+                            } break
+                        }
+                        return flags
+                    }
+                    setStyle(value.tagName, true, value.attribs["href"])
                     // whitelist of decoration
-                    const test = this.parser.decode($(value).html())
-                    Log.d("HTML", test)
+                    const texts:TextType[] = []
+                    let rawContent = $(value).html()
+                    Log.d("HTML", this.parser.decode(rawContent) + " / " + value.tagName)
+                    while (rawContent.length >= 1) {
+                        const index = rawContent.search(/<\/?(b|u|i|strike)>/g)
+                        if (index < 0) {
+                            texts.push({
+                                content: this.parser.decode(rawContent),
+                                style: {...flags},
+                            })
+                            break
+                        }
+                        texts.push({
+                            content: this.parser.decode(rawContent.substring(0, index)),
+                            style: {...flags},
+                        })
+                        const sub = rawContent.substr(index, 3)
+                        if (sub.charAt(1) === "/") {
+                            // delete flag mode
+                            setStyle(sub.charAt(2), false, null)
+                        } else {
+                            let searchSrc = rawContent.substr(index)
+                            searchSrc = this.parser.decode(searchSrc.substring(0, searchSrc.indexOf(">")))
+                            Log.d("Src", searchSrc)
+                            if (searchSrc.indexOf("href=") >= 0) {
+                                searchSrc = searchSrc.substr(searchSrc.indexOf("href=\"") + 6)
+                                searchSrc = searchSrc.substring(0, searchSrc.indexOf("\""))
+                                Log.d(searchSrc)
+                            }
+                            setStyle(sub.charAt(1), true)
+                        }
+                        rawContent = rawContent.substr(index)
+                        if (rawContent.indexOf(">") === rawContent.length - 1) {
+                            rawContent = ""
+                        } else {
+                            rawContent = rawContent.substr(rawContent.indexOf(">") + 1)
+                        }
+                    }
+                    type = "text"
+                    data = value.data
+                    info = texts
                 } else {
                     type = "text"
                     data = value.data
+                    info = [{
+                        content: value.data,
+                        style: {
+                            bold: false,
+                            italic: false,
+                            namu: false,
+                            underline: false,
+                            url: null,
+                        }
+                    }] as TextType[]
                 }
                 return {type, data, info}
-            })
-            .filter((value) => (value.type !== "text") || (value.data.replace(/\s+/igm, "").length >= 1))
-            if (i >= 1 && parsedContent.filter((value) => value.type === "newline").length <= 0) {
-                parsedContent.push({type: "newline", data: "div"})
-            }
+            }).filter((v) => v != null)
+            // .filter((value) => (value.type !== "text") || (value.data.replace(/\s+/igm, "").length >= 1))
+            parsedContent.push({type: "newline", data: el.tagName})
             return parsedContent
         }).get() as any[]
         // use async here
@@ -487,12 +558,26 @@ export default class NcFetch extends NcCredent {
                 const video = await this.getVideoFromURL(element.data)
                 element.data = video.share
                 element.info = video
+                contents.push(element)
             } else if (type === "youtube") {
                 const video = await ytdl.getBasicInfo(element.data)
                 element.data = video.video_url
                 element.info = video
+                contents.push(element)
+            } else if (type === "text") {
+                for (const text of element.info as TextType[]) {
+                    if (text.content == null || text.content.length <= 0) {
+                        continue
+                    }
+                    contents.push({
+                        type,
+                        data: text.content,
+                        info: text.style,
+                    })
+                }
+            } else {
+                contents.push(element)
             }
-            contents.push(element)
         }
         const images = contents.filter((value) => value.type === "image")
         let image = null

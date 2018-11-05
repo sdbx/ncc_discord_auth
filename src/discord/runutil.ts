@@ -1,8 +1,11 @@
 import Discord from "discord.js"
 import { MessageMentions } from "discord.js"
 import Long from "long"
+import ytdl from "ytdl-core"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
+import { ArticleContent, ImageType, TextStyle } from "../ncc/structure/article"
+import NaverVideo from "../ncc/structure/navervideo"
 import { blankChar, blankChar2, ClonedMessage, CmdParam, ParamAccept, ParamType } from "./rundefine"
 import { MainCfg } from "./runtime"
 
@@ -685,6 +688,9 @@ export class DiscordFormat {
         this._blockBig = true
         return this
     }
+    public eof() {
+        return this
+    }
     public toString() {
         let format = "%s"
         if (this._underline) {
@@ -969,6 +975,63 @@ export function decodeTime(period:number) {
         outs.push(`${Math.floor(period / 86400)}일`)
     }
     return outs.reverse().join(" ")
+}
+/**
+ * Print article's content to markdown.
+ * @param contents Article's content.
+ */
+export function articleMarkdown(contents:ArticleContent[]) {
+    let out:string = ""
+    for (const content of contents) {
+        // NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
+        if (content.type === "newline") {
+            out += "\n"
+        } else if (content.type === "text") {
+            // make style
+            const txt = new DiscordFormat(content.data)
+            const info = content.info as TextStyle
+            if (info.bold) {
+                txt.bold.eof()
+            }
+            if (info.italic) {
+                txt.italic.eof()
+            }
+            if (info.namu) {
+                txt.namu.eof()
+            }
+            if (info.underline) {
+                txt.underline.eof()
+            }
+            let formatTxt = txt.toString()
+            if (info.url != null) {
+                formatTxt = `[${formatTxt}](${info.url})`
+            }
+            out += formatTxt
+        } else if (content.type === "image") {
+            const info = content.info as ImageType
+            let name:string = info.src
+            if (name.indexOf("?") >= 0) {
+                name = name.substring(0, name.indexOf("?"))
+            }
+            name = name.substr(name.lastIndexOf("/") + 1)
+            out += `![${name}](${info.src})`
+        } else if (content.type === "embed") {
+            const url = content.data
+            if (url.length >= 1) {
+                out += `[Unknown Embed](${url})`
+            }
+        } else if (content.type === "nvideo") {
+            const info = content.info as NaverVideo
+            out += `[${info.title} - ${info.author})](${info.share})`
+        } else if (content.type === "vote") {
+            // skip.
+            out += `[네이버 투표](${content.data})`
+        } else if (content.type === "youtube") {
+            const info = content.info as ytdl.videoInfo
+            out += `[${info.title} - ${info.author.name}](${info.video_url})`
+        }
+    }
+    return out
 }
 /**
  * Clone message

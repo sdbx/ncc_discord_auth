@@ -3,11 +3,14 @@ import chalk from "chalk"
 import Discord from "discord.js"
 import readline from "readline"
 import request from "request-promise-native"
+import ytdl from "ytdl-core"
 import Runtime, { MainCfg } from "./discord/runtime"
-import { getFirst } from "./discord/runutil"
+import { articleMarkdown, DiscordFormat, getFirst } from "./discord/runutil"
 import Log from "./log"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
+import { ArticleContent, ImageType, TextStyle } from "./ncc/structure/article"
 import Cafe from "./ncc/structure/cafe"
+import NaverVideo from "./ncc/structure/navervideo"
 import NcChannel from "./ncc/talk/ncchannel"
 import NcMessage from "./ncc/talk/ncmessage"
 import { ILastMessage, INcMessage, INowMessage, IPastMessage,
@@ -42,9 +45,8 @@ async function checkEnv() {
 }
 Log.hook()
 Log.enable = true
-// checkEnv().then(() => start())
-// start()
-test()
+checkEnv().then(() => start())
+// test()
 // client()
 
 async function test() {
@@ -61,10 +63,8 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7678)
-            for (const content of article.contents) {
-                Log.json("Info",content)
-            }
+            const article = await ncc.getArticleDetail(26686242, 7658)
+            Log.d("Markdown", articleMarkdown(article.contents))
         }
     }
 }

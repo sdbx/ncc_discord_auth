@@ -1,5 +1,7 @@
+import ytdl from "ytdl-core"
 import Cafe from "./cafe"
 import Comment from "./comment"
+import NaverVideo from "./navervideo"
 
 export default interface Article extends Cafe {
     /**
@@ -60,6 +62,27 @@ export default interface Article extends Cafe {
 export interface ArticleContent {
     type:ContentType,
     data:string,
-    info?:unknown,
+    info?:InfoType,
 }
-export type ContentType = "embed" | "image" | "text" | "newline" | "url" | "vote" | "nvideo" | "youtube"
+export interface ImageType {
+    src:string;
+    width:number;
+    height:number;
+}
+export interface UrlType {
+    url:string;
+}
+export interface TextStyle {
+    bold:boolean;
+    italic:boolean;
+    namu:boolean;
+    underline:boolean;
+    url:string;
+}
+export interface TextType {
+    content:string;
+    style:TextStyle;
+}
+// Array<{content:string, style:TextStyle}>
+export type InfoType = NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
+export type ContentType = "embed" | "image" | "text" | "newline" | "vote" | "nvideo" | "youtube"
