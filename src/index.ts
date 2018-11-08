@@ -63,7 +63,7 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7658)
+            const article = await ncc.getArticleDetail(26686242, 7698)
             Log.d("Markdown", articleMarkdown(article.contents))
         }
     }

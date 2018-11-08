@@ -390,6 +390,37 @@ export default class NcFetch extends NcCredent {
             }
         }
         const elements:ArticleContent[] = tbody.children().map((i,el) => {
+            const c$ = $(el)
+            if (c$.find(".og").length >= 1) {
+                // naver custom linker.
+                const linkInfo = {
+                    title: "링크",
+                    url: "about:blank",
+                }
+                const qTitle = c$.find(".tit")
+                if (qTitle.length === 1) {
+                    linkInfo.title = qTitle.text()
+                }
+                const qUrl = c$.find(".link")
+                if (qTitle.length === 1) {
+                    linkInfo.url = qUrl.attr("href")
+                }
+                return [{
+                    type: "text",
+                    data: linkInfo.title,
+                    info: [{
+                        content: linkInfo.title,
+                        style: {
+                            bold: false,
+                            italic: false,
+                            namu: false,
+                            underline: false,
+                            url: linkInfo.url,
+                        }
+                    }],
+                }, {type: "newline", data: el.tagName}]
+            }
+            Log.d("HTML", this.parser.decode($(el).html()))
             const parsedContent:ArticleContent[] = this.getTextsR(el, [])
             .filter((_el) => _el.data != null ||
             whitelist.indexOf(_el.tagName) >= 0 || whitelistDeco.indexOf(_el.tagName) >= 0).map((value) => {

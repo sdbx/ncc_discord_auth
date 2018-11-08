@@ -985,11 +985,13 @@ export function articleMarkdown(contents:ArticleContent[]) {
     for (const content of contents) {
         // NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
         if (content.type === "newline") {
-            out += "\n"
+            if (!out.endsWith("\n")) {
+                out += "\n"
+            }
         } else if (content.type === "text") {
             // make style
-            const txt = new DiscordFormat(content.data)
             const info = content.info as TextStyle
+            const txt = new DiscordFormat(info.url != null ? `[${content.data}](${info.url})` : content.data)
             if (info.bold) {
                 txt.bold.eof()
             }
@@ -1002,11 +1004,7 @@ export function articleMarkdown(contents:ArticleContent[]) {
             if (info.underline) {
                 txt.underline.eof()
             }
-            let formatTxt = txt.toString()
-            if (info.url != null) {
-                formatTxt = `[${formatTxt}](${info.url})`
-            }
-            out += formatTxt
+            out += txt.toString()
         } else if (content.type === "image") {
             const info = content.info as ImageType
             let name:string = info.src
@@ -1022,7 +1020,7 @@ export function articleMarkdown(contents:ArticleContent[]) {
             }
         } else if (content.type === "nvideo") {
             const info = content.info as NaverVideo
-            out += `[${info.title} - ${info.author})](${info.share})`
+            out += `[${info.title} - ${info.author.nickname})](${info.share})`
         } else if (content.type === "vote") {
             // skip.
             out += `[네이버 투표](${content.data})`
