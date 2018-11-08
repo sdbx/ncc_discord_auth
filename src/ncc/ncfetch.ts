@@ -395,6 +395,9 @@ export default class NcFetch extends NcCredent {
                 // naver custom linker.
                 const linkInfo = {
                     title: "링크",
+                    image: null,
+                    imageWidth: 1,
+                    imageHeight: 1,
                     url: "about:blank",
                 }
                 const qTitle = c$.find(".tit")
@@ -405,7 +408,22 @@ export default class NcFetch extends NcCredent {
                 if (qTitle.length === 1) {
                     linkInfo.url = qUrl.attr("href")
                 }
-                return [{
+                const qImg = c$.find("img")
+                if (qImg.length === 1) {
+                    const url = qImg.attr("src")
+                    if (url != null && url.startsWith("http")) {
+                        linkInfo.image = url
+                        const query = url.lastIndexOf("type=")
+                        if (query >= 0) {
+                            const nums = url.substr(query).match(/\d+/ig)
+                            if (nums != null && nums.length === 2) {
+                                linkInfo.imageWidth = Number.parseInt(nums[0])
+                                linkInfo.imageHeight = Number.parseInt(nums[1])
+                            }
+                        }
+                    }
+                }
+                const linkOut:ArticleContent[] = [{
                     type: "text",
                     data: linkInfo.title,
                     info: [{
@@ -419,6 +437,14 @@ export default class NcFetch extends NcCredent {
                         }
                     }],
                 }, {type: "newline", data: el.tagName}]
+                if (linkInfo.image != null) {
+                    linkOut.unshift({type: "image", data: linkInfo.image, info: {
+                        src: linkInfo.image,
+                        width: linkInfo.imageWidth,
+                        height: linkInfo.imageHeight,
+                    }})
+                }
+                return linkOut
             }
             Log.d("HTML", this.parser.decode($(el).html()))
             const parsedContent:ArticleContent[] = this.getTextsR(el, [])
