@@ -141,3 +141,7 @@ export enum PresenseState {
     BUSY = "다른 용무 중",
     INVISIBLE = "오프라인",
 }
+export enum MarkType {
+    GITHUB,
+    DISCORD,
+}

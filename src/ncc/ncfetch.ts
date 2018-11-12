@@ -16,7 +16,7 @@ import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
     VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDeco, whitelistDig } from "./ncconstant"
 import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
-import Article, { ArticleContent, ContentType, InfoType, TextStyle, TextType } from "./structure/article"
+import Article, { ArticleContent, ContentType, ImageType, InfoType, TextStyle, TextType } from "./structure/article"
 import Cafe from "./structure/cafe"
 import Comment from "./structure/comment"
 import NaverVideo, { forceTimestamp, parseVideo } from "./structure/navervideo"
@@ -373,7 +373,8 @@ export default class NcFetch extends NcCredent {
         // parse article names
         const tbody = $("#tbody")
         const contents:ArticleContent[] = []
-        const whitelist = ["img","iframe", "embed", "br"]
+        const rootEl = ["table", "iframe", "embed"]
+        const whitelist = ["img", "br", ...rootEl]
         // that first strange structure;
         const rawHTML = tbody.html().trim()
         if (rawHTML.length >= 1 && rawHTML.charAt(0) !== "<") {
@@ -412,7 +413,18 @@ export default class NcFetch extends NcCredent {
                 if (qImg.length === 1) {
                     const url = qImg.attr("src")
                     if (url != null && url.startsWith("http")) {
-                        linkInfo.image = url
+                        let u = url.substr(url.indexOf("src=") + 4)
+                        if (u.indexOf("&") >= 0) {
+                            u = u.substring(0,u.indexOf("&"))
+                        }
+                        u = decodeURIComponent(u)
+                        if (u.startsWith("\"")) {
+                            u = u.substr(1)
+                        }
+                        if (u.endsWith("\"")) {
+                            u = u.substring(0, u.length - 1)
+                        }
+                        linkInfo.image = u
                         const query = url.lastIndexOf("type=")
                         if (query >= 0) {
                             const nums = url.substr(query).match(/\d+/ig)
@@ -436,68 +448,72 @@ export default class NcFetch extends NcCredent {
                             url: linkInfo.url,
                         }
                     }],
-                }, {type: "newline", data: el.tagName}]
+                }]
                 if (linkInfo.image != null) {
                     linkOut.unshift({type: "image", data: linkInfo.image, info: {
                         src: linkInfo.image,
                         width: linkInfo.imageWidth,
                         height: linkInfo.imageHeight,
-                    }})
+                        name: "Thumbnail",
+                        linkURL: "",
+                    }}, {type: "newline", data: el.tagName})
                 }
+                linkOut.push({type: "newline", data: el.tagName})
                 return linkOut
             }
             Log.d("HTML", this.parser.decode($(el).html()))
-            const parsedContent:ArticleContent[] = this.getTextsR(el, [])
+            const parsedContent:ArticleContent[] = this.getTextsR(el, rootEl, [])
             .filter((_el) => _el.data != null ||
             whitelist.indexOf(_el.tagName) >= 0 || whitelistDeco.indexOf(_el.tagName) >= 0).map((value) => {
                 let type:ContentType
                 let data:string = ""
                 let info:InfoType
+                Log.d("TagName", value.tagName)
                 if (whitelist.indexOf(value.tagName) >= 0) {
                     // whitelist of external
                     if (value.tagName === "img") {
-                        // image
-                        let width:number = -1
-                        let height:number = -1
-                        let style = value.attribs["style"]
-                        if (style != null) {
-                            style = style.replace(/\s+/ig, "")
-                            const _w = style.match(/width:\s*\d+px/i)
-                            if (_w != null) {
-                                width = Number.parseInt(_w[0].match(/\d+/)[0])
-                            }
-                            const _h = style.match(/height:\s*\d+px/i)
-                            if (_h != null) {
-                                height = Number.parseInt(_h[0].match(/\d+/)[0])
-                            }
-                        } else {
-                            const _w = value.attribs["width"]
-                            const _h = value.attribs["height"]
-                            if (_w != null && _w.indexOf("%") < 0) {
-                                width = Number.parseInt(_w.trim())
-                            }
-                            if (_h != null && _h.indexOf("%") < 0) {
-                                height = Number.parseInt(_h.trim())
-                            }
-                        }
-                        if (Number.isNaN(width)) {
-                            width = -1
-                        }
-                        if (Number.isNaN(height)) {
-                            height = -1
-                        }
-                        type = "image"
-                        data = value.attribs["src"]
-                        info = {
-                            src: value.attribs["src"],
-                            width,
-                            height,
-                        }
+                        const conv = this.parseImageTag(value)
+                        type = conv.type as ContentType
+                        data = conv.data
+                        info = conv.info
                     } else if (value.tagName === "br") {
                         // hmm.
                         // return null
                         type = "newline"
                         data = "br"
+                    } else if (value.tagName === "table") {
+                        type = "table"
+                        data = ""
+                        info = {
+                            header: [],
+                            body: [],
+                        }
+                        // select thead tbody
+                        const table$ = $(value)
+                        const tParser = (tIO:Cheerio, query:string) => {
+                            const jArr = tIO.find(query + " > tr").map((_ti,_tEl) => {
+                                return $(_tEl).find("td").map((_ti2, _tEl2) => $(_tEl2).text())
+                            }) as any as string[][]
+                            // That's a strange thing
+                            const outArr:string[][] = []
+                            // tslint:disable-next-line
+                            for (let k = 0; k < jArr.length; k += 1) {
+                                const oneArr:string[] = []
+                                const dep1Arr = jArr[k]
+                                // tslint:disable-next-line
+                                for (let l = 0; l < dep1Arr.length; l += 1) {
+                                    oneArr.push(dep1Arr[l])
+                                }
+                                outArr.push(oneArr)
+                            }
+                            return outArr
+                        }
+                        if (table$.find("thead").length > 0) {
+                            info.header = tParser(table$, "thead")
+                        }
+                        if (table$.find("tbody").length > 0) {
+                            info.body = tParser(table$, "tbody")
+                        }
                     } else {
                         // embed, iframe
                         const src = value.attribs.src
@@ -547,9 +563,26 @@ export default class NcFetch extends NcCredent {
                     setStyle(value.tagName, true, value.attribs["href"])
                     // whitelist of decoration
                     const texts:TextType[] = []
-                    let rawContent = $(value).html()
-                    Log.d("HTML", this.parser.decode(rawContent) + " / " + value.tagName)
-                    while (rawContent.length >= 1) {
+                    // .replace(/&lt;\/?font.*?&gt;/ig, "")
+                    let rawContent = $(value).html().replace(/<\/?font.*?>/ig, "")
+                    let useImageLink = false
+                    if (value.tagName === "a" && rawContent.search(/<img.*?>/ig) >= 0) {
+                        let img:ArticleContent
+                        $(value).find("img").each((vI, vEl) => {
+                            Log.d("IMG!")
+                            if (img == null) {
+                                img = this.parseImageTag(vEl) as ArticleContent
+                            }
+                        })
+                        if (img != null) {
+                            useImageLink = true;
+                            (img.info as ImageType).linkURL = flags.url
+                            type = "image"
+                            data = img.data
+                            info = img.info
+                        }
+                    }
+                    while (!useImageLink && rawContent.length >= 1) {
                         const index = rawContent.search(/<\/?(b|u|i|strike)>/g)
                         if (index < 0) {
                             texts.push({
@@ -569,11 +602,9 @@ export default class NcFetch extends NcCredent {
                         } else {
                             let searchSrc = rawContent.substr(index)
                             searchSrc = this.parser.decode(searchSrc.substring(0, searchSrc.indexOf(">")))
-                            Log.d("Src", searchSrc)
                             if (searchSrc.indexOf("href=") >= 0) {
                                 searchSrc = searchSrc.substr(searchSrc.indexOf("href=\"") + 6)
                                 searchSrc = searchSrc.substring(0, searchSrc.indexOf("\""))
-                                Log.d(searchSrc)
                             }
                             setStyle(sub.charAt(1), true)
                         }
@@ -612,10 +643,14 @@ export default class NcFetch extends NcCredent {
             const type = element.type
             if (type === "nvideo") {
                 // permanent
-                const video = await this.getVideoFromURL(element.data)
-                element.data = video.share
-                element.info = video
-                contents.push(element)
+                try {
+                    const video = await this.getVideoFromURL(element.data)
+                    element.data = video.share
+                    element.info = video
+                    contents.push(element)
+                } catch (err) {
+                    Log.e(err)
+                }
             } else if (type === "youtube") {
                 const video = await ytdl.getBasicInfo(element.data)
                 element.data = video.video_url
@@ -662,9 +697,9 @@ export default class NcFetch extends NcCredent {
             flags: {
                 file: attaches.length >= 1,
                 image: images.length >= 1,
-                video: contents.filter((v) => v.type === "embed").length >= 1,
-                question: false,
-                vote: false,
+                video: contents.filter((v) => v.type === "youtube" || v.type === "nvideo").length >= 1,
+                question: false, // impossible from detail.
+                vote: contents.filter((v) => v.type === "vote").length >= 1,
             },
             userName: this.querystr(infos[3]),
             userId: this.querystr(infos[1]),
@@ -1054,6 +1089,11 @@ export default class NcFetch extends NcCredent {
     private encodeURI_KR(str:string):string {
         return encoding.convert(str, "euc-kr").toString("hex").replace(/([a-f0-9]{2})/g, "%$1").toUpperCase()
     }
+    /**
+     * Remove get parameter
+     * @param str URL
+     * @param decode decodeURIComponent?
+     */
     private orgURI(str:string,decode = false):string {
         if (str == null) {
             return null
@@ -1065,19 +1105,70 @@ export default class NcFetch extends NcCredent {
         return decode ? decodeURI(str) : str
     }
     /**
+     * Parse Image from <img> html
+     * @param el Cheerio Element (img tag)
+     */
+    private parseImageTag(el:CheerioElement) {
+        // image
+        let width:number = -1
+        let height:number = -1
+        let style = el.attribs["style"]
+        if (el.attribs["width"] != null && el.attribs["height"] != null) {
+            const _w = el.attribs["width"]
+            const _h = el.attribs["height"]
+            if (_w != null && _w.indexOf("%") < 0) {
+                width = Number.parseInt(_w.trim())
+            }
+            if (_h != null && _h.indexOf("%") < 0) {
+                height = Number.parseInt(_h.trim())
+            }
+        } else if (style != null) {
+            style = style.replace(/\s+/ig, "")
+            const _w = style.match(/width:\s*\d+px/i)
+            if (_w != null) {
+                width = Number.parseInt(_w[0].match(/\d+/)[0])
+            }
+            const _h = style.match(/height:\s*\d+px/i)
+            if (_h != null) {
+                height = Number.parseInt(_h[0].match(/\d+/)[0])
+            }
+        }
+        if (Number.isNaN(width)) {
+            width = -1
+        }
+        if (Number.isNaN(height)) {
+            height = -1
+        }
+        // name
+        const src = el.attribs["src"]
+        let name = src
+        if (name != null && name.indexOf("?") >= 0) {
+            name = name.substring(0, name.indexOf("?"))
+        }
+        name = name.substr(name.lastIndexOf("/") + 1)
+        // return
+        return {type: "image", data: src, info: {
+            src,
+            width,
+            height,
+            name,
+            linkURL: "",
+        } as ImageType}       
+    }
+    /**
      * get "no child" elements 
      * @param el $
      * @param arr init []
      */
-    private getTextsR(el:CheerioElement,arr:CheerioElement[] = []):CheerioElement[] {
-        if (el.children != null && el.children.length >= 1) {
+    private getTextsR(el:CheerioElement,breaks:string[], arr:CheerioElement[] = []):CheerioElement[] {
+        if (el.children != null && el.children.length >= 1 && breaks.indexOf(el.tagName) < 0) {
             let onlyDeco = true
             for (const _el of el.children) {
                 if (whitelistDeco.indexOf(el.tagName) < 0) {
                     onlyDeco = false
                 }
                 if (whitelistDig.indexOf(el.tagName) >= 0) {
-                    arr = this.getTextsR(_el, arr)
+                    arr = this.getTextsR(_el, breaks, arr)
                 }
             }
             if (onlyDeco) {

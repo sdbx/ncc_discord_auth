@@ -4,9 +4,9 @@ import Long from "long"
 import ytdl from "ytdl-core"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
-import { ArticleContent, ImageType, TextStyle } from "../ncc/structure/article"
+import { ArticleContent, ImageType, TableType, TextStyle } from "../ncc/structure/article"
 import NaverVideo from "../ncc/structure/navervideo"
-import { blankChar, blankChar2, ClonedMessage, CmdParam, ParamAccept, ParamType } from "./rundefine"
+import { blankChar, blankChar2, ClonedMessage, CmdParam, MarkType, ParamAccept, ParamType } from "./rundefine"
 import { MainCfg } from "./runtime"
 
 
@@ -980,18 +980,31 @@ export function decodeTime(period:number) {
  * Print article's content to markdown.
  * @param contents Article's content.
  */
-export function articleMarkdown(contents:ArticleContent[]) {
+export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
     let out:string = ""
+    const addLineSep = () => {
+        if (!out.endsWith("\n")) {
+            out += "\n"
+            if (markType === MarkType.GITHUB) {
+                out += "\n"
+            }
+        }
+    }
     for (const content of contents) {
         // NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
         if (content.type === "newline") {
-            if (!out.endsWith("\n")) {
-                out += "\n"
-            }
+            addLineSep()
         } else if (content.type === "text") {
             // make style
             const info = content.info as TextStyle
-            const txt = new DiscordFormat(info.url != null ? `[${content.data}](${info.url})` : content.data)
+            let txt:DiscordFormat
+            if (markType === MarkType.GITHUB) {
+                txt = new DiscordFormat(content.data)
+            } else if (markType === MarkType.DISCORD) {
+                txt = new DiscordFormat((info.url != null) ? `[${content.data}](${info.url})` : content.data)
+            } else {
+                throw new Error("wtf")
+            }
             if (info.bold) {
                 txt.bold.eof()
             }
@@ -1004,15 +1017,28 @@ export function articleMarkdown(contents:ArticleContent[]) {
             if (info.underline) {
                 txt.underline.eof()
             }
-            out += txt.toString()
+            if (markType === MarkType.GITHUB) {
+                out += (info.url != null) ? `[${txt.toString()}](${info.url})` : txt.toString()
+            } else if (markType === MarkType.DISCORD) {
+                out += txt.toString() + blankChar2
+            }
         } else if (content.type === "image") {
             const info = content.info as ImageType
-            let name:string = info.src
-            if (name.indexOf("?") >= 0) {
-                name = name.substring(0, name.indexOf("?"))
+            if (markType === MarkType.GITHUB) {
+                /*
+                let src = info.src
+                if (info.width > 0 && info.height > 0) {
+                    src += ` =${info.width}x${info.height}`
+                }
+                */
+                let imgmd = `![${info.name}](${info.src})`
+                if (info.linkURL.length >= 1) {
+                    imgmd = `[${imgmd}](${info.linkURL})`
+                }
+                out += imgmd
+            } else if (markType === MarkType.DISCORD) {
+                out += `[이미지 - ${info.name}](${info.src})`
             }
-            name = name.substr(name.lastIndexOf("/") + 1)
-            out += `![${name}](${info.src})`
         } else if (content.type === "embed") {
             const url = content.data
             if (url.length >= 1) {
@@ -1020,13 +1046,45 @@ export function articleMarkdown(contents:ArticleContent[]) {
             }
         } else if (content.type === "nvideo") {
             const info = content.info as NaverVideo
-            out += `[${info.title} - ${info.author.nickname})](${info.share})`
+            if (markType === MarkType.GITHUB) {
+                out += `[![Thumbnail-${info.masterVideoId}](${info.previewImg})](${info.share})\n`
+            }
+            out += `[${info.title} - ${info.author.nickname}](${info.share})`
         } else if (content.type === "vote") {
             // skip.
             out += `[네이버 투표](${content.data})`
         } else if (content.type === "youtube") {
             const info = content.info as ytdl.videoInfo
+            if (markType === MarkType.GITHUB) {
+                out += `[![Thumbnail-${info.video_id}](${info.thumbnail_url})](${info.video_url})\n`
+            }
             out += `[${info.title} - ${info.author.name}](${info.video_url})`
+        } else if (content.type === "table") {
+            const info = content.info as TableType
+            const tableOut:string[] = []
+            if (info.header.length === 1) {
+                let column = "|"
+                let endColumn = "|"
+                for (const tel of info.header[0]) {
+                    column += " " + tel + " |"
+                    endColumn += " " + "".padStart(tel.length, "-") + " |"
+                }
+                tableOut.push(column, endColumn)
+            } else {
+                tableOut.push("|  |  |", "| - | - |")
+            }
+            if (info.body.length >= 1) {
+                for (const body of info.body) {
+                    let column = "|"
+                    for (const tel of body) {
+                        column += " " + tel + " |"
+                    }
+                    tableOut.push(column)
+                }
+            }
+            addLineSep()
+            out += tableOut.join("\n")
+            addLineSep()
         }
     }
     return out

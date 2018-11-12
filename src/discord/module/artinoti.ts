@@ -5,7 +5,7 @@ import Log from "../../log"
 import { cafePrefix } from "../../ncc/ncconstant"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
-import { UniqueID } from "../rundefine"
+import { MarkType, UniqueID } from "../rundefine"
 import { CmdParam } from "../rundefine"
 import { articleMarkdown, CommandHelp, DiscordFormat } from "../runutil"
 import { AuthConfig } from "./auth"
@@ -101,7 +101,7 @@ export default class ArtiNoti extends Plugin {
                             const fname = attach.substring(attach.lastIndexOf("/") + 1, attach.lastIndexOf("?"))
                             attaches.push(new Discord.Attachment(attach, fname))
                         }
-                        rich.setDescription(articleMarkdown(article.contents))
+                        rich.setDescription(articleMarkdown(article.contents, MarkType.DISCORD))
                         rich.setURL(`${cafePrefix}/${cafe.cafeName}/${article.articleId}`)
                         try {
                             const authlist = await this.sub(new AuthConfig(), guild.id, false)

@@ -68,6 +68,8 @@ export interface ImageType {
     src:string;
     width:number;
     height:number;
+    name:string;
+    linkURL:string; // Why I should implement this?????
 }
 export interface UrlType {
     url:string;
@@ -83,6 +85,20 @@ export interface TextType {
     content:string;
     style:TextStyle;
 }
+export interface TableType {
+    /**
+     * Column first
+     * 
+     * Row second
+     */
+    header:string[][];
+    /**
+     * Column first
+     * 
+     * Row second
+     */
+    body:string[][];
+}
 // Array<{content:string, style:TextStyle}>
-export type InfoType = NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
-export type ContentType = "embed" | "image" | "text" | "newline" | "vote" | "nvideo" | "youtube"
+export type InfoType = NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle | TableType
+export type ContentType = "embed" | "image" | "text" | "newline" | "vote" | "nvideo" | "youtube" | "table"

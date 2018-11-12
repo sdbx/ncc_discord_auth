@@ -16,10 +16,15 @@ export function parseVideo(json:object):NaverVideo {
         bitrateAudio: Number.parseFloat(v.bitrate.audio),
         source: v.source,
     } as VideoInfo))
-    const thumbnails = res.thumbnails.list.map((v) => ({
-        time: Number.parseFloat(v.time),
-        imageUrl: v.source,
-    } as ThumbnailInfo))
+    let thumbnails:ThumbnailInfo[]
+    if (res.thumbnails != null && res.thumbnails.list != null) {
+        thumbnails = res.thumbnails.list.map((v) => ({
+            time: Number.parseFloat(v.time),
+            imageUrl: v.source,
+        } as ThumbnailInfo))
+    } else {
+        thumbnails = []
+    }
     const meta = res.meta
     let countURL:string = ""
     for (const apiPair of meta.apiList) {

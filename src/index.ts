@@ -4,6 +4,7 @@ import Discord from "discord.js"
 import readline from "readline"
 import request from "request-promise-native"
 import ytdl from "ytdl-core"
+import { MarkType } from "./discord/rundefine"
 import Runtime, { MainCfg } from "./discord/runtime"
 import { articleMarkdown, DiscordFormat, getFirst } from "./discord/runutil"
 import Log from "./log"
@@ -43,10 +44,10 @@ async function checkEnv() {
         }
     }
 }
-Log.hook()
+// Log.hook()
 Log.enable = true
-checkEnv().then(() => start())
-// test()
+// checkEnv().then(() => start())
+test()
 // client()
 
 async function test() {
@@ -63,8 +64,8 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7698)
-            Log.d("Markdown", articleMarkdown(article.contents))
+            const article = await ncc.getArticleDetail(26686242, 7702)
+            console.log(articleMarkdown(article.contents, MarkType.GITHUB))
         }
     }
 }
