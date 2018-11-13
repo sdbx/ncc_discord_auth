@@ -39,8 +39,8 @@ export class CommandHelp {
     private _description:string // Description command
     private example:Map<string, string> // example parameter.. todo.
     // public singleWord:boolean; // receive only single word?
-    public constructor(commands:string, desc:string,complex:boolean = false,
-        options?:{ reqAdmin?:boolean, chatType?:"dm" | "guild", example?:Map<string, string>}) {
+    public constructor(commands:string, desc:string, complex:boolean = false,
+        options?:{ reqAdmin?:boolean, chatType?:"dm" | "guild", example?:Map<string, string> }) {
         this.cmds = commands.split(seperator)
         this._description = desc
         this.example = this.safeGet(this.example, new Map())
@@ -65,7 +65,7 @@ export class CommandHelp {
         return this._description
     }
     public addField(type:ParamType, content:string,
-        require:boolean, options:{code?:string[], accept?:ParamAccept} = {}) {
+        require:boolean, options:{ code?:string[], accept?:ParamAccept } = {}) {
         this.params.push({
             type,
             code: this.safeGet(options.code, []),
@@ -83,7 +83,7 @@ export class CommandHelp {
     public get simpleTitle():string {
         return this.getTitle(true)
     }
-    public check(global:{prefix:RegExp, simplePrefix:string}, content:string, state?:CmdParam):CommandStatus {
+    public check(global:{ prefix:RegExp, simplePrefix:string }, content:string, state?:CmdParam):CommandStatus {
         const output = {
             match: false,
             reqParam: false,
@@ -109,7 +109,7 @@ export class CommandHelp {
             if (blocks == null) {
                 // @TODO return cmd not match
                 return new CommandStatus(output.match, output.reqParam, output.requires,
-                     output.opticals, output.command)
+                    output.opticals, output.command)
             }
             for (const block of blocks) {
                 const field = getFirst(this.fields.filter((v) => v.type === block.type))
@@ -199,7 +199,7 @@ export class CommandHelp {
                     if (block.subType == null && require.code.length === 1) {
                         block.subType = require.code[0].split(seperator)[0]
                     }
-                    output.requires.set(require.type, block)   
+                    output.requires.set(require.type, block)
                 }
                 i += 1
             }
@@ -212,7 +212,7 @@ export class CommandHelp {
                     if (block.subType == null && optical.code.length === 1) {
                         block.subType = optical.code[0].split(seperator)[0]
                     }
-                    output.opticals.set(optical.type, block)   
+                    output.opticals.set(optical.type, block)
                 }
                 i += 1
             }
@@ -229,12 +229,12 @@ export class CommandHelp {
     }
     protected getCommand(str:string) {
         const suffix = getFirst(
-            str.match(new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig,"|")})?$`,"ig"))
+            str.match(new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig, "|")})?$`, "ig"))
         )
         if (suffix == null) {
             return null
         }
-        const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig,"|")})$`,"ig"), "").trim()
+        const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig, "|")})$`, "ig"), "").trim()
         return {
             short,
             long: getFirst(this.cmds.filter((v) => short === v)),
@@ -246,7 +246,7 @@ export class CommandHelp {
         if (chain.match(prefix) == null) {
             return null
         }
-        chain = chain.replace(prefix,"").trimLeft()
+        chain = chain.replace(prefix, "").trimLeft()
         // cut suffix
         const suffixReg = new RegExp(`(${this.cmds.join("|")})(${ParamType.do.replace(/\//ig, "|")})?$`, "ig")
         const suffix = getFirst(chain.match(suffixReg))
@@ -267,7 +267,7 @@ export class CommandHelp {
                 mergeCommands.push(...destCommands)
             }
             // regex match for block
-            const fsmatch = new RegExp(`.*(${mergeCommands.join("|")})(${destCommands.join("|")})?\\s+`,"ig")
+            const fsmatch = new RegExp(`.*(${mergeCommands.join("|")})(${destCommands.join("|")})?\\s+`, "ig")
             let regexMatch = getFirst(chain.match(fsmatch)) // regexMatch must have "TRIM" on right
             if (regexMatch != null) {
                 // check cmd
@@ -277,7 +277,7 @@ export class CommandHelp {
                 let ends = ""
                 if (filter != null) {
                     const codeObj = getFirst(field.code
-                        .map((v, i) => ({ obj: this.endsWith(filter.str, v.split(seperator)), index:i}))
+                        .map((v, i) => ({ obj: this.endsWith(filter.str, v.split(seperator)), index: i }))
                         .filter((v) => v.obj != null))
                     if (codeObj != null) {
                         codeID = field.code[codeObj.index]
@@ -350,7 +350,7 @@ export class CommandHelp {
             if (guideCode) {
                 echo += `{${cmds.join(" | ")}}${splitter}`
             } else if (cmds.length === 1) {
-                echo += `${cmds[0]}${splitter}` 
+                echo += `${cmds[0]}${splitter}`
             }
         }
         if (value.desc.length >= 1) {
@@ -363,7 +363,7 @@ export class CommandHelp {
         }
         echo += value.require ? ">" : "]"
         if (korMode) {
-            echo += `{${value.type.replace(/\//ig,",")}}`
+            echo += `{${value.type.replace(/\//ig, ",")}}`
         }
         return echo
     }
@@ -400,7 +400,7 @@ export class CommandHelp {
                 }
                 return Math.round((this.safeGet(str.match(alphabetCmd), []).length / str.length) * 1000)
             }
-            arr.sort((a,b) => {
+            arr.sort((a, b) => {
                 return delta(a) - delta(b)
             })
             return arr[hangul ? 0 : arr.length - 1]
@@ -483,7 +483,7 @@ export class DiscordFormat {
         if (user == null) {
             return null
         }
-        return user instanceof Discord.GuildMember ? 
+        return user instanceof Discord.GuildMember ?
             (user.nickname == null ? user.user.username : user.nickname) : user.username
     }
     /**
@@ -694,26 +694,26 @@ export class DiscordFormat {
     public toString() {
         let format = "%s"
         if (this._underline) {
-            format = format.replace("%s","__%s__")
+            format = format.replace("%s", "__%s__")
         }
         if (this._namu) {
-            format = format.replace("%s","~~%s~~")
+            format = format.replace("%s", "~~%s~~")
         }
         if (this._italic) {
-            format = format.replace("%s","*%s*")
+            format = format.replace("%s", "*%s*")
         }
         if (this._bold) {
-            format = format.replace("%s","**%s**")
+            format = format.replace("%s", "**%s**")
         }
         if (this._block || this._blockBig) {
             format = "%s"
             if (this._block) {
                 format = format.replace("%s", "`%s`")
             } else {
-                format = format.replace("%s","```%s```")
+                format = format.replace("%s", "```%s```")
             }
         }
-        return format.replace("%s",this._content)
+        return format.replace("%s", this._content)
     }
 }
 export class CommandStatus {
@@ -725,11 +725,11 @@ export class CommandStatus {
 
     constructor(cmdMatch:boolean, reqParam:boolean, require:Map<ParamType, FieldBlock>
         , opt:Map<ParamType, FieldBlock>, command:string) {
-            this.commandMatch = cmdMatch
-            this.requireParam = reqParam
-            this.requires = require
-            this.opticals = opt
-            this.command = command
+        this.commandMatch = cmdMatch
+        this.requireParam = reqParam
+        this.requires = require
+        this.opticals = opt
+        this.command = command
     }
     public has(key:ParamType) {
         return this.exist(key)
@@ -756,7 +756,7 @@ export class CommandStatus {
         if (end >= commands.length || start > end) {
             return null
         } else {
-            const filter = commands.filter((_v,_i) => _i >= start && _i < end)
+            const filter = commands.filter((_v, _i) => _i >= start && _i < end)
             return filter.length >= 1 ? filter.join(" ") : null
         }
     }
@@ -765,7 +765,7 @@ export class CommandStatus {
         if (depth >= commands.length) {
             return null
         }
-        return commands[Math.max(0,commands.length - depth)]
+        return commands[Math.max(0, commands.length - depth)]
     }
     public get match():boolean {
         return this.commandMatch && !this.requireParam
@@ -853,7 +853,7 @@ export function substrMatch(str:string, start:number | string[], end:number | st
             start = 0
         }
     }
-    start = Math.max(0,start + startOffset)
+    start = Math.max(0, start + startOffset)
     if (Array.isArray(end)) {
         let n = -1
         for (const value of end) {
@@ -890,7 +890,7 @@ export function toLowerString(str:string) {
     return str.split("_").map((v) => {
         v = v.toLowerCase()
         if (v.length >= 2) {
-            v = v.charAt(0).toUpperCase() + v.substr(1)       
+            v = v.charAt(0).toUpperCase() + v.substr(1)
         } else if (v.length >= 1) {
             v = v.charAt(0).toUpperCase()
         }
@@ -926,8 +926,8 @@ export function humanFileSize(bytes:number, si:boolean = true):string {
         return bytes + ' B'
     }
     const units = si
-        ? ['kB','MB','GB','TB','PB','EB','ZB','YB']
-        : ['KiB','MiB','GiB','TiB','PiB','EiB','ZiB','YiB']
+        ? ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+        : ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
     let u = -1
     do {
         bytes /= thresh
@@ -1001,7 +1001,10 @@ export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
             if (markType === MarkType.GITHUB) {
                 txt = new DiscordFormat(content.data)
             } else if (markType === MarkType.DISCORD) {
-                txt = new DiscordFormat((info.url != null) ? `[${content.data}](${info.url})` : content.data)
+                let data = content.data
+                // before processing
+                data = data.replace(/\\/ig, "\\\\").replace(/\*/ig, "\\*").replace(/~/ig, "\\~")
+                txt = new DiscordFormat((info.url != null) ? `[${data}](${info.url})` : data)
             } else {
                 throw new Error("wtf")
             }
@@ -1020,10 +1023,18 @@ export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
             if (markType === MarkType.GITHUB) {
                 out += (info.url != null) ? `[${txt.toString()}](${info.url})` : txt.toString()
             } else if (markType === MarkType.DISCORD) {
-                out += txt.toString() + blankChar2
+                if (info.bold || info.italic || info.namu || info.underline) {
+                    out += txt.toString() + blankChar2
+                } else {
+                    out += txt.toString()
+                }
             }
         } else if (content.type === "image") {
             const info = content.info as ImageType
+            let name = info.name
+            if (name.length <= 0) {
+                name = "Image"
+            }
             if (markType === MarkType.GITHUB) {
                 /*
                 let src = info.src
@@ -1031,13 +1042,13 @@ export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
                     src += ` =${info.width}x${info.height}`
                 }
                 */
-                let imgmd = `![${info.name}](${info.src})`
+                let imgmd = `![${name}](${info.src})`
                 if (info.linkURL.length >= 1) {
                     imgmd = `[${imgmd}](${info.linkURL})`
                 }
                 out += imgmd
             } else if (markType === MarkType.DISCORD) {
-                out += `[이미지 - ${info.name}](${info.src})`
+                out += `[${name}](${info.src})`
             }
         } else if (content.type === "embed") {
             const url = content.data
@@ -1070,7 +1081,7 @@ export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
                     endColumn += " " + "".padStart(tel.length, "-") + " |"
                 }
                 tableOut.push(column, endColumn)
-            } else {
+            } else if (markType === MarkType.GITHUB) {
                 tableOut.push("|  |  |", "| - | - |")
             }
             if (info.body.length >= 1) {
@@ -1086,6 +1097,10 @@ export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
             out += tableOut.join("\n")
             addLineSep()
         }
+    }
+    if (markType === MarkType.DISCORD) {
+        // post-process
+        out = out.replace(/\s*\n[\n\s]*/ig, "\n")
     }
     return out
 }
@@ -1103,7 +1118,7 @@ export function cloneMessage(msg:Discord.Message) {
     }
     const content = msg.content
     for (const [, attach] of msg.attachments) {
-        attaches.push(new Discord.Attachment(attach.url,attach.filename))
+        attaches.push(new Discord.Attachment(attach.url, attach.filename))
     }
     for (const embed of msg.embeds) {
         const richEmbed = new Discord.RichEmbed()
@@ -1157,7 +1172,7 @@ export class SnowFlake {
     public static from(snowflake:string) {
         const L = Long.fromString(snowflake, true, 10)
         const th = new SnowFlake()
-        
+
         th.timestamp = L.shiftRight(22).toNumber() + 1420070400000
         th.increment = L.and(0xFFF).toNumber()
         th.iWorkerID = L.and(0x3E0000).shiftRight(17).toNumber()

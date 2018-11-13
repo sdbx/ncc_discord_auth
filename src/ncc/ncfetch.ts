@@ -12,8 +12,8 @@ import Cache from "../cache"
 import Log from "../log"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
     CAFE_VOTE_SITE, cafePrefix, CHATAPI_MEMBER_SEARCH,
-    mCafePrefix, naverRegex, VIDEO_PLAYER_PREFIX, VIDEO_PLAYER_URL,
-    VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDeco, whitelistDig } from "./ncconstant"
+    mCafePrefix, NAVER_THUMB_PROXY, naverRegex, VIDEO_PLAYER_PREFIX,
+    VIDEO_PLAYER_URL, VIDEO_REQUEST, VIDEO_SHARE_URL, videoOpt, whitelistDeco, whitelistDig } from "./ncconstant"
 import { getFirst, parseFile, withName } from "./nccutil"
 import NcCredent from "./ncredent"
 import Article, { ArticleContent, ContentType, ImageType, InfoType, TextStyle, TextType } from "./structure/article"
@@ -323,11 +323,15 @@ export default class NcFetch extends NcCredent {
                 minute: parseInt(hm[1], 10),
                 offset: 3600 * 9 * 1000,
             }
+            let content = $(el).find(".u_cbox_contents").text()
+            if (content == null) {
+                content = ""
+            }
             return {
                 cafeId: cafeid,
                 userid: reft.substring(reft.lastIndexOf("=") + 1),
                 nickname: author.text(),
-                content: $(el).find(".u_cbox_contents").text(),
+                content,
                 timestamp: new Date(time.year, time.month, time.day, time.hour, time.minute).getTime() - time.offset,
                 imageurl: imgurl,
                 stickerurl,
@@ -357,6 +361,7 @@ export default class NcFetch extends NcCredent {
         const infos = $(".etc-box .p-nick a").attr("onclick").split(",")
         const link = $(".etc-box #linkUrl").text()
         const title = $(".tit-box span").text()
+        const category = $(".tit-box > .fl").find("a").text()
         // parse attaches
         const attaches = $(".download_opt").map((i, el) => {
             return getFirst($(el).children("a").map((i2, el2) => {
@@ -412,19 +417,9 @@ export default class NcFetch extends NcCredent {
                 const qImg = c$.find("img")
                 if (qImg.length === 1) {
                     const url = qImg.attr("src")
-                    if (url != null && url.startsWith("http")) {
-                        let u = url.substr(url.indexOf("src=") + 4)
-                        if (u.indexOf("&") >= 0) {
-                            u = u.substring(0,u.indexOf("&"))
-                        }
-                        u = decodeURIComponent(u)
-                        if (u.startsWith("\"")) {
-                            u = u.substr(1)
-                        }
-                        if (u.endsWith("\"")) {
-                            u = u.substring(0, u.length - 1)
-                        }
-                        linkInfo.image = u
+                    if (url != null && url.startsWith("https://dthumb-phinf.pstatic.net/")) {
+                        // linkInfo.image = this.decodeThumb(url)
+                        linkInfo.image = url
                         const query = url.lastIndexOf("type=")
                         if (query >= 0) {
                             const nums = url.substr(query).match(/\d+/ig)
@@ -564,25 +559,23 @@ export default class NcFetch extends NcCredent {
                     // whitelist of decoration
                     const texts:TextType[] = []
                     // .replace(/&lt;\/?font.*?&gt;/ig, "")
-                    let rawContent = $(value).html().replace(/<\/?font.*?>/ig, "")
-                    let useImageLink = false
+                    let rawContent = $(value).html().replace(/<\/?(font|span).*?>/ig, "").replace(/<br>/ig, "")
                     if (value.tagName === "a" && rawContent.search(/<img.*?>/ig) >= 0) {
                         let img:ArticleContent
                         $(value).find("img").each((vI, vEl) => {
-                            Log.d("IMG!")
                             if (img == null) {
                                 img = this.parseImageTag(vEl) as ArticleContent
                             }
                         })
                         if (img != null) {
-                            useImageLink = true;
                             (img.info as ImageType).linkURL = flags.url
                             type = "image"
                             data = img.data
                             info = img.info
+                            return {type, data, info}
                         }
                     }
-                    while (!useImageLink && rawContent.length >= 1) {
+                    while (rawContent.length >= 1) {
                         const index = rawContent.search(/<\/?(b|u|i|strike)>/g)
                         if (index < 0) {
                             texts.push({
@@ -671,15 +664,34 @@ export default class NcFetch extends NcCredent {
                 contents.push(element)
             }
         }
-        const images = contents.filter((value) => value.type === "image")
+        const images = contents.map((value) => {
+            if (value.type === "image") {
+                const info = value.info as ImageType
+                return info
+            } else if (value.type === "nvideo") {
+                const info = value.info as NaverVideo
+                return {
+                    src: info.previewImg,
+                    width: 1280,
+                    height: 720,
+                }
+            } else if (value.type === "youtube") {
+                const info = value.info as ytdl.videoInfo
+                return {
+                    src: info.thumbnail_url,
+                    width: 1280,
+                    height: 720,
+                }
+            } else {
+                return null
+            }
+        }).filter((v) => v != null && v.src != null)
         let image = null
         if (images.length >= 1) {
             images.sort((a, b) => {
-                const ainfo = a.info as {width:number, height:number}
-                const binfo = b.info as {width:number, height:number}
-                return Math.abs(binfo.width * binfo.width) - Math.abs(ainfo.width * ainfo.width)
+                return Math.abs(b.width * b.width) - Math.abs(a.width * a.width)
             })
-            image = images[0].data
+            image = images[0].src
         }
         // name
         const _titles = this.parser.decode($("head").html()).match(/var cafeNameTitle =.+/ig)
@@ -688,7 +700,7 @@ export default class NcFetch extends NcCredent {
             titles = _titles[0].substring(_titles[0].indexOf('"') + 1,_titles[0].lastIndexOf('"'))
         }
 
-        const out = {
+        const out:Article = {
             cafeId: Number.parseInt(this.querystr(infos[4])),
             cafeName: link.substring(link.indexOf("/") + 1, link.lastIndexOf("/")),
             cafeDesc: titles,
@@ -708,6 +720,7 @@ export default class NcFetch extends NcCredent {
             contents,
             imageURL: image,
             attaches: attaches == null ? [] : attaches,
+            categoryName: category,
         }
         return out
         // https://cafe.naver.com/ArticleRead.nhn?clubid=26686242&
@@ -1090,6 +1103,29 @@ export default class NcFetch extends NcCredent {
         return encoding.convert(str, "euc-kr").toString("hex").replace(/([a-f0-9]{2})/g, "%$1").toUpperCase()
     }
     /**
+     * Decode dthumb-phint to real src
+     * @param url URL
+     */
+    private decodeThumb(url:string) {
+        if (url == null) {
+            return ""
+        } else if (url.startsWith(NAVER_THUMB_PROXY)) {
+            let u = url.substr(url.indexOf("src=") + 4)
+            if (u.indexOf("&") >= 0) {
+                u = u.substring(0,u.indexOf("&"))
+            }
+            u = decodeURIComponent(u)
+            if (u.startsWith("\"")) {
+                u = u.substr(1)
+            }
+            if (u.endsWith("\"")) {
+                u = u.substring(0, u.length - 1)
+            }
+            return u
+        }
+        return url
+    }
+    /**
      * Remove get parameter
      * @param str URL
      * @param decode decodeURIComponent?
@@ -1141,11 +1177,12 @@ export default class NcFetch extends NcCredent {
         }
         // name
         const src = el.attribs["src"]
-        let name = src
+        let name = this.decodeThumb(src)
         if (name != null && name.indexOf("?") >= 0) {
             name = name.substring(0, name.indexOf("?"))
         }
         name = name.substr(name.lastIndexOf("/") + 1)
+        name = decodeURIComponent(name)
         // return
         return {type: "image", data: src, info: {
             src,

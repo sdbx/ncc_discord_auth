@@ -9,6 +9,7 @@ export const whitelistDeco = ["strike", "u", "b", "i", "a"]
 export const CHAT_HOME_URL = "https://talk.cafe.naver.com"
 export const CHAT_API_URL = `${CHAT_HOME_URL}/talkapi/v1`
 export const CAFE_DEFAULT_IMAGE = `https://ssl.pstatic.net/static/cafe/chatting/default_cafe.png`
+export const NAVER_THUMB_PROXY = `https://dthumb-phinf.pstatic.net`
 export enum CHAT_APIS {
     CHANNEL = "channels",
     CAFE = "categories",

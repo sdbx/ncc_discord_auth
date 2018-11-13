@@ -46,8 +46,8 @@ async function checkEnv() {
 }
 // Log.hook()
 Log.enable = true
-// checkEnv().then(() => start())
-test()
+checkEnv().then(() => start())
+// test()
 // client()
 
 async function test() {
@@ -65,7 +65,7 @@ async function test() {
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
             const article = await ncc.getArticleDetail(26686242, 7702)
-            console.log(articleMarkdown(article.contents, MarkType.GITHUB))
+            console.log(articleMarkdown(article.contents, MarkType.DISCORD))
         }
     }
 }

@@ -41,7 +41,7 @@ export default interface Article extends Cafe {
      * 
      * length is zero if not exists.
      */
-    attaches:string[]; // attach file urls
+    attaches?:string[]; // attach file urls
     /**
      * Article's Comments
      */
@@ -55,9 +55,13 @@ export default interface Article extends Cafe {
      */
     contents?:ArticleContent[]; // content (max.3?)
     /**
-     * Thinking
+     * @todo mobile parse?
      */
     previewImage?:string;
+    /**
+     * Where article wrote?
+     */
+    categoryName?:string;
 }
 export interface ArticleContent {
     type:ContentType,
