@@ -689,7 +689,7 @@ export default class NcFetch extends NcCredent {
         let image = null
         if (images.length >= 1) {
             images.sort((a, b) => {
-                return Math.abs(b.width * b.width) - Math.abs(a.width * a.width)
+                return (b.width * b.height) - (a.width * a.height)
             })
             image = images[0].src
         }
