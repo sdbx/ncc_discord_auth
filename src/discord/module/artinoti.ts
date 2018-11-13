@@ -67,8 +67,10 @@ export default class ArtiNoti extends Plugin {
                 const cafe = await this.ncc.parseNaver(cfg.cafeURL)
                 const article = await this.ncc.getArticleDetail(
                     cafe.cafeId, Number.parseInt(testChecker.get(ParamType.dest)))
-                const rich = await this.articleToRich(cafe, article, guild)
-                await msg.channel.send(rich)
+                const riches = await this.articleToRich(cafe, article, guild)
+                for (const rich of riches) {
+                    await msg.channel.send(rich)
+                }
             } catch (err) {
                 Log.e(err)
             }
@@ -106,14 +108,17 @@ export default class ArtiNoti extends Plugin {
                 }
                 articles = articles.filter((_v) => _v.articleId > lastID)
                 for (const _ar of articles) {
-                    const sendContent = await this.articleToRich(cafe, _ar, guild)
-                    if (sendContent == null) {
+                    const sendContents = await this.articleToRich(cafe, _ar, guild)
+                    if (sendContents.length === 0) {
                         Log.w("Article", "Article parse failed!")
                         continue
                     }
                     for (const _v of cfg.toPostChannel) {
                         if (this.client.channels.has(_v)) {
-                            await (this.client.channels.get(_v) as Discord.TextChannel).send(sendContent)
+                            const ch = this.client.channels.get(_v) as Discord.TextChannel
+                            for (const rich of sendContents) {
+                                await ch.send(rich)
+                            }
                         }
                     }
                 }
@@ -122,7 +127,7 @@ export default class ArtiNoti extends Plugin {
             }
         }
     }
-    protected async articleToRich(cafe:Cafe, arti:Article, guild?:Discord.Guild):Promise<MessageOptions> {
+    protected async articleToRich(cafe:Cafe, arti:Article, guild?:Discord.Guild) {
         try {
             const article = await this.ncc.getArticleDetail(cafe.cafeId, arti.articleId)
             const user = await this.ncc.getMemberById(cafe.cafeId,article.userId)
@@ -142,7 +147,6 @@ export default class ArtiNoti extends Plugin {
                     attach.substring(attach.lastIndexOf("/") + 1, attach.lastIndexOf("?")))
                 attaches.push(new Discord.Attachment(attach, fname))
             }
-            rich.setDescription(articleMarkdown(article.contents, MarkType.DISCORD))
             rich.setURL(`${cafePrefix}/${cafe.cafeName}/${article.articleId}`)
             try {
                 if (guild != null) {
@@ -170,11 +174,11 @@ export default class ArtiNoti extends Plugin {
             for (const comment of article.comments) {
                 const sendCon = comment.content.length >= 1 ? (" " + comment.content) : ""
                 if (comment.imageurl != null) {
-                    comments.push(`**${comment.nickname}**: [이미지](${comment.imageurl})${sendCon}`)
+                    comments.push(`**${comment.nickname}** [이미지](${comment.imageurl})${sendCon}`)
                 } else if (comment.stickerurl != null) {
-                    comments.push(`**${comment.nickname}**: [스티커](${comment.stickerurl})${sendCon}`)
+                    comments.push(`**${comment.nickname}** [스티커](${comment.stickerurl})${sendCon}`)
                 } else {
-                    comments.push(`**${comment.nickname}**:${sendCon}`)
+                    comments.push(`**${comment.nickname}**${sendCon}`)
                 }
             }
             if (comments.length >= 1) {
@@ -206,11 +210,45 @@ export default class ArtiNoti extends Plugin {
             if (icons.length >= 1) {
                 rich.setTitle(article.articleTitle + " " + icons.join(" "))
             }
-            return {
+            // split
+            const contentSplit = articleMarkdown(article.contents, MarkType.DISCORD).split("\n")
+            const contents:string[] = []
+            let conCache:string = ""
+            while (contentSplit.length >= 1) {
+                const piece = contentSplit.shift() + "\n"
+                if (piece.length + conCache.length >= 2045) {
+                    // push content and reset
+                    conCache = conCache.substring(0, conCache.length - 1)
+                    contents.push(conCache)
+                    conCache = piece
+                } else {
+                    conCache += piece
+                }
+            }
+            if (conCache.length >= 1) {
+                contents.push(conCache)
+            }
+            const out:Array<MessageOptions | Discord.RichEmbed> = []
+            if (contents.length === 0) {
+                rich.setDescription("내용 없음")
+            } else {
+                rich.setDescription(contents[0] + ((contents.length >= 2) ? "..." : ""))
+            }
+            out.push({
                 embed: rich,
                 files: attaches,
                 disableEveryone: true,
+            } as MessageOptions)
+            if (contents.length >= 2) {
+                contents.shift()
+                out.push(...contents.map((v) => {
+                    const _rich = new Discord.RichEmbed()
+                    _rich.setTitle("더 보기")
+                    _rich.setDescription(v)
+                    return _rich
+                }))
             }
+            return out
         } catch (err2) {
             Log.e(err2)
         }
