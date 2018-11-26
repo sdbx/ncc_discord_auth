@@ -23,14 +23,28 @@ async function start() {
     run = new Runtime()
     run.on("restart",async () => {
         run.removeAllListeners("restart")
-        await run.destroy()
+        try {
+            await run.destroy()
+        } catch (err) {
+            Log.e(err)
+        }
         Log.d("Main", "Restarting Runtime...")
         setTimeout(start, 5000)
     })
-    run.start().catch((err) => {
+    try {
+        run.start()
+    } catch (err) {
         Log.e(err)
-        setTimeout(start, 10000)
-    })
+        if (run != null) {
+            try {
+                await run.destroy()
+            } catch {
+                // rip
+            }
+            setTimeout(start, 10000)
+        }
+    }
+    run.start()
 }
 async function checkEnv() {
     if (process.env.tokenKey !== undefined) {
