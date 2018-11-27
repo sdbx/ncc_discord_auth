@@ -1,13 +1,17 @@
 import { decode, encode } from "bencodex"
 import chalk from "chalk"
 import Discord from "discord.js"
+import fs from "fs-extra"
+import os from "os"
 import readline from "readline"
 import request from "request-promise-native"
+import showdown from "showdown"
 import ytdl from "ytdl-core"
 import { MarkType } from "./discord/rundefine"
 import Runtime, { MainCfg } from "./discord/runtime"
 import { articleMarkdown, DiscordFormat, getFirst } from "./discord/runutil"
 import Log from "./log"
+import { ArticleParser } from "./ncc/articleparser"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
 import { ArticleContent, ImageType, TextStyle } from "./ncc/structure/article"
 import Cafe from "./ncc/structure/cafe"
@@ -60,8 +64,8 @@ async function checkEnv() {
 }
 // Log.hook()
 Log.enable = true
-checkEnv().then(() => start())
-// test()
+// checkEnv().then(() => start())
+test()
 // client()
 
 async function test() {
@@ -78,8 +82,11 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7702)
-            console.log(articleMarkdown(article.contents, MarkType.DISCORD))
+            const article = await ncc.getArticleDetail(26686242, 7719)
+            const conv = new showdown.Converter()
+            // const md2HTML = conv.makeHtml(ArticleParser.articleToMd(article, MarkType.GITHUB))
+            const rawHTML = ArticleParser.articleToHTML(article)
+            // await fs.writeFile(os.homedir() + "/Downloads/test.html", Buffer.from(md2HTML, "utf8"))
         }
     }
 }

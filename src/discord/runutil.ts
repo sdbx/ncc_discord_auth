@@ -1,6 +1,7 @@
 import Discord from "discord.js"
 import { MessageMentions } from "discord.js"
 import Long from "long"
+import showdown from "showdown"
 import ytdl from "ytdl-core"
 import Log from "../log"
 import NCaptcha from "../ncc/ncaptcha"
@@ -975,6 +976,11 @@ export function decodeTime(period:number) {
         outs.push(`${Math.floor(period / 86400)}일`)
     }
     return outs.reverse().join(" ")
+}
+export function markdownToHTML(markdown:string) {
+    const conv = new showdown.Converter()
+    const mdHTML = conv.makeHtml(markdown)
+    const htmlForm = `<meta charset="utf-8">\n<html>\n</html>`
 }
 /**
  * Print article's content to markdown.

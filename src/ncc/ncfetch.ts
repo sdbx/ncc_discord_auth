@@ -10,6 +10,7 @@ import request from "request-promise-native"
 import ytdl from "ytdl-core"
 import Cache from "../cache"
 import Log from "../log"
+import { ArticleParser } from "./articleparser"
 import { CAFE_NICKNAME_CHECK, CAFE_PROFILE_UPDATE, CAFE_UPLOAD_FILE,
     CAFE_VOTE_SITE, cafePrefix, CHATAPI_MEMBER_SEARCH,
     mCafePrefix, NAVER_THUMB_PROXY, naverRegex, VIDEO_PLAYER_PREFIX,
@@ -155,13 +156,13 @@ export default class NcFetch extends NcCredent {
             id = Number.parseInt(src.match(/clubid=[0-9]+/m)[0].split("=")[1])
             this.cacheCafeID.set(cafename,new Cache(id, 86400))
         }
-        return this.parseNaverDetail(id)
+        return this.parseCafeDetail(id)
     }
     /**
      * 네이버 카페 ID로 네이버 카페 정보를 받아옵니다.
      * @param cafeid 네카페 숫자 ID
      */
-    public async parseNaverDetail(cafeid:number):Promise<Cafe> {
+    public async parseCafeDetail(cafeid:number):Promise<Cafe> {
         // check cache
         if (this.cacheDetail.has(cafeid) && !this.cacheDetail.get(cafeid).expired) {
             return this.cacheDetail.get(cafeid).cache
@@ -395,6 +396,9 @@ export default class NcFetch extends NcCredent {
                 contents.push({type: "newline", data: "none"})
             }
         }
+        const test = ArticleParser.domToContent(tbody.children().toArray())
+        Log.d("Creta", test.map((v) => v.data).join(","))
+        Log.time()
         const elements:ArticleContent[] = tbody.children().map((i,el) => {
             const c$ = $(el)
             if (c$.find(".og").length >= 1) {
@@ -441,6 +445,7 @@ export default class NcFetch extends NcCredent {
                             namu: false,
                             underline: false,
                             url: linkInfo.url,
+                            size: 0,
                         }
                     }],
                 }]
@@ -464,6 +469,9 @@ export default class NcFetch extends NcCredent {
                 let data:string = ""
                 let info:InfoType
                 Log.d("TagName", value.tagName)
+                if (value.attribs != null) {
+                    Log.d("StyleCode", value.attribs["style"])
+                }
                 if (whitelist.indexOf(value.tagName) >= 0) {
                     // whitelist of external
                     if (value.tagName === "img") {
@@ -535,6 +543,7 @@ export default class NcFetch extends NcCredent {
                         namu: false,
                         underline: false,
                         url: null,
+                        size: 0,
                     }
                     // <\/?(b|u|i|strike)>
                     const setStyle = (code:string, modify:boolean, url?:string) => {
@@ -838,7 +847,7 @@ export default class NcFetch extends NcCredent {
             "memberid": userid,
         }
         const $ = await this.getWeb(`${cafePrefix}/CafeMemberNetworkView.nhn`, paramLevel)
-        const cafe = await this.parseNaverDetail(cafeid)
+        const cafe = await this.parseCafeDetail(cafeid)
         if ($ == null) {
             return Promise.reject("Error")
         }
@@ -913,7 +922,7 @@ export default class NcFetch extends NcCredent {
             page: 1,
             perPage,
         }
-        const cafe = await this.parseNaverDetail(cafeid)
+        const cafe = await this.parseCafeDetail(cafeid)
         if (cafe.cafeUserCount == null) {
             cafe.cafeUserCount = -1
         }
@@ -977,12 +986,17 @@ export default class NcFetch extends NcCredent {
         }
         return uploadImage(this.credit, file, filename)
     }
+    /**
+     * Fetch Cafe's watching users
+     * @param cafeid CafeID
+     */
     public async fetchWatching(cafeid:number) {
         if (this.cacheNCMC4 == null || this.cacheNCMC4.expired) {
             if (!await this.availableAsync()) {
                 return Promise.reject("Not Logined")
             }
-            const str = await this.credit.reqGet("https://cafe.naver.com/sdbx") as string
+            const {cafeName} = await this.parseCafeDetail(cafeid)
+            const str = await this.credit.reqGet("https://cafe.naver.com/" + cafeName) as string
             const first = getFirst(str.match(/.+ncmc4.+/ig))
             if (first == null) {
                 return Promise.reject("Not Logined")

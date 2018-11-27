@@ -84,6 +84,7 @@ export interface TextStyle {
     namu:boolean;
     underline:boolean;
     url:string;
+    size:number;
 }
 export interface TextType {
     content:string;
