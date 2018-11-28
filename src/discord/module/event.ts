@@ -240,8 +240,8 @@ export default class EventNotifier extends Plugin {
                 continue
             }
             for (const u of users) {
-                const i = this.getFirst(org.map((v, _i) => ({ id: v.userid, index: _i }))
-                    .filter((v) => v.id === u.userid))
+                const i = org.map((v, _i) => ({ id: v.userid, index: _i }))
+                    .find((v) => v.id === u.userid)
                 if (i == null) {
                     added.push(u)
                 } else {

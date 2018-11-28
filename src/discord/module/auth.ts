@@ -84,7 +84,7 @@ export default class Auth extends Plugin {
             /**
              * Check duplicate
              */
-            const have = this.getFirst(this.authQueue.filter((v) => v.guildID === guild.id && v.userID === user.id))
+            const have = this.authQueue.find((v) => v.guildID === guild.id && v.userID === user.id)
             if (have != null) {
                 if (await this.inviteExpired(have.uInviteCode)) {
                     (await this.ncc.leaveChannel(have.uChatID)).handleError()
@@ -159,10 +159,10 @@ export default class Auth extends Plugin {
             /**
              * Create room first
              */
-            const filterRoom = this.getFirst(this.ncc.joinedChannels.filter((v) => {
+            const filterRoom = this.ncc.joinedChannels.find((v) => {
                 return v.type === ChannelType.OnetoOne && v.channelInfo.name === member.nickname
                     && v.cafe.cafeId === member.cafeId
-            }))
+            })
             let room:NcChannel
             try {
                 if (filterRoom != null) {
@@ -243,7 +243,7 @@ export default class Auth extends Plugin {
                         }))
                         return Promise.resolve()
                     }
-                    const gu = this.getFirst(guildCfg.users.filter((v) => v.userID === member.user.id))
+                    const gu = guildCfg.users.find((v) => v.userID === member.user.id)
                     if (gu != null) {
                         try {
                             naver = await this.ncc.getMemberById(cafe.cafeId, gu.naverID)
@@ -278,7 +278,7 @@ export default class Auth extends Plugin {
                     type: "",
                 }))
             } else {
-                const idOwner = this.getFirst(guildCfg.users.filter((v) => v.naverID === naver.userid))
+                const idOwner = guildCfg.users.find((v) => v.naverID === naver.userid)
                 let idUser:Discord.GuildMember
                 if (idOwner != null) {
                     idUser = guild.members.get(idOwner.userID)
@@ -325,7 +325,7 @@ export default class Auth extends Plugin {
                     }
                 }
                 if (banUid != null) {
-                    const uid = getFirst(cfg.users.filter((v) => v.userID === banUid))
+                    const uid = cfg.users.find((v) => v.userID === banUid)
                     if (uid != null) {
                         banUser = uid.naverID
                     }
@@ -426,7 +426,7 @@ export default class Auth extends Plugin {
         const cfg = await this.sub(this.config, queue.guildID)
         const guild = this.client.guilds.get(queue.guildID)
         const member = guild.member(queue.userID)
-        const toRole = this.getFirstMap(guild.roles.filter((v) => v.name === cfg.destRole))
+        const toRole = guild.roles.find((v) => v.name === cfg.destRole)
         if (toRole == null || member == null) {
             return cfg.destRole + " role not found / Contact admin."
         }
@@ -443,7 +443,7 @@ export default class Auth extends Plugin {
     }
     protected async onNccMessage(channel:NcChannel, message:NcMessage) {
         const roomID = message.channelId
-        const queue = this.getFirst(this.authQueue.filter((_v) => _v.uChatID === roomID))
+        const queue = this.authQueue.find((_v) => _v.uChatID === roomID)
         if (queue == null || queue.naverID !== message.author.naverId) {
             return Promise.resolve()
         }
@@ -501,9 +501,9 @@ export default class Auth extends Plugin {
     }
     protected async onGuildMemberAdd(member:Discord.GuildMember) {
         const user = member.user
-        const queue = this.getFirst(this.authQueue.filter((v) => {
+        const queue = this.authQueue.find((v) => {
             return v.userID === user.id && v.proxyID === member.guild.id
-        }))
+        })
         if (queue == null) {
             return Promise.resolve()
         }
@@ -550,7 +550,7 @@ export default class Auth extends Plugin {
         if (guild == null || !(guild instanceof Discord.Guild)) {
             return null
         }
-        return this.getFirstMap((await guild.fetchInvites()).filter((v) => v.code === id))
+        return (await guild.fetchInvites()).find((v) => v.code === id)
     }
     private deleteQueue(queue:AuthInfo) {
         this.authCache.forEach((v, i) => {
@@ -578,8 +578,7 @@ export default class Auth extends Plugin {
     }
 }
 export function getNaver(authlist:AuthConfig, guildid:string, userid:string):string {
-    return getFirst(authlist.users.filter(
-        (_v) => _v.guildID === guildid && _v.userID === userid).map((_v) => _v.naverID))
+    return authlist.users.find((_v) => _v.guildID === guildid && _v.userID === userid).naverID
 }
 enum PType {
     ID = "id/아이디",

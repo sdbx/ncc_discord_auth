@@ -135,7 +135,7 @@ export default class NCredit extends EventEmitter {
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
               "Accept": "text/plain",
-              "Referer": "https://www.naver.com/",
+              "Referer": "https://nid.naver.com/nidlogin.login",
               "User-Agent": "Mozilla/5.0 (Nodejs) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.0.0 Safari/537.36",
             },
             method: "POST",

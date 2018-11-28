@@ -403,7 +403,7 @@ export default class PermManager extends Plugin {
                             flagOR |= mFlag
                         }
                     }
-                    if (selectedRole.filter((v) => v.id === role.id).length === 0) {
+                    if (selectedRole.find((v) => v.id === role.id) == null) {
                         selectedRole.push(role)
                     }
                     for (const r of selectedRole) {
@@ -495,7 +495,7 @@ export default class PermManager extends Plugin {
             }
             for (const [id,role] of roles) {
                 let changed = ""
-                const target = this.getFirst(result.roles.map((v, i) => ({index:i, ...v})).filter((v) => v.id === id))
+                const target = result.roles.map((v, i) => ({index:i, ...v})).find((v) => v.id === id)
                 const delta:RoleData = {
                     id: role.id
                 }
@@ -1107,10 +1107,10 @@ export default class PermManager extends Plugin {
             const n = Number.parseInt(decoded)
             if (Number.isNaN(n)) {
                 // name search
-                result = this.getFirst(arr.filter((_v) => _v.name === decoded))
+                result = arr.find((_v) => _v.name === decoded)
             } else if (!Number.isSafeInteger(n)) {
                 // id search
-                result = this.getFirst(arr.filter((_v) => _v.id === decoded))
+                result = arr.find((_v) => _v.id === decoded)
             } else {
                 // index search
                 if (!ignoreI) {

@@ -140,7 +140,7 @@ export default class Color extends Plugin {
                     await this.clearUnusedColors(prefix, msg.guild)
                     return Promise.resolve()
                 }
-                const definedRole = this.getFirstMap(roles.filter((v) => v.name === (prefix + colorCode)))
+                const definedRole = roles.find((v) => v.name === (prefix + colorCode))
                 if (definedRole != null) {
                     await setRole(definedRole)
                     await msg.channel.send(

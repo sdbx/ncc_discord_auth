@@ -76,11 +76,10 @@ export default class Cast extends Plugin {
                 }
                 return Promise.resolve()
             }
-            let rooms:NcJoinedChannel[]
             let room:NcJoinedChannel = null
             try {
-                rooms = (await this.ncc.fetchChannels()).filter((value) => value.channelID === roomid)
-                if (rooms.length === 0) {
+                room = (await this.ncc.fetchChannels()).find((value) => value.channelID === roomid)
+                if (room == null) {
                     if (!testSetup.has(ParamType.from)) {
                         await channel.send(this.lang.cast.needNaver)
                         return Promise.resolve()
@@ -90,8 +89,6 @@ export default class Cast extends Plugin {
                     if (r.success) {
                         room = await this.ncc.getJoinedChannel(roomid)
                     }
-                } else {
-                    room = rooms[0]
                 }
             } catch (err) {
                 Log.e(err)

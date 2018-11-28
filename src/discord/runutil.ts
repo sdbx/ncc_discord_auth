@@ -113,7 +113,7 @@ export class CommandHelp {
                     output.opticals, output.command)
             }
             for (const block of blocks) {
-                const field = getFirst(this.fields.filter((v) => v.type === block.type))
+                const field = this.fields.find((v) => v.type === block.type)
                 block.content = this.decode(block.content, encoded.key)
                 if (field == null) {
                     continue // wtf???
@@ -238,7 +238,7 @@ export class CommandHelp {
         const short = suffix.replace(new RegExp(`(${ParamType.do.replace(/\//ig, "|")})$`, "ig"), "").trim()
         return {
             short,
-            long: getFirst(this.cmds.filter((v) => short === v)),
+            long: this.cmds.find((v) => short === v),
         }
     }
     protected splitByFields(str:string, prefix:RegExp, fields:Param[]) {
@@ -277,9 +277,9 @@ export class CommandHelp {
                 let codeID
                 let ends = ""
                 if (filter != null) {
-                    const codeObj = getFirst(field.code
+                    const codeObj = field.code
                         .map((v, i) => ({ obj: this.endsWith(filter.str, v.split(seperator)), index: i }))
-                        .filter((v) => v.obj != null))
+                        .find((v) => v.obj != null)
                     if (codeObj != null) {
                         codeID = field.code[codeObj.index]
                         ends += codeObj.obj.end
@@ -522,7 +522,7 @@ export class DiscordFormat {
             if (guild == null || !guild.available) {
                 return ""
             }
-            const member = getFirstMap(guild.members.filter((v) => v.id === id))
+            const member = guild.members.find((v) => v.id === id)
             if (member != null) {
                 return "@" + (member.nickname == null ? member.user.username : member.nickname)
             } else {
@@ -549,7 +549,7 @@ export class DiscordFormat {
             if (guild == null || !guild.available) {
                 return ""
             }
-            const channel = getFirstMap(guild.channels.filter((v) => v.id === id))
+            const channel = guild.channels.find((v) => v.id === id)
             if (channel != null) {
                 return "#" + channel.name
             } else {
@@ -562,7 +562,7 @@ export class DiscordFormat {
             if (guild == null || !guild.available) {
                 return ""
             }
-            const role = getFirstMap(guild.roles.filter((v) => v.id === id))
+            const role = guild.roles.find((v) => v.id === id)
             if (role != null) {
                 return "@" + role.name
             } else {

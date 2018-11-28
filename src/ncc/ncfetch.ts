@@ -718,9 +718,9 @@ export default class NcFetch extends NcCredent {
             flags: {
                 file: attaches.length >= 1,
                 image: images.length >= 1,
-                video: contents.filter((v) => v.type === "youtube" || v.type === "nvideo").length >= 1,
+                video: contents.find((v) => v.type === "youtube" || v.type === "nvideo") != null,
                 question: false, // impossible from detail.
-                vote: contents.filter((v) => v.type === "vote").length >= 1,
+                vote: contents.find((v) => v.type === "vote") != null,
             },
             userName: this.querystr(infos[3]),
             userId: this.querystr(infos[1]),
@@ -897,13 +897,11 @@ export default class NcFetch extends NcCredent {
                 chainNick = chainNick.substring(0, chainNick.length - 1)
             }
         } while (profiles.length <= 0 && chainNick.length  >= 1)
-        const real = profiles.filter((_v) => _v.nickname === nickname)
-        if (real.length === 0) {
+        const real = profiles.find((_v) => _v.nickname === nickname)
+        if (real == null) {
             return Promise.reject(`${nickname} 닉의 유저는 없음`)
-        } else if (real.length >= 2) {
-            real.splice(1,real.length - 1)
         }
-        return this.getMemberById(cafeid, real[0].userid)
+        return this.getMemberById(cafeid, real.userid)
     }
     /**
      * 특정 네이버 카페의 **모든** 회원 목록을 가져옵니다.
