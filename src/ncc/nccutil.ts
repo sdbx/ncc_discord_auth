@@ -1,3 +1,4 @@
+import deepcopy from "deepcopy"
 import fs from "fs-extra"
 import get from "get-value"
 import mime from "mime-types"
@@ -5,6 +6,7 @@ import path from "path"
 import request from "request-promise-native"
 import { Stream } from "stream"
 import Log from "../log"
+import { DeepReadonly } from "./deepreadonly"
 import Cafe from "./structure/cafe"
 import Profile from "./structure/profile"
 import NcAPIStatus from "./talk/ncapistatus"
@@ -159,6 +161,9 @@ export async function parseFile(file:string | Buffer, filename:string = null, de
         filename,
         filesize,
     }
+}
+export function copy<T>(value:T):T {
+    return deepcopy(value)
 }
 export class ParamStr {
     public static make(str:string) {

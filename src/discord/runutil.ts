@@ -1049,8 +1049,8 @@ export function articleMarkdown(contents:ArticleContent[], markType:MarkType) {
                 }
                 */
                 let imgmd = `![${name}](${info.src})`
-                if (info.linkURL.length >= 1) {
-                    imgmd = `[${imgmd}](${info.linkURL})`
+                if (content.style.url.length >= 1) {
+                    imgmd = `[${imgmd}](${content.style.url})`
                 }
                 out += imgmd
             } else if (markType === MarkType.DISCORD) {

@@ -63,17 +63,17 @@ export default interface Article extends Cafe {
      */
     categoryName?:string;
 }
-export interface ArticleContent {
-    type:ContentType,
+export interface ArticleContent<T extends (InfoType) = InfoType> {
+    type:KeyType<T>,
     data:string,
-    info?:InfoType,
+    info:T,
+    style:TextStyle,
 }
 export interface ImageType {
     src:string;
     width:number;
     height:number;
     name:string;
-    linkURL:string; // Why I should implement this?????
 }
 export interface UrlType {
     url:string;
@@ -85,10 +85,11 @@ export interface TextStyle {
     underline:boolean;
     url:string;
     size:number;
+    align:"left" | "center" | "right" | "undefined";
 }
+// deprecated style.
 export interface TextType {
     content:string;
-    style:TextStyle;
 }
 export interface TableType {
     /**
@@ -105,5 +106,22 @@ export interface TableType {
     body:string[][];
 }
 // Array<{content:string, style:TextStyle}>
-export type InfoType = NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle | TableType
+export type KeyType<T extends InfoType> =
+    T extends ImageType ? "image" :
+    T extends TextType ? "text" | "newline" :
+    T extends NaverVideo ? "nvideo" :
+    T extends ytdl.videoInfo ? "youtube" :
+    T extends TableType ? "table" :
+    "embed" | "vote"
+export type ValueType<T extends ContentType> = 
+    T extends "embed" ? {} :
+    T extends "image" ? ImageType :
+    T extends "text" ? TextType :
+    T extends "newline" ? TextType :
+    T extends "vote" ? {} :
+    T extends "nvideo" ? NaverVideo :
+    T extends "youtube" ? ytdl.videoInfo :
+    T extends "table" ? TableType :
+    {}
+export type InfoType = NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType | TableType | {}
 export type ContentType = "embed" | "image" | "text" | "newline" | "vote" | "nvideo" | "youtube" | "table"
