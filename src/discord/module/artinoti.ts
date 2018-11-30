@@ -2,6 +2,7 @@ import Discord, { MessageOptions } from "discord.js"
 import request from "request-promise-native"
 import Config from "../../config"
 import Log from "../../log"
+import { ArticleParser } from "../../ncc/articleparser"
 import { cafePrefix } from "../../ncc/ncconstant"
 import Article from "../../ncc/structure/article"
 import Cafe from "../../ncc/structure/cafe"
@@ -9,7 +10,7 @@ import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { MarkType, ParamAccept, ParamType, UniqueID } from "../rundefine"
 import { CmdParam } from "../rundefine"
-import { articleMarkdown, CommandHelp, DiscordFormat } from "../runutil"
+import { CommandHelp, DiscordFormat } from "../runutil"
 import { AuthConfig } from "./auth"
 
 export default class ArtiNoti extends Plugin {
@@ -211,7 +212,7 @@ export default class ArtiNoti extends Plugin {
                 rich.setTitle(article.articleTitle + " " + icons.join(" "))
             }
             // split
-            const contentSplit = articleMarkdown(article.contents, MarkType.DISCORD).split("\n")
+            const contentSplit = ArticleParser.articleToMd(article, MarkType.DISCORD).split("\n")
             const contents:string[] = []
             let conCache:string = ""
             while (contentSplit.length >= 1) {

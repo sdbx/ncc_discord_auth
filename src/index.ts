@@ -9,7 +9,6 @@ import showdown from "showdown"
 import ytdl from "ytdl-core"
 import { MarkType } from "./discord/rundefine"
 import Runtime, { MainCfg } from "./discord/runtime"
-import { articleMarkdown, DiscordFormat, getFirst } from "./discord/runutil"
 import Log from "./log"
 import { ArticleParser } from "./ncc/articleparser"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
@@ -84,9 +83,10 @@ async function test() {
         if (await ncc.availableAsync()) {
             const article = await ncc.getArticleDetail(26686242, 7719)
             const conv = new showdown.Converter()
-            // const md2HTML = conv.makeHtml(ArticleParser.articleToMd(article, MarkType.GITHUB))
-            const rawHTML = ArticleParser.articleToHTML(article)
-            // await fs.writeFile(os.homedir() + "/Downloads/test.html", Buffer.from(md2HTML, "utf8"))
+            const md = ArticleParser.articleToMd(article, MarkType.GITHUB)
+            console.log(md)
+            await fs.writeFile(os.homedir() + "/Downloads/test.html",
+                Buffer.from(ArticleParser.mdToHTML(article, md), "utf8"))
         }
     }
 }

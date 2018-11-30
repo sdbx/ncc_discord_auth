@@ -1,14 +1,17 @@
 import Cheerio from "cheerio"
+import colorString from "color-string"
+import pretty from "pretty"
 import request from "request-promise-native"
 import showdown from "showdown"
 import ytdl from "ytdl-core"
 import Log from "../log"
 import { asReadonly, DeepReadonly } from "./deepreadonly"
 import Ncc from "./ncc"
-import { CAFE_VOTE_SITE, VIDEO_PLAYER_PREFIX } from "./ncconstant"
+import { CAFE_VOTE_SITE, NAVER_THUMB_PROXY, VIDEO_PLAYER_PREFIX } from "./ncconstant"
 import { copy, getFirst } from "./nccutil"
 import NcFetch from "./ncfetch"
-import { ArticleContent, ContentType, ImageType, TableType, TextStyle, TextType } from "./structure/article"
+import { ArticleContent, ContentType, GeneralStyle, ImageStyle,
+    ImageType, TableType, TextStyle, TextType } from "./structure/article"
 import Article from "./structure/article"
 import NaverVideo from "./structure/navervideo"
 
@@ -19,11 +22,11 @@ import NaverVideo from "./structure/navervideo"
  */
 const blankChar = "\u{17B5}"
 const blankChar2 = "\u{FFF5}"
+type MergeStyle = TextStyle & GeneralStyle & ImageStyle
 enum MarkType {
     GITHUB,
     DISCORD,
 }
-const githubCSSURL = "https://github.com/sindresorhus/github-markdown-css/raw/gh-pages/github-markdown.css"
 const blockTag = ["address", "article", "aside", "blockquote", "canvas",
     "dd", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer",
     "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
@@ -46,9 +49,15 @@ export class ArticleParser {
                 italic: false,
                 underline: false,
                 namu: false,
-                url: "",
+                url: null,
                 size: 12,
+                textColor: null,
+                textAlign: "undefined",
+                backgroundColor: null,
+                fontName: null,
                 align: "undefined",
+                viewWidth: -1,
+                viewHeight: -1,
             },
         })
         return chain.contents
@@ -74,7 +83,8 @@ export class ArticleParser {
                 addLineSep()
             } else if (content.type === "text") {
                 // make style
-                const info = content.info as TextStyle
+                const typeCon = content as ArticleContent<TextType>
+                const info = typeCon.style
                 let txt:MarkdownFormat
                 if (markType === MarkType.GITHUB) {
                     txt = new MarkdownFormat(content.data)
@@ -121,7 +131,7 @@ export class ArticleParser {
                     }
                     */
                     let imgmd = `![${name}](${info.src})`
-                    if (content.style.url.length >= 1) {
+                    if (content.style.url != null) {
                         imgmd = `[${imgmd}](${content.style.url})`
                     }
                     out += imgmd
@@ -182,6 +192,19 @@ export class ArticleParser {
         }
         return out
     }
+    public static mdToHTML(article:Article, markdown:string) {
+        const conv = new showdown.Converter()
+        const html = `
+        ${htmlFrame}
+        <body>
+        <article class="markdown-body">
+        <h1><a href=\"${article.url}\">${article.articleTitle}</a></h1>
+        ${conv.makeHtml(markdown)}
+        </article>
+        </body>
+        `
+        return pretty(html) as string
+    }
     public static articleToHTML(article:Article) {
         for (const info of article.contents) {
             Log.d("Article", info.data)
@@ -237,7 +260,7 @@ export class ArticleParser {
                         image: null,
                         imageWidth: 1,
                         imageHeight: 1,
-                        url: "",
+                        url: null,
                     }
                     const qTitle = c$.find(".tit")
                     if (qTitle.length === 1) {
@@ -437,8 +460,8 @@ export class ArticleParser {
  * @param param Parameters.
  */
 function setTextStyler(param:{
-    style:DeepReadonly<TextStyle>, tagName:string, enable:boolean, url:string, attrStyle:string
-}):TextStyle {
+    style:DeepReadonly<MergeStyle>, tagName:string, enable:boolean, url:string, attrStyle:string
+}):MergeStyle {
     const { tagName, enable, url, attrStyle } = param
     // break immutable for style.
     const style = { ...param.style }
@@ -481,11 +504,10 @@ function setTextStyler(param:{
             const fontText = styleMap.get("font-size")
             const fontSize = sizeAsPx(fontText)
             Log.d("TextSize", fontSize + "")
-            if (fontText.indexOf("!important") <= 0 && fontSize >= 0) {
-                // use fallback 
-                style.size = fontSize
-            } else {
+            if (fontText.indexOf("!important") >= 0 && fontSize <= 0) {
                 // we don't have parent's css, so ignore.
+            } else {
+                style.size = fontSize
             }
         }
         // text-align : center, left, right, justify - fu**you
@@ -506,21 +528,85 @@ function setTextStyler(param:{
                     break
             }
         }
+        // font-family: i think so lot.
+        if (styleMap.has("font-family")) {
+            const fonts = styleMap.get("font-family").split(",").map((v) => v.trim())
+            if (fonts.length >= 1) {
+                style.fontName = fonts[0]
+            }
+        }
+        // text color
+        if (styleMap.has("color")) {
+            style.textColor = colorAsHex(styleMap.get("color").trim())
+        }
+        // text background color
+        if (styleMap.has("background-color")) {
+            style.backgroundColor = colorAsHex(styleMap.get("background-color").trim())
+        }
+        // css3: underline, strike
+        if (styleMap.has("text-decoration-line")) {
+            const styles = styleMap.get("text-decoration-line").trim().split(/\s+/ig)
+            style.underline = styles.indexOf("underline") >= 0
+            style.namu = styles.indexOf("line-through") >= 0
+        }
+        // bold
+        if (styleMap.has("font-weight")) {
+            const fw = styleMap.get("font-weight").trim()
+            switch (fw) {
+                case "normal":
+                    style.bold = false; break
+                case "bold":
+                    style.bold = true; break
+            }
+        }
+        // italic
+        if (styleMap.has("font-style")) {
+            const fontS = styleMap.get("font-style").trim()
+            switch (fontS) {
+                case "italic":
+                case "oblique":
+                    style.italic = true; break
+                case "normal":
+                    style.italic = false; break
+            }
+        }
+        // width, height : to img tag
+        if (styleMap.has("width") && styleMap.has("height")) {
+            const width = sizeAsPx(styleMap.get("width"))
+            const height = sizeAsPx(styleMap.get("height"))
+            if (width >= 0 && height >= 0) {
+                style.viewWidth = width
+                style.viewHeight = height
+            }
+        }
     }
     return style
+}
+function colorAsHex(str:string) {
+    const colorInfo = colorString.get.rgb(str) // [r,g,b,a]
+    if (colorInfo == null) {
+        return ""
+    }
+    if (colorInfo[3] < 1) {
+        colorInfo[3] = Math.floor(colorInfo[3] * 255)
+        colorInfo.unshift(colorInfo.pop())
+    } else {
+        colorInfo.pop()
+    }
+    return "#" + colorInfo.map((v) => v.toString(16).toUpperCase()).join("")
 }
 /**
  * Conver various css length to px
  * @param str 15px, 15pt
  */
 function sizeAsPx(str:string) {
-    let sizePx = 0
-    const sizeText = getFirst(str.match(/\d+(\.\d{1,3})?\s*(px|pt|em)/ig))
+    let sizePx = -1
+    const sizeText = getFirst(str.match(/\d+(\.\d{1,3})?\s*(px|pt|em|%)/ig))
     if (sizeText == null) {
         return -1
     }
     const sizeNum = Number.parseFloat(getFirst(str.match(/\d+(\.\d{1,3})?/i)))
-    switch (safeGet(getFirst(sizeText.match(/(px|pt|em)/i)), "")) {
+    switch (safeGet(getFirst(sizeText.match(/(px|pt|em|%)/i)), "")) {
         case "px":
             sizePx = sizeNum
             break
@@ -529,6 +615,9 @@ function sizeAsPx(str:string) {
             break
         case "em":
             sizePx = sizeNum * 12
+            break
+        case "%":
+            sizePx = sizeNum * 8
             break
         default:
             sizePx = -1
@@ -541,7 +630,8 @@ function sizeAsPx(str:string) {
  * Parse Image from <img> html
  * @param el Cheerio Element (img tag)
  */
-function contentAsImage(el:CheerioElement, _style:DeepReadonly<TextStyle> | TextStyle):ArticleContent<ImageType> {
+function contentAsImage(el:CheerioElement, 
+    _style:DeepReadonly<GeneralStyle & ImageStyle> | (GeneralStyle & ImageStyle)):ArticleContent<ImageType> {
     // image
     let width:number = -1
     let height:number = -1
@@ -549,13 +639,13 @@ function contentAsImage(el:CheerioElement, _style:DeepReadonly<TextStyle> | Text
     if (el.attribs["width"] != null && el.attribs["height"] != null) {
         const _w = el.attribs["width"]
         const _h = el.attribs["height"]
-        if (_w != null && _w.indexOf("%") < 0) {
-            width = Number.parseInt(_w.trim())
-        }
-        if (_h != null && _h.indexOf("%") < 0) {
-            height = Number.parseInt(_h.trim())
-        }
+        width = sizeAsPx(_w.trim())
+        height = sizeAsPx(_h.trim())
+    } else if (_style.viewWidth >= 0 && _style.viewHeight >= 0) {
+        width = _style.viewWidth
+        height = _style.viewHeight
     } else if (style != null) {
+        // legacy code. (should not fallback.)
         style = style.replace(/\s+/ig, "")
         const _w = style.match(/width:\s*\d+px/i)
         if (_w != null) {
@@ -574,7 +664,7 @@ function contentAsImage(el:CheerioElement, _style:DeepReadonly<TextStyle> | Text
     }
     // name
     const src = el.attribs["src"]
-    let name = this.decodeThumb(src)
+    let name = decodeThumb(src)
     if (name != null && name.indexOf("?") >= 0) {
         name = name.substring(0, name.indexOf("?"))
     }
@@ -594,11 +684,12 @@ function contentAsImage(el:CheerioElement, _style:DeepReadonly<TextStyle> | Text
 /**
  * Generate Line Seperator (ArticleContent)
  */
-function contentAsLS(style:DeepReadonly<TextStyle> | TextStyle):ArticleContent<TextType> {
+function contentAsLS(
+    style:DeepReadonly<TextStyle & GeneralStyle> | (TextStyle & GeneralStyle)):ArticleContent<TextType> {
     return {
         type: "newline",
         data: "\n",
-        info: { content: "\n" } as TextType,
+        info: { content: "\n", style: {...style} } as TextType,
         style: { ...style },
     }
 }
@@ -607,17 +698,20 @@ function contentAsLS(style:DeepReadonly<TextStyle> | TextStyle):ArticleContent<T
  * @param content Content of text
  * @param style Text Style
  */
-function contentAsText(content:string, style:DeepReadonly<TextStyle> | TextStyle):ArticleContent<TextType> {
+function contentAsText(content:string, 
+    style:DeepReadonly<TextStyle & GeneralStyle> | (TextStyle & GeneralStyle)):ArticleContent<TextType> {
     return {
         type: "text",
         data: content,
-        info: { content } as TextType,
+        info: { content, style: {...style} } as TextType,
         style: { ...style },
     }
 }
 function shouldBreak(el:CheerioElement) {
     if (["table"].indexOf(el.tagName) >= 0) {
         return "table"
+    } else if (el.attribs == null) {
+        return ""
     } else if (el.attribs["class"] != null) {
         const classes = el.attribs["class"].split(/\s+/ig)
         if (classes.indexOf("og") >= 0) {
@@ -626,6 +720,29 @@ function shouldBreak(el:CheerioElement) {
         }
     }
     return ""
+}
+/**
+ * Decode dthumb-phint to real src
+ * @param url URL
+ */
+function decodeThumb(url:string) {
+    if (url == null) {
+        return ""
+    } else if (url.startsWith(NAVER_THUMB_PROXY)) {
+        let u = url.substr(url.indexOf("src=") + 4)
+        if (u.indexOf("&") >= 0) {
+            u = u.substring(0, u.indexOf("&"))
+        }
+        u = decodeURIComponent(u)
+        if (u.startsWith("\"")) {
+            u = u.substr(1)
+        }
+        if (u.endsWith("\"")) {
+            u = u.substring(0, u.length - 1)
+        }
+        return u
+    }
+    return url
 }
 function safeGet<T>(value:T, defaultV?:T):T {
     if (value == null) {
@@ -641,7 +758,7 @@ function safeGet<T>(value:T, defaultV?:T):T {
 interface DomChain {
     els:CheerioElement[],
     contents:ArticleContent[],
-    style:TextStyle,
+    style:MergeStyle,
 }
 class MarkdownFormat {
     private _italic = false
@@ -687,6 +804,8 @@ class MarkdownFormat {
     }
     public toString() {
         let format = "%s"
+        let content = this._content
+        content = content.replace(/>/ig, "\\>").replace(/\*/ig, "\\*")
         if (this._underline) {
             format = format.replace("%s", "__%s__")
         }
@@ -707,6 +826,43 @@ class MarkdownFormat {
                 format = format.replace("%s", "```%s```")
             }
         }
-        return format.replace("%s", this._content)
+        return format.replace("%s", content)
     }
 }
+/*
+        headers.push("<meta charset=\"UTF-8\">")
+        headers.push("<head>")
+        headers.push(String.raw`<meta name="viewport" content="width=device-width, initial-scale=1">`)
+        // tslint:disable-next-line
+        headers.push(String.raw``)
+        headers.push(exportCss)
+*/
+/* tslint:disable */
+const htmlFrame = String.raw`
+<meta charset="UTF-8">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sindresorhus/github-markdown-css@latest/github-markdown.css">
+    <style>
+	.markdown-body {
+		box-sizing: border-box;
+		min-width: 200px;
+		max-width: 980px;
+		margin: 0 auto;
+		padding: 45px;
+	}
+
+	@media (max-width: 767px) {
+		.markdown-body {
+			padding: 15px;
+		}
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+    }
+    </style>
+</head>
+`
+/* tslint:enable */
