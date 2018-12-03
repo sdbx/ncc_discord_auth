@@ -81,15 +81,17 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7725)
+            const article = await ncc.getArticleDetail(26686242, 7722)
             const conv = new showdown.Converter()
             const md = ArticleParser.articleToMd(article, MarkType.GITHUB)
+            console.log(md)
             for (const content of article.contents) {
                 if (content.type === "text") {
                     Log.d("FontSize", "TagName: " + content.style.tagName +
                         "\nText: " + content.data + "\nSize: " + (content.style as TextStyle).size)
                 }
             }
+            await fs.writeFile("/home/alyac/Documents/test.html", ArticleParser.mdToHTML(article, md))
         }
     }
 }

@@ -11,7 +11,7 @@ import { CAFE_VOTE_SITE, NAVER_THUMB_PROXY, VIDEO_PLAYER_PREFIX } from "./nccons
 import { copy, getFirst } from "./nccutil"
 import NcFetch from "./ncfetch"
 import { ArticleContent, ContentType, GeneralStyle, ImageStyle,
-    ImageType, TableType, TextStyle, TextType } from "./structure/article"
+    ImageType, TableSeperator, TableType, TextStyle, TextType } from "./structure/article"
 import Article from "./structure/article"
 import NaverVideo from "./structure/navervideo"
 
@@ -80,18 +80,25 @@ export class ArticleParser {
     public static articleToMd(article:Article, markType:MarkType) {
         const contents = article.contents
         let out:string = ""
-        const addLineSep = () => {
-            if (!out.endsWith("\n")) {
-                out += "\n"
-                if (markType === MarkType.GITHUB) {
-                    out += "\n"
-                }
-            }
-        }
+        let lastContent:ArticleContent
+        let inTable = false
         for (const content of contents) {
+            // in table, we should use br. (yeah, there's no way without html.)
+            let linesep:string = "\n"
+            if (inTable) {
+                linesep = markType === MarkType.GITHUB ? "<br>" : " "
+            } else {
+                linesep = markType === MarkType.GITHUB ? "\n\n" : "\n"
+            }
             // NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
             if (content.type === "newline") {
-                addLineSep()
+                if ((lastContent != null && lastContent.type === "table"
+                && (lastContent as ArticleContent<TableType>).info.seperator === TableSeperator.tableEnd)) {
+                    // in this case, we should ignore line sep cause github bug.
+                } else {
+                    // else, add.
+                    out += linesep
+                }
             } else if (content.type === "text") {
                 // make style
                 const typeCon = content as ArticleContent<TextType>
@@ -157,7 +164,7 @@ export class ArticleParser {
             } else if (content.type === "nvideo") {
                 const info = content.info as NaverVideo
                 if (markType === MarkType.GITHUB) {
-                    out += `[![Thumbnail-${info.masterVideoId}](${info.previewImg})](${info.share})\n`
+                    out += `[![Thumbnail-${info.masterVideoId}](${info.previewImg})](${info.share})${linesep}`
                 }
                 out += `[${info.title} - ${info.author.nickname}](${info.share})`
             } else if (content.type === "vote") {
@@ -166,36 +173,52 @@ export class ArticleParser {
             } else if (content.type === "youtube") {
                 const info = content.info as ytdl.videoInfo
                 if (markType === MarkType.GITHUB) {
-                    out += `[![Thumbnail-${info.video_id}](${info.thumbnail_url})](${info.video_url})\n`
+                    out += `[![Thumbnail-${info.video_id}](${info.thumbnail_url})](${info.video_url})${linesep}`
                 }
                 out += `[${info.title} - ${info.author.name}](${info.video_url})`
             } else if (content.type === "table") {
-                const info = content.info as TableType
+                const { seperator, isHead } = (content as ArticleContent<TableType>).info
                 const tableOut:string[] = []
-                if (info.header.length === 1) {
-                    let column = "|"
-                    let endColumn = "|"
-                    for (const tel of info.header[0]) {
-                        column += " " + tel + " |"
-                        endColumn += " " + "".padStart(tel.length, "-") + " |"
-                    }
-                    tableOut.push(column, endColumn)
-                } else if (markType === MarkType.GITHUB) {
-                    tableOut.push("|  |  |", "| - | - |")
-                }
-                if (info.body.length >= 1) {
-                    for (const body of info.body) {
-                        let column = "|"
-                        for (const tel of body) {
-                            column += " " + tel + " |"
+                switch (seperator) {
+                    case TableSeperator.tableStart: {
+                        inTable = true
+                        // github markdown's bug.
+                        if (markType === MarkType.GITHUB && out.endsWith("\\\n")) {
+                            out = out.substring(0, out.length - 2)
+                            out += "\n\n"
+                        } else {
+                            out += "\n"
                         }
-                        tableOut.push(column)
-                    }
+                        if (!(markType !== MarkType.GITHUB || (lastContent != null && lastContent.type === "table"
+                            && (lastContent as ArticleContent<TableType>).info.isHead))) {
+                            out += `| | |\n`
+                            out += `|-|-|\n`
+                        }
+                    } break
+                    case TableSeperator.tableEnd: {
+                        if (markType === MarkType.GITHUB && isHead) {
+                            out += `|-|-|\n`
+                        } else {
+                            out += `\n`
+                        }
+                        inTable = false
+                    } break
+                    case TableSeperator.rowStart: {
+                        out += "| "
+                    } break
+                    case TableSeperator.rowNext: {
+                        out += " | "
+                    } break
+                    case TableSeperator.rowEnd: {
+                        out += ` |\n`
+                    } break
                 }
-                addLineSep()
-                out += tableOut.join("\n")
-                addLineSep()
             }
+            lastContent = content
+        }
+        // github check.
+        if (markType === MarkType.GITHUB && out.endsWith("\\\n")) {
+            out = out.substring(0, out.length - 2)
         }
         if (markType === MarkType.DISCORD) {
             // post-process
@@ -204,17 +227,14 @@ export class ArticleParser {
         return out
     }
     public static mdToHTML(article:Article, markdown:string) {
-        const conv = new showdown.Converter()
-        const html = `
-        ${htmlFrame}
-        <body>
-        <article class="markdown-body">
-        <h1><a href=\"${article.url}\">${article.articleTitle}</a></h1>
-        ${conv.makeHtml(markdown)}
-        </article>
-        </body>
-        `
-        return pretty(html) as string
+        const sd = new showdown.Converter()
+        sd.setOption("strikethrough", true)
+        sd.setOption("tables", true)
+        sd.setOption("simpleLineBreaks", true)
+        sd.setOption("backslashEscapesHTMLTags", true)
+        sd.setOption("emoji", true)
+        sd.setOption("underline", true)
+        return pretty(htmlFrame(sd.makeHtml(markdown), article.articleTitle, article.url, article.userName)) as string
     }
     public static articleToHTML(article:Article) {
         for (const info of article.contents) {
@@ -229,9 +249,9 @@ export class ArticleParser {
         const style = asReadonly(param.style)
         for (const element of els) {
             /**
-             * First
-             * 
              * set TextStyle from tag/attrStyle.
+             * 
+             * @todo make process before recursiving
              */
             const url = element.attribs != null ? element.attribs["href"] : null
             const attrStyle = element.attribs != null ? element.attribs["style"] : null
@@ -243,6 +263,23 @@ export class ArticleParser {
                 url,
                 attrStyle,
             })
+            // table start, end
+            const isTableRoot = ["thead", "tbody", "tfoot"].indexOf(tagName) >= 0
+            const isTableHead = "thead" === tagName
+            /**
+             * 세로 한 그룹
+             */
+            const isTr = tagName === "tr"
+            /**
+             * 자식 한 개
+             */
+            const isTd = tagName === "td"
+            if (isTableRoot) {
+                contents.push(contentAsTableInfo(TableSeperator.tableStart, isTableHead, style))
+            }
+            if (isTr) {
+                contents.push(contentAsTableInfo(TableSeperator.rowStart, isTableHead, style))
+            }
             /**
              * Two
              * 
@@ -329,46 +366,6 @@ export class ArticleParser {
                             ...style,
                         }
                     } as ArticleContent<TextType>, contentAsLS(style))
-                } else if (checkBreak === "table") {
-                    /**
-                     * Table Parser
-                     */
-                    const info = {
-                        header: [],
-                        body: [],
-                    }
-                    // select thead tbody
-                    const table$ = $(element)
-                    const tParser = (tIO:Cheerio, query:string) => {
-                        const jArr = tIO.find(query + " > tr").map((_ti, _tEl) => {
-                            return $(_tEl).find("td").map((_ti2, _tEl2) => $(_tEl2).text())
-                        }) as any as string[][]
-                        // That's a strange thing
-                        const outArr:string[][] = []
-                        // tslint:disable-next-line
-                        for (let k = 0; k < jArr.length; k += 1) {
-                            const oneArr:string[] = []
-                            const dep1Arr = jArr[k]
-                            // tslint:disable-next-line
-                            for (let l = 0; l < dep1Arr.length; l += 1) {
-                                oneArr.push(dep1Arr[l])
-                            }
-                            outArr.push(oneArr)
-                        }
-                        return outArr
-                    }
-                    if (table$.find("thead").length > 0) {
-                        info.header = tParser(table$, "thead")
-                    }
-                    if (table$.find("tbody").length > 0) {
-                        info.body = tParser(table$, "tbody")
-                    }
-                    contents.push({
-                        type: "table",
-                        data: "",
-                        info,
-                        style: { ...style },
-                    } as ArticleContent<TableType>)
                 } else {
                     throw new Error("No implement breaking!")
                 }
@@ -450,6 +447,30 @@ export class ArticleParser {
                         // iframe/embed end
                     }
                 }
+            }
+            /**
+             * @todo Post-process from recursive
+             */
+            // add table info
+            if (isTableRoot) {
+                // table end info
+                contents.push(contentAsTableInfo(TableSeperator.tableEnd, isTableHead, style))
+            }
+            if (isTr) {
+                // remove empty rowNext for beauty table.
+                if (contents.length >= 1) {
+                    const lastCon = contents[contents.length - 1]
+                    if (lastCon.type === "table" && 
+                        (lastCon as ArticleContent<TableType>).info.seperator === TableSeperator.rowNext) {
+                        contents.pop()
+                    }
+                }
+                // row end info
+                contents.push(contentAsTableInfo(TableSeperator.rowEnd, isTableHead, style))
+            }
+            if (isTd) {
+                // child end info
+                contents.push(contentAsTableInfo(TableSeperator.rowNext, isTableHead, style))
             }
             // line seperator need tag?
             if (contents.length >= 1 && blockTag.find((v) => v === tagName) != null) {
@@ -752,10 +773,22 @@ function contentAsText(content:string,
         style: { ...style },
     }
 }
+/**
+ * Generate table info with style
+ * @param tableInfo Table's seperate info
+ * @param style General Style
+ */
+function contentAsTableInfo(tableInfo:TableSeperator, isHead:boolean,
+    style:DeepReadonly<GeneralStyle> | GeneralStyle):ArticleContent<TableType> {
+    return {
+        type: "table",
+        data: "",
+        info: { seperator: tableInfo, isHead },
+        style: { ...style },
+    }
+}
 function shouldBreak(el:CheerioElement) {
-    if (["table"].indexOf(el.tagName) >= 0) {
-        return "table"
-    } else if (el.attribs == null) {
+    if (el.attribs == null) {
         return ""
     } else if (el.attribs["class"] != null) {
         const classes = el.attribs["class"].split(/\s+/ig)
@@ -883,31 +916,63 @@ class MarkdownFormat {
         headers.push(exportCss)
 */
 /* tslint:disable */
-const htmlFrame = String.raw`
-<meta charset="UTF-8">
+const htmlFrame = (markDown:string, title:string, url:string, author:string) => `
+<!DOCTYPE html>
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sindresorhus/github-markdown-css@latest/github-markdown.css">
+    <link rel="stylesheet" href="https://necolas.github.io/normalize.css/8.0.1/normalize.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <!--<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sindresorhus/github-markdown-css@latest/github-markdown.css">-->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <style>
-	.markdown-body {
-		box-sizing: border-box;
-		min-width: 200px;
-		max-width: 980px;
-		margin: 0 auto;
-		padding: 45px;
-	}
-
-	@media (max-width: 767px) {
-		.markdown-body {
-			padding: 15px;
-		}
-    }
-
     img {
         max-width: 100%;
         height: auto;
     }
+    .main-header {
+        background-color: #6ac36e;
+    }
     </style>
 </head>
+<body>
+    <div id="dogpig" style="width:100%;height:100%;position:ablsolute;top:0;left:0;bottom:0;right:0;background-size:fill;background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAMAAABHPGVmAAAAPFBMVEX///8AAADtHCQICAifn5+Hh4cgICC3t7doaGgYGBgQEBD39/eXl5dYWFhAQEAEBARgYGBwcHBHR0c3NzclDAhFAAADUklEQVRoge2Y23rbIAyAOcQmTp22297/XRdzlDhKxLtZrfRLCQZ+JIQEFuKSS4SQ8ev4lrYowSMhD4mt3S+Z6qUgyAgiUxFXytCDBvEzPQCu2IXARrYzhRFHlf7TM5efO9NcoJOfZhq40j/OBtcMGVmnvEGQ1qMxA08ndWoOnFuPbK6MVC3WGhW8fwHhWCozEqiUeYNs+txFueSHiVLq9fX6+LIrKiuuFkVDEf4xwrzjhJHDD5F+oIAOILhIYP1XEJUgCrDaaxK3PBFSW3gISfKGJgrZKEL8H4yI8xAlKhAlACSGwTqEINA4aXNAH4CxPSVlcDIislSyvoIL4YqdVHiF+Ut+tJhVYllvJxNu6/qQhZyJcTp8lZDzMMFM96x+OZFjnJmeH+WjszBejVyLUzFOjRYCcPQ8hcAImHnKRkAEzCxlJzLeoRzGehLbTlMOY1Uct0PhMwzZWJHCV2Wj3f3Mpx9az6hCVGQLQ8+oshMvsanZhCob0bUSZGHfrXeiaxkwMhtCVQS6h+YuClERFBQW5qJ4K5i1G8RtIgAKM+3lrbB2c4UL0kBhJsRboRfFK/mMuVPCnJZ24lvLXMPcKdj7q5ilDAnfPHuB1ow8Tgx3FUjEjC2hWXE795NlnOvD8YxxcGFHCJNOsWQMF2LgSZmah5kQy7Dm5JyPeJDEEJxsz4Pg8xk5r7Adfia68FJDNiVqdOGlhsqumukXBd4c44bIG78Fye+mwVVPhBTX30jJVtpQt33pIWFTw5TuFy5b6Y0aX0oP2YogGdPHgVvQBGlxu/SQV8UnqrCqueIvOPHDWj47DCClvQrdwD7/0HbidtHWwCaYrBizOFCDFOV8wi/al6/XY5OV9sqxS2I87JMFewbFZIW9llZyBIuTritxkK7N6OcbGIQ33EkP3Ix8qUH3vkoY69pME1McOgjVBuxB7Cy+xxC0RysrYLqrbyn7iIHvfbpcgcGR7zclAm0oEtiJoSvH8Kr+JO5a2ODV4fDpqE5fkRTau+ufvfEwEm1JO0hTkYD4Q4oNSd0wMz/Ko+fAt/RWsLnTMcVz4M4YvPfbu09bFCi3EcLpwbkFYM5dg3Krh9WD/Baq4NxhsSWGrUcD2BnDMth68OQEPcZCfYXKlr801w8oOgVHEQAAAABJRU5ErkJggg==')"></div>
+    <div class="navbar-fixed">
+    <nav>
+    <div class="nav-wrapper main-header">
+        <div style="padding-left: 2rem;" class="brand-logo arti-title">${title}</div>
+        <ul id="nav-mobile" class="right hide-on-med-and-down">
+            <li style="margin-right: 2rem;">${author}</li>
+            <li><a href="${url}">카페에서 보기</a></li>
+        </ul>
+    </div>
+    </nav>
+    </div>
+    <div class="container">
+        <div id="content" class="section">
+${markDown}
+        </div>
+    </div>
+    <noscript>
+        자바스크립트를 활성화 해주세요.
+    </noscript>
+    <script>
+        var isIE11 = !!window.MSInputMethodContext && !!document.documentMode;
+        if (!isIE11) {
+            document.getElementById('dogpig').remove();
+        }
+        try {
+            if (Number.parseInt(Symbol("ES2017 <3").description.substring(2,6)) * 53 === 106901) {
+                /* document.getElementById('content').innerHTML = marked(\`
+\${markDown}
+\`); */
+            }
+        } catch (err) {
+            // chrome v70+, firefox v60+
+            document.getElementById('content').innerHTML = \`<p>브라우저를 채신버전으로 업데이트 시켜주세요!</p>\`
+        }
+    </script> 
+</body>
 `
 /* tslint:enable */

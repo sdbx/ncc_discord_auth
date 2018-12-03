@@ -104,18 +104,8 @@ export interface TextType {
     content:string;
 }
 export interface TableType {
-    /**
-     * Column first
-     * 
-     * Row second
-     */
-    header:string[][];
-    /**
-     * Column first
-     * 
-     * Row second
-     */
-    body:string[][];
+    seperator:TableSeperator;
+    isHead:boolean;
 }
 // Array<{content:string, style:TextStyle}>
 export type KeyType<T extends InfoType> =
@@ -131,3 +121,11 @@ export type StyleType<T extends InfoType> =
     {}
 export type InfoType = NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType | TableType | {}
 export type ContentType = "embed" | "image" | "text" | "newline" | "vote" | "nvideo" | "youtube" | "table"
+export enum TableSeperator {
+    tableStart,
+    rowStart,
+    rowNext,
+    // this means close row and \n.
+    rowEnd,
+    tableEnd,
+}
