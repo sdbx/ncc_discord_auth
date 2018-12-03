@@ -79,6 +79,7 @@ export interface UrlType {
     url:string;
 }
 export interface GeneralStyle {
+    tagName:string;
     url:string;
     align:"left" | "center" | "right" | "undefined";
 }
@@ -92,6 +93,7 @@ export interface TextStyle {
     backgroundColor:string;
     fontName:string;
     textAlign:"left" | "center" | "right" | "undefined";
+    isTitle:boolean;
 }
 export interface ImageStyle {
     viewWidth:number;

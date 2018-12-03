@@ -12,7 +12,7 @@ import Runtime, { MainCfg } from "./discord/runtime"
 import Log from "./log"
 import { ArticleParser } from "./ncc/articleparser"
 import Ncc, { ChannelListEvent, NccEvents } from "./ncc/ncc"
-import { ArticleContent, ImageType, TextStyle } from "./ncc/structure/article"
+import { ArticleContent, ImageType, TextStyle, TextType } from "./ncc/structure/article"
 import Cafe from "./ncc/structure/cafe"
 import NaverVideo from "./ncc/structure/navervideo"
 import NcChannel from "./ncc/talk/ncchannel"
@@ -81,12 +81,15 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7719)
+            const article = await ncc.getArticleDetail(26686242, 7725)
             const conv = new showdown.Converter()
             const md = ArticleParser.articleToMd(article, MarkType.GITHUB)
-            console.log(md)
-            await fs.writeFile(os.homedir() + "/Downloads/test.html",
-                Buffer.from(ArticleParser.mdToHTML(article, md), "utf8"))
+            for (const content of article.contents) {
+                if (content.type === "text") {
+                    Log.d("FontSize", "TagName: " + content.style.tagName +
+                        "\nText: " + content.data + "\nSize: " + (content.style as TextStyle).size)
+                }
+            }
         }
     }
 }

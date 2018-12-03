@@ -41,23 +41,34 @@ export class ArticleParser {
     public static GITHUB = MarkType.GITHUB
     public static DISCORD = MarkType.DISCORD
     public static async domToContent($:CheerioStatic, els:CheerioElement[]) {
+        const textStyle:TextStyle = {
+            bold: false,
+            italic: false,
+            underline: false,
+            namu: false,
+            size: 12,
+            textColor: null,
+            textAlign: "undefined",
+            backgroundColor: null,
+            fontName: null,
+            isTitle: false,
+        }
+        const generalStyle:GeneralStyle = {
+            url: null,
+            align: "undefined",
+            tagName: "",
+        }
+        const imageStyle:ImageStyle = {
+            viewWidth: -1,
+            viewHeight: -1,
+        }
         const chain = await this.chain_domToContent($, {
             els: [...els],
             contents: [],
             style: {
-                bold: false,
-                italic: false,
-                underline: false,
-                namu: false,
-                url: null,
-                size: 12,
-                textColor: null,
-                textAlign: "undefined",
-                backgroundColor: null,
-                fontName: null,
-                align: "undefined",
-                viewWidth: -1,
-                viewHeight: -1,
+                ...textStyle,
+                ...generalStyle,
+                ...imageStyle,
             },
         })
         return chain.contents
@@ -225,7 +236,7 @@ export class ArticleParser {
             const url = element.attribs != null ? element.attribs["href"] : null
             const attrStyle = element.attribs != null ? element.attribs["style"] : null
             const tagName = element.tagName != null ? element.tagName.toLowerCase() : ""
-            param.style = setTextStyler({
+            param.style = setStyler({
                 style,
                 tagName,
                 enable: true,
@@ -459,13 +470,15 @@ export class ArticleParser {
  * Style or unstyle *TextStyle*
  * @param param Parameters.
  */
-function setTextStyler(param:{
+function setStyler(param:{
     style:DeepReadonly<MergeStyle>, tagName:string, enable:boolean, url:string, attrStyle:string
 }):MergeStyle {
     const { tagName, enable, url, attrStyle } = param
     // break immutable for style.
     const style = { ...param.style }
-    // style simple blod, underline, italic, strike, link(not simple)
+    style.tagName = tagName
+    // style simple blod, underline, italic, strike, link(not simple), and title.
+    let titleSize = -1
     switch (tagName.toLowerCase()) {
         case "b": {
             style.bold = enable
@@ -487,6 +500,25 @@ function setTextStyler(param:{
                 style.url = null
             }
         } break
+        case "h1":
+        case "h2":
+        case "h3":
+        case "h4":
+        case "h5":
+        case "h6": {
+            const clamp = (num:number, min:number, max:number) => Math.min(Math.max(num, min), max)
+            titleSize = [2, 1.5, 1.17, 1, 0.83, 0.67][clamp(Number.parseInt(tagName.charAt(1)) - 1, 0, 5)]
+            if (style.size < 0) {
+                titleSize *= 18
+            } else {
+                titleSize *= style.size
+            }
+            titleSize = Math.round(titleSize)
+            style.bold = enable
+            style.isTitle = enable
+            Log.d("ParentSize", style.size + "")
+            Log.d("TitleSize", titleSize + "")
+        } break
     }
     // if not modify element
     if (attrStyle != null) {
@@ -502,13 +534,14 @@ function setTextStyler(param:{
         // font-size : !important - ignore, [n]sem - ignore, [n](px, em, pt) - accept (Yes convert.)
         if (styleMap.has("font-size")) {
             const fontText = styleMap.get("font-size")
-            const fontSize = sizeAsPx(fontText)
-            Log.d("TextSize", fontSize + "")
-            if (fontText.indexOf("!important") >= 0 && fontSize <= 0) {
+            const fontSize = sizeAsPx(fontText, style.size)
+            if (fontText.indexOf("!important") >= 0 && style.size >= 0) {
                 // we don't have parent's css, so ignore.
             } else {
                 style.size = fontSize
             }
+        } else if (titleSize >= 0) {
+            style.size = titleSize
         }
         // text-align : center, left, right, justify - fu**you
         if (styleMap.has("text-align")) {
@@ -579,6 +612,8 @@ function setTextStyler(param:{
                 style.viewHeight = height
             }
         }
+    } else if (titleSize >= 0) {
+        style.size = titleSize
     }
     return style
 }
@@ -597,26 +632,36 @@ function colorAsHex(str:string) {
 }
 /**
  * Conver various css length to px
- * @param str 15px, 15pt
+ * @param str 15px, 15pt, 1.25rem, 1.5353em, 100%...
  */
-function sizeAsPx(str:string) {
+function sizeAsPx(str:string, parentSize?:number) {
     let sizePx = -1
-    const sizeText = getFirst(str.match(/\d+(\.\d{1,3})?\s*(px|pt|em|%)/ig))
+    // rem = otaku
+    const sizeText = getFirst(str.match(/\d+(\.\d+)?\s*(px|pt|rem|em|%)/ig))
     if (sizeText == null) {
-        return -1
+        return (parentSize == null || parentSize < 0) ? -1 : parentSize
+    }
+    if (parentSize == null || parentSize < 0) {
+        // fallback to default browser number.
+        parentSize = 16
     }
     const sizeNum = Number.parseFloat(getFirst(str.match(/\d+(\.\d{1,3})?/i)))
-    switch (safeGet(getFirst(sizeText.match(/(px|pt|em|%)/i)), "")) {
+    switch (safeGet(getFirst(sizeText.match(/(px|pt|rem|em|%)/i)), "")) {
         case "px":
             sizePx = sizeNum
             break
         case "pt":
             sizePx = sizeNum * 4 / 3
             break
+        case "rem":
+            // I'll define root element's fontSize is 16.
+            sizePx = sizeNum * 16
+            break
         case "em":
-            sizePx = sizeNum * 12
+            sizePx = sizeNum * parentSize
             break
         case "%":
+            // how can i define this..
             sizePx = sizeNum * 8
             break
         default:
