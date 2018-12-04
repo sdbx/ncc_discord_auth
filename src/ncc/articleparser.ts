@@ -296,6 +296,92 @@ export class ArticleParser {
             Log.d("Article", info.data)
         }
     }
+    public static contentsToJujube(contents:ArticleContent[]) {
+        let out = ""
+        let lastMod = ""
+        const composer:TextStyle = {
+            bold: false,
+            italic: false,
+            namu: false,
+            underline: false,
+            size: -1,
+            textColor: null,
+            backgroundColor: null,
+            fontName: null,
+            textAlign: null,
+            isTitle: false,
+        }
+        const buildStyle = () => {
+
+        }
+        const jujubeCodes = contents.map((_content) => {
+            switch (_content.type) {
+                case "text": {
+                    const styleTags:string[] = []
+                    const content = _content as ArticleContent<TextType>
+                    const info = content.style
+                    const blKey = [info.bold, info.italic, info.namu, info.underline]
+                    const blValue = ["tb", "ti", "ts", "tu"]
+                    for (let i = 0; i < blKey.length; i += 1) {
+                        if (blKey[i]) {
+                            styleTags.push(blValue[i])
+                        }
+                    }
+                    const merge = (str1:string, str2:string) => {
+                        return str2 == null ? null : str1 + str2
+                    }
+                    const strKey:Array<string | null> = [info.textColor, info.fontName,
+                        info.size >= 0 ? info.size + "px" : null, info.backgroundColor]
+                    const strValue:string[] = ["c", "f", "i", "k"]
+                    for (let i = 0; i < strKey.length; i += 1) {
+                        const key = strKey[i]
+                        if (key != null) {
+                            styleTags.push(strValue[i] + key)
+                        }
+                    }
+                    // header
+                    if (/^h[1-6]$/i.test(info.tagName)) {
+                        return `<G${getFirst(info.tagName.match(/\d+/ig))}/${content.data}>`
+                    }
+                    styleTags.push(content.data)
+                    return `<F${styleTags.join("/")}>`
+                } break
+                case "newline": {
+                    return `<N>`
+                } break
+                case "image": {
+                    const content = _content as ArticleContent<ImageType>
+                    return `<Iu${content.info.src}/zw${content.info.width}/zh${content.info.height}>`
+                } break
+                case "nvideo": {
+                    const content = _content as ArticleContent<NaverVideo>
+                    return `<Yu${content.info.share}/${content.info.title}>`
+                } break
+                case "youtube": {
+                    const content = _content as ArticleContent<ytdl.videoInfo>
+                    return `<Yu${content.info.video_url}/${content.info.title}>`
+                } break
+            }
+            return ""
+        }).filter((v) => v.length >= 1)
+        console.log(jujubeCodes.join(""))
+        /*
+        for (const _content of contents) {
+            switch (_content.type) {
+                case "text": {
+                    const content = _content as ArticleContent<TextType>
+                    if (lastMod !== "text") {
+                        lastMod = "text"
+                        out += "A"
+                    }
+                } break
+                case "newline": {
+                    
+                }
+            }
+        }
+        */
+    }
     protected static async chain_domToContent(param:DomChain, $?:CheerioStatic) {
         const { els, contents } = param
         /**
