@@ -16,11 +16,16 @@ import Article from "./structure/article"
 import NaverVideo from "./structure/navervideo"
 
 /**
- * From Runutil.ts
+ * Semi-transparent char
  * 
- * Extracted.
+ * Works in nickname, but showing char in sublime
  */
 const blankChar = "\u{17B5}"
+/**
+ * Fully-transparent char
+ * 
+ * Does not work in nickname.
+ */
 const blankChar2 = "\u{FFF5}"
 type MergeStyle = TextStyle & GeneralStyle & ImageStyle
 enum MarkType {
@@ -40,7 +45,7 @@ const blockTag = ["address", "article", "aside", "blockquote", "canvas",
 export class ArticleParser {
     public static GITHUB = MarkType.GITHUB
     public static DISCORD = MarkType.DISCORD
-    public static async domToContent($:CheerioStatic, els:CheerioElement[]) {
+    public static async domToContent(els:CheerioElement[], $?:CheerioStatic) {
         const textStyle:TextStyle = {
             bold: false,
             italic: false,
@@ -62,15 +67,15 @@ export class ArticleParser {
             viewWidth: -1,
             viewHeight: -1,
         }
-        const chain = await this.chain_domToContent($, {
+        const chain = await this.chain_domToContent({
             els: [...els],
             contents: [],
             style: {
-                ...textStyle,
                 ...generalStyle,
+                ...textStyle,
                 ...imageStyle,
             },
-        })
+        }, $)
         return chain.contents
     }
     /**
@@ -80,15 +85,20 @@ export class ArticleParser {
     public static articleToMd(article:Article, markType:MarkType) {
         const contents = article.contents
         let out:string = ""
-        let lastContent:ArticleContent
         let inTable = false
-        for (const content of contents) {
+        for (let i = 0; i < contents.length; i += 1) {
+            const content = contents[i]
+            let lastContent:ArticleContent = null
+            if (i >= 1) {
+                lastContent = contents[i - 1]               
+            }
             // in table, we should use br. (yeah, there's no way without html.)
             let linesep:string = "\n"
             if (inTable) {
                 linesep = markType === MarkType.GITHUB ? "<br>" : " "
             } else {
-                linesep = markType === MarkType.GITHUB ? "\n\n" : "\n"
+                // invisible, but this is only way supported all library...
+                linesep = markType === MarkType.GITHUB ? "  \n" : "\n"
             }
             // NaverVideo | ytdl.videoInfo | ImageType | UrlType | TextType[] | TextStyle
             if (content.type === "newline") {
@@ -104,12 +114,16 @@ export class ArticleParser {
                 const typeCon = content as ArticleContent<TextType>
                 const info = typeCon.style
                 let txt:MarkdownFormat
+                // before processing
+                content.data = content.data.replace(/\\/ig, "\\\\")
+                    .replace(/\*/ig, "\\*")
+                    .replace(/~/ig, "\\~")
+                    .replace(/<\/?[A-Za-z0-9-_]+/ig, "\\$&")
                 if (markType === MarkType.GITHUB) {
                     txt = new MarkdownFormat(content.data)
                 } else if (markType === MarkType.DISCORD) {
-                    let data = content.data
+                    const data = content.data
                     // before processing
-                    data = data.replace(/\\/ig, "\\\\").replace(/\*/ig, "\\*").replace(/~/ig, "\\~")
                     txt = new MarkdownFormat((info.url != null) ? `[${data}](${info.url})` : data)
                 } else {
                     throw new Error("wtf")
@@ -127,7 +141,15 @@ export class ArticleParser {
                     txt.underline.eof()
                 }
                 if (markType === MarkType.GITHUB) {
-                    out += (info.url != null) ? `[${txt.toString()}](${info.url})` : txt.toString()
+                    let sharp = ""
+                    if (/^h[1-6]$/i.test(info.tagName)) {
+                        const sharps = Number.parseInt(getFirst(info.tagName.match(/\d+/)))
+                        for (let k = 0 ; k < sharps; k += 1) {
+                            sharp += "#"
+                        }
+                        sharp += " "
+                    }
+                    out += sharp + ((info.url != null) ? `[${txt.toString()}](${info.url})` : txt.toString())
                 } else if (markType === MarkType.DISCORD) {
                     if (info.bold || info.italic || info.namu || info.underline) {
                         out += txt.toString() + blankChar2
@@ -161,21 +183,36 @@ export class ArticleParser {
                 if (url.length >= 1) {
                     out += `[Unknown Embed](${url})`
                 }
-            } else if (content.type === "nvideo") {
-                const info = content.info as NaverVideo
-                if (markType === MarkType.GITHUB) {
-                    out += `[![Thumbnail-${info.masterVideoId}](${info.previewImg})](${info.share})${linesep}`
+            } else if (content.type === "nvideo" || content.type === "youtube") {
+                let title:string
+                let authorNick:string
+                let link:string
+                let previewImg:string
+                if (content.type === "nvideo") {
+                    const info = content.info as NaverVideo
+                    title = info.title
+                    authorNick = info.author.nickname
+                    link = info.share
+                    previewImg = info.previewImg
+                } else {
+                    const info = content.info as ytdl.videoInfo
+                    title = info.title
+                    authorNick = info.author.name
+                    link = info.video_url
+                    previewImg = info.thumbnail_url
                 }
-                out += `[${info.title} - ${info.author.nickname}](${info.share})`
+                const videoLink = `[${title} - ${authorNick}](${link})`
+                if (markType === MarkType.GITHUB && !inTable) {
+                    out += `
+| ${videoLink.replace(/\|/ig, "")} |  
+| -------------- |  
+| [![preview](${previewImg})](${link}) |  \n`
+                } else {
+                    out += videoLink
+                }
             } else if (content.type === "vote") {
                 // skip.
                 out += `[네이버 투표](${content.data})`
-            } else if (content.type === "youtube") {
-                const info = content.info as ytdl.videoInfo
-                if (markType === MarkType.GITHUB) {
-                    out += `[![Thumbnail-${info.video_id}](${info.thumbnail_url})](${info.video_url})${linesep}`
-                }
-                out += `[${info.title} - ${info.author.name}](${info.video_url})`
             } else if (content.type === "table") {
                 const { seperator, isHead } = (content as ArticleContent<TableType>).info
                 const tableOut:string[] = []
@@ -189,18 +226,33 @@ export class ArticleParser {
                         } else {
                             out += "\n"
                         }
-                        if (!(markType !== MarkType.GITHUB || (lastContent != null && lastContent.type === "table"
-                            && (lastContent as ArticleContent<TableType>).info.isHead))) {
-                            out += `| | |\n`
-                            out += `|-|-|\n`
+                        if (markType === MarkType.GITHUB) {
+                            let tableHead1 = "|"
+                            let tableHead2 = "|"
+                            for (let k = i + 1; k < contents.length; k += 1) {
+                                const c = contents[k] as ArticleContent<TableType>
+                                if (c.type === "table") {
+                                    if (c.info.seperator === TableSeperator.rowNext) {
+                                        tableHead1 += " |"
+                                        tableHead2 += "--|"
+                                    } else if (c.info.seperator === TableSeperator.rowEnd) {
+                                        tableHead1 += " |"
+                                        tableHead2 += "--|"
+                                        break
+                                    }
+                                }
+                            }
+                            if (lastContent != null && lastContent.type === "table" 
+                                && (lastContent as ArticleContent<TableType>).info.isHead) {
+                                // skip when header is before.
+                            } else {
+                                out += `${tableHead1}\n`
+                            }
+                            out += `${tableHead2}\n`
                         }
                     } break
                     case TableSeperator.tableEnd: {
-                        if (markType === MarkType.GITHUB && isHead) {
-                            out += `|-|-|\n`
-                        } else {
-                            out += `\n`
-                        }
+                        out += `\n`
                         inTable = false
                     } break
                     case TableSeperator.rowStart: {
@@ -228,12 +280,15 @@ export class ArticleParser {
     }
     public static mdToHTML(article:Article, markdown:string) {
         const sd = new showdown.Converter()
+        sd.setFlavor("github")
         sd.setOption("strikethrough", true)
         sd.setOption("tables", true)
-        sd.setOption("simpleLineBreaks", true)
+        sd.setOption("simpleLineBreaks", false)
+        sd.setOption("ghCompatibleHeaderId", false)
         sd.setOption("backslashEscapesHTMLTags", true)
         sd.setOption("emoji", true)
         sd.setOption("underline", true)
+        sd.setOption("tablesHeaderId", false)
         return pretty(htmlFrame(sd.makeHtml(markdown), article.articleTitle, article.url, article.userName)) as string
     }
     public static articleToHTML(article:Article) {
@@ -241,7 +296,7 @@ export class ArticleParser {
             Log.d("Article", info.data)
         }
     }
-    protected static async chain_domToContent($:CheerioStatic, param:DomChain) {
+    protected static async chain_domToContent(param:DomChain, $?:CheerioStatic) {
         const { els, contents } = param
         /**
          * style is Immutable
@@ -297,7 +352,7 @@ export class ArticleParser {
             }
             const checkBreak = shouldBreak(element)
             // custom parser
-            if (checkBreak.length >= 1) {
+            if (checkBreak.length >= 1 && $ != null) {
                 /**
                  * Naver link parser.
                  */
@@ -315,7 +370,7 @@ export class ArticleParser {
                         linkInfo.title = qTitle.text()
                     }
                     const qUrl = c$.find(".link")
-                    if (qTitle.length === 1) {
+                    if (qUrl.length === 1) {
                         linkInfo.url = qUrl.attr("href")
                     }
                     const qImg = c$.find("img")
@@ -350,8 +405,8 @@ export class ArticleParser {
                                 name: linkInfo.title,
                             },
                             style: {
-                                url: linkInfo.url,
                                 ...style,
+                                url: linkInfo.url,
                             }
                         } as ArticleContent<ImageType>)
                     }
@@ -362,8 +417,8 @@ export class ArticleParser {
                             content: linkInfo.title,
                         },
                         style: {
-                            url: linkInfo.url,
                             ...style,
+                            url: linkInfo.url,
                         }
                     } as ArticleContent<TextType>, contentAsLS(style))
                 } else {
@@ -373,7 +428,7 @@ export class ArticleParser {
             } else if (hasChild) {
                 // resclusive DOM
                 param.els = element.children
-                await this.chain_domToContent($, param)
+                await this.chain_domToContent(param, $)
             } else {
                 // Lastest Depth of code!
                 // There's no need to put text here. (Element.data part)
@@ -883,25 +938,46 @@ class MarkdownFormat {
     public toString() {
         let format = "%s"
         let content = this._content
-        content = content.replace(/>/ig, "\\>").replace(/\*/ig, "\\*")
-        if (this._underline) {
-            format = format.replace("%s", "__%s__")
-        }
-        if (this._namu) {
-            format = format.replace("%s", "~~%s~~")
-        }
-        if (this._italic) {
-            format = format.replace("%s", "*%s*")
-        }
-        if (this._bold) {
-            format = format.replace("%s", "**%s**")
-        }
         if (this._block || this._blockBig) {
             format = "%s"
             if (this._block) {
                 format = format.replace("%s", "`%s`")
             } else {
                 format = format.replace("%s", "```%s```")
+            }
+        } else {
+            let startBlank:string
+            let endBlank:string
+            if (this._underline || this._namu || this._italic || this._bold) {
+                startBlank = getFirst(content.match(/^\s+/i))
+                if (startBlank != null) {
+                    content = content.substr(startBlank.length)
+                }
+                endBlank = getFirst(content.match(/\s+$/i))
+                if (endBlank != null) {
+                    content = content.substring(0, content.length - endBlank.length)
+                }
+                if (content.length < 1) {
+                    return content
+                }
+            }
+            if (this._underline) {
+                format = format.replace("%s", "__%s__")
+            }
+            if (this._namu) {
+                format = format.replace("%s", "~~%s~~")
+            }
+            if (this._italic) {
+                format = format.replace("%s", "*%s*")
+            }
+            if (this._bold) {
+                format = format.replace("%s", "**%s**")
+            }
+            if (startBlank != null) {
+                format = startBlank + format
+            }
+            if (endBlank != null) {
+                format = format + endBlank
             }
         }
         return format.replace("%s", content)
@@ -924,7 +1000,7 @@ const htmlFrame = (markDown:string, title:string, url:string, author:string) => 
     <link rel="stylesheet" href="https://necolas.github.io/normalize.css/8.0.1/normalize.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <!--<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sindresorhus/github-markdown-css@latest/github-markdown.css">-->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!--<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <style>
     img {
@@ -934,6 +1010,21 @@ const htmlFrame = (markDown:string, title:string, url:string, author:string) => 
     .main-header {
         background-color: #6ac36e;
     }
+    strong {
+        font-weight: bolder;
+    }
+    #arti-title {
+        padding-left: 2rem;
+        font-size: 2rem;
+    }
+    @media screen and (max-width:800px) {
+        /* Smallize */
+        #arti-title {
+            padding-left: 0;
+            font-size: 1.5rem;
+            white-space: nowrap;
+        }
+    }
     </style>
 </head>
 <body>
@@ -941,7 +1032,7 @@ const htmlFrame = (markDown:string, title:string, url:string, author:string) => 
     <div class="navbar-fixed">
     <nav>
     <div class="nav-wrapper main-header">
-        <div style="padding-left: 2rem;" class="brand-logo arti-title">${title}</div>
+        <div id="arti-title" class="brand-logo"><a href="${url}">${title}</a></div>
         <ul id="nav-mobile" class="right hide-on-med-and-down">
             <li style="margin-right: 2rem;">${author}</li>
             <li><a href="${url}">카페에서 보기</a></li>

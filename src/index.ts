@@ -81,7 +81,7 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7722)
+            const article = await ncc.getArticleDetail(26686242, 7725)
             const conv = new showdown.Converter()
             const md = ArticleParser.articleToMd(article, MarkType.GITHUB)
             console.log(md)
