@@ -217,7 +217,7 @@ export default class ArtiNoti extends Plugin {
             let conCache:string = ""
             while (contentSplit.length >= 1) {
                 const piece = contentSplit.shift() + "\n"
-                if (piece.length + conCache.length >= 2045) {
+                if (piece.length + conCache.length >= 1000) {
                     // push content and reset
                     conCache = conCache.substring(0, conCache.length - 1)
                     contents.push(conCache)
@@ -235,12 +235,14 @@ export default class ArtiNoti extends Plugin {
             } else {
                 rich.setDescription(contents[0] + ((contents.length >= 2) ? "..." : ""))
             }
+            const readFile = ArticleParser.mdToHTML(article, ArticleParser.articleToMd(article, MarkType.GITHUB))
+            attaches.push(new Discord.Attachment(Buffer.from(readFile, "utf8"), article.articleId + ".html"))
             out.push({
                 embed: rich,
                 files: attaches,
                 disableEveryone: true,
             } as MessageOptions)
-            if (contents.length >= 2) {
+            if (contents.length >= 2 && false) {
                 contents.shift()
                 out.push(...contents.map((v) => {
                     const _rich = new Discord.RichEmbed()

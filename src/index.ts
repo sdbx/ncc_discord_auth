@@ -63,8 +63,8 @@ async function checkEnv() {
 }
 // Log.hook()
 Log.enable = true
-// checkEnv().then(() => start())
-test()
+checkEnv().then(() => start())
+// test()
 // client()
 
 async function test() {
