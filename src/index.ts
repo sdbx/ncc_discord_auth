@@ -80,11 +80,11 @@ async function test() {
         Log.d(`name: ${loaded}`)
         // const ar = await ncc.getArticleDetail(26686242, 7382);
         if (await ncc.availableAsync()) {
-            const article = await ncc.getArticleDetail(26686242, 7725)
+            const article = await ncc.getArticleDetail(26686242, 7741)
             const conv = new showdown.Converter()
             const md = ArticleParser.articleToMd(article, MarkType.GITHUB)
             const jujube = ArticleParser.contentsToJujube(article.contents)
-            console.log(jujube)
+            console.log(md)
             await fs.writeFile("/home/alyac/Documents/test.html", ArticleParser.mdToHTML(article, md))
         }
     }

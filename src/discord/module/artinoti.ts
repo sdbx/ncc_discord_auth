@@ -6,6 +6,7 @@ import { ArticleParser } from "../../ncc/articleparser"
 import { cafePrefix } from "../../ncc/ncconstant"
 import Article from "../../ncc/structure/article"
 import Cafe from "../../ncc/structure/cafe"
+import Profile from "../../ncc/structure/profile"
 import { bindFn, TimerID, WebpackTimer } from "../../webpacktimer"
 import Plugin from "../plugin"
 import { MarkType, ParamAccept, ParamType, UniqueID } from "../rundefine"
@@ -131,12 +132,19 @@ export default class ArtiNoti extends Plugin {
     protected async articleToRich(cafe:Cafe, arti:Article, guild?:Discord.Guild) {
         try {
             const article = await this.ncc.getArticleDetail(cafe.cafeId, arti.articleId)
-            const user = await this.ncc.getMemberById(cafe.cafeId,article.userId)
+            const user = await this.ncc.getMemberById(cafe.cafeId,article.userId).catch((err) => {
+                Log.e(err)
+                return null as Profile
+            })
             const rich = this.defaultRich
-            // rich.setTitle(article.articleTitle)
-            rich.setThumbnail(user.cafeImage)
-            // tslint:disable-next-line
-            rich.setAuthor(user.nickname, user.profileurl, `${cafePrefix}/CafeMemberNetworkView.nhn?clubid=${cafe.cafeId.toString(10)}&m=view&memberid=${user.userid}`);
+            rich.setTitle(article.articleTitle)
+            if (user != null) {
+                rich.setThumbnail(user.cafeImage)
+                // tslint:disable-next-line
+                rich.setAuthor(user.nickname, user.profileurl, `${cafePrefix}/CafeMemberNetworkView.nhn?clubid=${cafe.cafeId.toString(10)}&m=view&memberid=${user.userid}`)
+            } else {
+                rich.setAuthor(article.userId + " (탈퇴한 사용자)")
+            }
             if (article.imageURL != null) {
                 const image:Buffer = await request.get(article.imageURL, { encoding: null })
                 rich.attachFile(new Discord.Attachment(image, "image.png"))
@@ -154,7 +162,7 @@ export default class ArtiNoti extends Plugin {
                     const authlist = await this.sub(new AuthConfig(), guild.id, false)
                     const suffix = article.categoryName + ", " + article.articleId.toString(10)
                     rich.setFooter(suffix)
-                    if (authlist.users != null) {
+                    if (authlist.users != null && user != null) {
                         for (const authUser of authlist.users) {
                             if (authUser.naverID === user.userid) {
                                 const m = guild.member(authUser.userID)

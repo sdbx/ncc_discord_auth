@@ -1,5 +1,6 @@
 import Cheerio from "cheerio"
 import colorString from "color-string"
+import Entities from "html-entities"
 import pretty from "pretty"
 import request from "request-promise-native"
 import showdown from "showdown"
@@ -115,10 +116,11 @@ export class ArticleParser {
                 const info = typeCon.style
                 let txt:MarkdownFormat
                 // before processing
+                // html escaping looks like hell.
                 content.data = content.data.replace(/\\/ig, "\\\\")
                     .replace(/\*/ig, "\\*")
                     .replace(/~/ig, "\\~")
-                    .replace(/<\/?[A-Za-z0-9-_]+/ig, "\\$&")
+                    .replace(/<.+?(\/>|<\/[A-Za-z0-9-_]+?>)/ig, "\\$&")
                 if (markType === MarkType.GITHUB) {
                     txt = new MarkdownFormat(content.data)
                 } else if (markType === MarkType.DISCORD) {
@@ -297,8 +299,8 @@ export class ArticleParser {
         }
     }
     public static contentsToJujube(contents:ArticleContent[]) {
-        let out = ""
-        let lastMod = ""
+        const out = ""
+        const lastMod = ""
         const composer:TextStyle = {
             bold: false,
             italic: false,
@@ -311,9 +313,8 @@ export class ArticleParser {
             textAlign: null,
             isTitle: false,
         }
-        const buildStyle = () => {
-
-        }
+        const parser = new Entities.XmlEntities()
+        const e = (str:string) => parser.encode(str).replace(/\//ig, "&#47;")
         const jujubeCodes = contents.map((_content) => {
             switch (_content.type) {
                 case "text": {
@@ -329,37 +330,37 @@ export class ArticleParser {
                     }
                     const merge = (str1:string, str2:string) => {
                         return str2 == null ? null : str1 + str2
-                    }
+                    }             
                     const strKey:Array<string | null> = [info.textColor, info.fontName,
                         info.size >= 0 ? info.size + "px" : null, info.backgroundColor]
                     const strValue:string[] = ["c", "f", "i", "k"]
                     for (let i = 0; i < strKey.length; i += 1) {
                         const key = strKey[i]
                         if (key != null) {
-                            styleTags.push(strValue[i] + key)
+                            styleTags.push(e(strValue[i]) + key)
                         }
                     }
                     // header
                     if (/^h[1-6]$/i.test(info.tagName)) {
-                        return `<G${getFirst(info.tagName.match(/\d+/ig))}/${content.data}>`
+                        return `<G${getFirst(info.tagName.match(/\d+/ig))}/${e(content.data)}>`
                     }
-                    styleTags.push(content.data)
+                    styleTags.push(e(content.data))
                     return `<F${styleTags.join("/")}>`
                 } break
                 case "newline": {
-                    return `<N>`
+                    return `<N/>`
                 } break
                 case "image": {
                     const content = _content as ArticleContent<ImageType>
-                    return `<Iu${content.info.src}/zw${content.info.width}/zh${content.info.height}>`
+                    return `<Iu${e(content.info.src)}/zw${content.info.width}/zh${content.info.height}>`
                 } break
                 case "nvideo": {
                     const content = _content as ArticleContent<NaverVideo>
-                    return `<Yu${content.info.share}/${content.info.title}>`
+                    return `<Yu${e(content.info.share)}/${e(content.info.title)}>`
                 } break
                 case "youtube": {
                     const content = _content as ArticleContent<ytdl.videoInfo>
-                    return `<Yu${content.info.video_url}/${content.info.title}>`
+                    return `<Yu${e(content.info.video_url)}/${e(content.info.title)}>`
                 } break
             }
             return ""
