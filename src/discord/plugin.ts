@@ -290,8 +290,10 @@ export default abstract class Plugin {
         if (this.config != null) {
             await this.config.export()
             const proArr = []
-            this.subs.forEach((_value) => proArr.push(_value.export()))
-            await Promise.all(proArr)
+            if (this.subs != null) {
+                this.subs.forEach((_value) => proArr.push(_value.export()))
+                await Promise.all(proArr)
+            }
         }
         return Promise.resolve()
     }
