@@ -151,14 +151,18 @@ export default class Runtime extends EventEmitter implements IRuntime {
     public async destroy() {
         this.client.removeAllListeners()
         try {
-            await this.client.destroy()
-            for (const plugin of this.plugins) {
-                await plugin.onDestroy()
-            }
             this.ncc.destory()
+            await this.client.destroy()
         } catch (err) {
             Log.e(err)
             process.exit(-1)
+        }
+        for (const plugin of this.plugins) {
+            try {
+                plugin.onDestroy()
+            } catch (err) {
+                Log.e(err)
+            }
         }
         // may save failed.
         // this.emit("save");

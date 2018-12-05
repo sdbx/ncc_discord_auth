@@ -387,7 +387,9 @@ export default class Purge extends Plugin {
         return Promise.resolve()
     }
     public async onDestroy() {
-        this.tempDir.cleanup()
+        if (this.tempDir != null) {
+            this.tempDir.cleanup()
+        }
         return super.onDestroy()
     }
     private async getCachedFile(fileid:string) {

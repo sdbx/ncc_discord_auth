@@ -29,7 +29,8 @@ export default class ArtiNoti extends Plugin {
         // super: load config
         await super.ready()
         // CommandHelp: suffix, description
-        this.toggle = new CommandHelp("알림 전환", this.lang.noti.toggleDesc, true, {reqAdmin:true})
+        this.toggle = new CommandHelp("게시글 중계", this.lang.noti.toggleDesc, true, {reqAdmin:true})
+        this.toggle.addField(ParamType.dest, "중계할 게시판 이름", false)
         this.checkArti = new CommandHelp("게시글 확인", "__", true, {chatType: "guild"})
         this.checkArti.addField(ParamType.dest, "게시글 번호", true, {accept: ParamAccept.NUMBER})
         // get parameter as complex
@@ -48,15 +49,38 @@ export default class ArtiNoti extends Plugin {
         const testToggle = this.toggle.check(this.global,command,state)
         if (testToggle.match) {
             const cfg = await this.subUnique(this.config, msg, UniqueID.guild)
-            if (cfg.toPostChannel.indexOf(msg.channel.id) >= 0) {
-                cfg.toPostChannel.splice(cfg.toPostChannel.indexOf(msg.channel.id), 1)
+            const postCh = cfg.toPostChannel
+            const categoryP = testToggle.get(ParamType.dest)
+            const categoryCfg = cfg.categoryFilter[msg.channel.id]
+            if (postCh.indexOf(msg.channel.id) >= 0) {
+                if (categoryCfg === undefined) {
+                    if (categoryP == null) {
+                        postCh.splice(postCh.indexOf(msg.channel.id), 1)
+                    } else {
+                        delete cfg.categoryFilter[msg.channel.id]
+                    }
+                } else {
+                    if (categoryP == null) {
+                        delete cfg.categoryFilter[msg.channel.id]
+                    } else {
+                        cfg.categoryFilter[msg.channel.id] = categoryP
+                    }
+                }
             } else {
-                cfg.toPostChannel.push(msg.channel.id)
+                if (categoryCfg !== null) {
+                    delete cfg.categoryFilter[msg.channel.id]
+                }
+                if (categoryP != null) {
+                    cfg.categoryFilter[msg.channel.id] = categoryP
+                }
+                postCh.push(msg.channel.id)
             }
             const rich = this.defaultRich
+            const categorys = cfg.categoryFilter[msg.channel.id]
             rich.addField("수신 채널 목록",cfg.toPostChannel.length <= 0 ? "없음" : cfg.toPostChannel.join(","))
+            rich.addField("현재 채널 정보", postCh.indexOf(msg.channel.id) >= 0 ?
+                (categorys == null ? "전체 글" : categorys) : "수신 안함")
             await msg.channel.send(rich)
-            await cfg.export()
         }
         const testChecker = this.checkArti.check(this.global, command, state)
         if (testChecker.match) {
@@ -108,14 +132,23 @@ export default class ArtiNoti extends Plugin {
                     this.articleCache.set(guild.id,lastID)
                     continue
                 }
+                // const categorys = cfg.categoryFilter[msg.channel.id]
                 articles = articles.filter((_v) => _v.articleId > lastID)
                 for (const _ar of articles) {
-                    const sendContents = await this.articleToRich(cafe, _ar, guild)
+                    const article = await this.ncc.getArticleDetail(cafe.cafeId, _ar.articleId)
+                    const sendContents = await this.articleToRich(cafe, article, guild)
                     if (sendContents.length === 0) {
                         Log.w("Article", "Article parse failed!")
                         continue
                     }
                     for (const _v of cfg.toPostChannel) {
+                        const categories = cfg.categoryFilter[_v]
+                        if (categories != null) {
+                            const categoryArr = categories.split(",").map((v) => v.trim())
+                            if (categoryArr.indexOf(article.categoryName) < 0) {
+                                continue
+                            }
+                        }
                         if (this.client.channels.has(_v)) {
                             const ch = this.client.channels.get(_v) as Discord.TextChannel
                             for (const rich of sendContents) {
@@ -129,9 +162,8 @@ export default class ArtiNoti extends Plugin {
             }
         }
     }
-    protected async articleToRich(cafe:Cafe, arti:Article, guild?:Discord.Guild) {
+    protected async articleToRich(cafe:Cafe, article:Article, guild?:Discord.Guild) {
         try {
-            const article = await this.ncc.getArticleDetail(cafe.cafeId, arti.articleId)
             const user = await this.ncc.getMemberById(cafe.cafeId,article.userId).catch((err) => {
                 Log.e(err)
                 return null as Profile
@@ -269,6 +301,7 @@ export default class ArtiNoti extends Plugin {
 class AlertConfig extends Config {
     public cafeURL = "<네이버 카페 URL>"
     public toPostChannel:string[] = []
+    public categoryFilter:{[key in string]:string} = {}
     // proxy oauth
     // https://discordapp.com/oauth2/authorize?client_id=INSERT_CLIENT_ID_HERE&scope=bot&permissions=35
     constructor() {

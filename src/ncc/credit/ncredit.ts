@@ -104,7 +104,7 @@ export default class NCredit extends EventEmitter {
         log("Creating new cookie jar")
         const rsaKey = await this.reqGet("https://nid.naver.com/login/ext/keys.nhn")
             .catch((e) => {Log.e(e); return ""}) as string // RSA Key
-        let keyO
+        let keyO:{keyName:string, key:string}
         try {
             keyO = encryptKey(rsaKey, this.username, this._password)
         } catch (err) {
@@ -118,12 +118,12 @@ export default class NCredit extends EventEmitter {
             svctype: 0,
             "enc_url": "http0X0.0000000000001P-10220.0000000.000000www.naver.com",
             url: "https://www.naver.com",
-            "smart_level": 1,
+            "smart_LEVEL": 2,
             encpw: key,
             nvlong: this.keepLogin ? "on" : "off",
         }
         if (captcha != null) {
-            form["smart_LEVEL"] = -1
+            // form["smart_LEVEL"] = -1
             form["chptchakey"] = captcha.key // Not a typo; Naver uses CHptcha
             form["chptcha"] = captcha.value
             form["captcha_type"] = "image" // but in this case Naver uses CAptcha
