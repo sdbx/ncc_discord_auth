@@ -35,7 +35,7 @@ async function start() {
         setTimeout(start, 5000)
     })
     try {
-        run.start()
+        await run.start()
     } catch (err) {
         Log.e(err)
         if (run != null) {
@@ -47,7 +47,6 @@ async function start() {
             setTimeout(start, 10000)
         }
     }
-    run.start()
 }
 async function checkEnv() {
     if (process.env.tokenKey !== undefined) {

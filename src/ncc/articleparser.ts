@@ -1085,9 +1085,12 @@ const htmlFrame = (markDown:string, title:string, url:string, author:string) => 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://necolas.github.io/normalize.css/8.0.1/normalize.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/polonel/SnackBar@latest/dist/snackbar.min.css" />
     <!--<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sindresorhus/github-markdown-css@latest/github-markdown.css">-->
     <!--<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/polonel/SnackBar@latest/dist/snackbar.min.js"></script>
+    
     <style>
     img {
         max-width: 100%;
@@ -1141,13 +1144,12 @@ ${markDown}
         }
         try {
             if (Number.parseInt(Symbol("ES2017 <3").description.substring(2,6)) * 53 === 106901) {
-                /* document.getElementById('content').innerHTML = marked(\`
-\${markDown}
-\`); */
+                console.log("You are using latest browser!");
             }
         } catch (err) {
-            // chrome v70+, firefox v60+
-            document.getElementById('content').innerHTML = \`<p>브라우저를 채신버전으로 업데이트 시켜주세요!</p>\`
+            // if browser version lower than chrome v70+, firefox v60+
+            Snackbar.show({text: "(구) 브라우저로 인해 문제점이 발생할 수도 있습니다.", pos: "bottom-center"});
+            // document.getElementById('content').innerHTML = \`<p>브라우저를 채신버전으로 업데이트 시켜주세요!</p>\`
         }
     </script> 
 </body>
