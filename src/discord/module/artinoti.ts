@@ -13,6 +13,7 @@ import { MarkType, ParamAccept, ParamType, UniqueID } from "../rundefine"
 import { CmdParam } from "../rundefine"
 import { CommandHelp, DiscordFormat } from "../runutil"
 import { AuthConfig } from "./auth"
+const debug = false
 
 export default class ArtiNoti extends Plugin {
     // declare config file: use save data
@@ -36,7 +37,7 @@ export default class ArtiNoti extends Plugin {
         // get parameter as complex
         this.toggle.complex = true
         // setinterval
-        this.timer = WebpackTimer.setInterval(bindFn(this.fetch, this),60000)
+        this.timer = WebpackTimer.setInterval(bindFn(this.fetch, this), debug ? 5000 : 30000)
         // call once :)
         await this.fetch()
         return Promise.resolve()
@@ -133,7 +134,13 @@ export default class ArtiNoti extends Plugin {
                     continue
                 }
                 // const categorys = cfg.categoryFilter[msg.channel.id]
-                articles = articles.filter((_v) => _v.articleId > lastID)
+                articles = articles.filter((_v) => {
+                    if (debug) {
+                        return _v.articleId >= lastID
+                    } else {
+                        return _v.articleId > lastID
+                    }
+                })
                 for (const _ar of articles) {
                     const article = await this.ncc.getArticleDetail(cafe.cafeId, _ar.articleId)
                     const sendContents = await this.articleToRich(cafe, article, guild)
@@ -152,7 +159,11 @@ export default class ArtiNoti extends Plugin {
                         if (this.client.channels.has(_v)) {
                             const ch = this.client.channels.get(_v) as Discord.TextChannel
                             for (const rich of sendContents) {
-                                await ch.send(rich)
+                                try {
+                                    await ch.send(rich)
+                                } catch (err) {
+                                    Log.e(err)
+                                }
                             }
                         }
                     }

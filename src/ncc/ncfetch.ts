@@ -377,7 +377,13 @@ export default class NcFetch extends NcCredent {
             }).get(), (v) => v != null)
         }).get()
         // parse article names
-        const contents = await ArticleParser.domToContent($("#tbody").children().toArray(), $)
+        const doms = $("#tbody").children().toArray()
+        let contents:Array<ArticleContent<InfoType>>
+        if (doms.length === 0) {
+            contents = [ArticleParser.contentText($("#tbody").text())]
+        } else {
+            contents = await ArticleParser.domToContent(doms, $)
+        }
         const images = contents.map((value) => {
             if (value.type === "image") {
                 const info = value.info as ImageType

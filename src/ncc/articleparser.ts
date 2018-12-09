@@ -38,6 +38,29 @@ const blockTag = ["address", "article", "aside", "blockquote", "canvas",
     "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
     "main", "nav", "noscript", "ol", "output", "p", "pre", "section",
     "table", "tfoot", "ul", "video"]
+const defaultStyles:DeepReadonly<{textStyle:TextStyle, generalStyle:GeneralStyle, imageStyle:ImageStyle}> = {
+    textStyle: {
+        bold: false,
+        italic: false,
+        underline: false,
+        namu: false,
+        size: 12,
+        textColor: null,
+        textAlign: "undefined",
+        backgroundColor: null,
+        fontName: null,
+        isTitle: false,
+    },
+    generalStyle: {
+        url: null,
+        align: "undefined",
+        tagName: "",
+    },
+    imageStyle: {
+        viewWidth: -1,
+        viewHeight: -1,
+    }
+}
 /**
  * I like static class
  * 
@@ -46,38 +69,32 @@ const blockTag = ["address", "article", "aside", "blockquote", "canvas",
 export class ArticleParser {
     public static GITHUB = MarkType.GITHUB
     public static DISCORD = MarkType.DISCORD
+    /**
+     * Parse Cheerio's elements to Linear ArticleContent
+     * @param els Elements
+     * @param $ Cheerio Query
+     */
     public static async domToContent(els:CheerioElement[], $?:CheerioStatic) {
-        const textStyle:TextStyle = {
-            bold: false,
-            italic: false,
-            underline: false,
-            namu: false,
-            size: 12,
-            textColor: null,
-            textAlign: "undefined",
-            backgroundColor: null,
-            fontName: null,
-            isTitle: false,
-        }
-        const generalStyle:GeneralStyle = {
-            url: null,
-            align: "undefined",
-            tagName: "",
-        }
-        const imageStyle:ImageStyle = {
-            viewWidth: -1,
-            viewHeight: -1,
-        }
         const chain = await this.chain_domToContent({
             els: [...els],
             contents: [],
             style: {
-                ...generalStyle,
-                ...textStyle,
-                ...imageStyle,
+                ...defaultStyles.generalStyle,
+                ...defaultStyles.textStyle,
+                ...defaultStyles.imageStyle,
             },
         }, $)
         return chain.contents
+    }
+    /**
+     * Get simple texttype content.
+     * @param str content
+     */
+    public static contentText(str:string):ArticleContent<TextType> {
+        return contentAsText(str, {
+            ...defaultStyles.generalStyle,
+            ...defaultStyles.textStyle,
+        })
     }
     /**
      * Print article's content to markdown.
