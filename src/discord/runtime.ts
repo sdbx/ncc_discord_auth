@@ -40,6 +40,7 @@ const presetCfgs:{[key:string]: string[]} = {
     "Gitlab 토큰": ["artialert.gitlabToken"],
     "게시글 repo": ["artialert<%g>.repoPath"],
     "게시글 branch": ["artialert<%g>.repoBranch"],
+    "한타영타 변환": ["haneng<%g>.use"],
 }
 /**
  * The home of bot
