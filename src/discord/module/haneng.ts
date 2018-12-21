@@ -14,10 +14,12 @@ import { cloneMessage, CommandHelp, CommandStatus, DiscordFormat,
 export default class HanEng extends Plugin {
     // declare config file: use save data
     protected config = new HanengConfig()
+    protected cache:Map<string, boolean>
     /**
      * Initialize command
      */
     public async ready() {
+        this.cache = new Map()
         // super: load config
         await super.ready()
         return Promise.resolve()
@@ -38,11 +40,12 @@ export default class HanEng extends Plugin {
             return
         }
         const pm = packet.channel.permissionsFor(this.client.user)
-        if (!pm.has("SEND_MESSAGES") || !pm.has("MANAGE_WEBHOOKS")) {
+        if (!pm.has("SEND_MESSAGES") /* || !pm.has("MANAGE_WEBHOOKS") */) {
             return
         }
         // now, calc
         // first. Try to convert to hangul
+        const hanLength = (arr:string[]) => arr.filter((v) => v.match(/^[가-힣]+/ig) != null).length
         const m = packet.content
         const pieces = m.split(/[A-Za-z]+/ig)
         const engs = m.match(/[A-Za-z]+/ig)
@@ -50,6 +53,9 @@ export default class HanEng extends Plugin {
             return
         }
         if (m.indexOf("http://") >= 0 || m.indexOf("https://") >= 0) {
+            return
+        }
+        if (hanLength([m]) >= 1) {
             return
         }
         const applies:string[] = []
@@ -76,13 +82,15 @@ export default class HanEng extends Plugin {
             }
         }).filter((v) => v != null)
         const getSuggest = async (key:string) => {
+            Log.time()
             const url = `https://suggestqueries.google.com/complete/search?client=firefox&hl=ko&q=${
                 encodeURIComponent(key)
             }`
-            return JSON.parse(
+            const r = JSON.parse(
                 encoding.convert(await request.get(url, {encoding: null}), "utf-8", "euc-kr")) as [string, string[]]
+            Log.time("Delay")
+            return r
         }
-        const hanLength = (arr:string[]) => arr.filter((v) => v.match(/^[가-힣]+/ig) != null).length
         for (const kor of kors) {
             const eng = engs[kor.index]
             // google using euc-kr? believe?
@@ -118,19 +126,10 @@ export default class HanEng extends Plugin {
         }
         if (changed) {
             const clone = cloneMessage(packet)
-            if (pm.has("MANAGE_MESSAGES")) {
-                packet.delete()
-                const wh = await this.getWebhook(packet.channel, ...DiscordFormat.getUserProfile(packet.member))
-                await wh.send(make, {
-                    files: clone.attaches,
-                    embeds: clone.embeds,
-                })
-            } else {
-                await packet.channel.send(make, {
-                    files: clone.attaches,
-                    embed: clone.embeds.length >= 1 ? clone.embeds[0] : null,
-                })
-            }
+            await packet.channel.send(make, {
+                files: clone.attaches,
+                embed: clone.embeds.length >= 1 ? clone.embeds[0] : null,
+            })
         }
     }
 }
