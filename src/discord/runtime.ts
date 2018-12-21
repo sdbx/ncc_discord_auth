@@ -23,6 +23,7 @@ import Purge from "./module/purge"
 import Plugin from "./plugin"
 import { CmdParam, ParamType } from "./rundefine"
 import { CommandHelp, DiscordFormat, getRichTemplate } from "./runutil"
+import HanEng from "./module/haneng";
 
 /**
  * List of presets
@@ -78,7 +79,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
         this.plugins.push(
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
             new Cast(), new Gather(), new EventNotifier(), new Color(),
-            new Purge(), new PermManager(), new Presense())
+            new Purge(), new PermManager(), new Presense(), new HanEng())
     }
     /**
      * **Async**
