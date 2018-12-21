@@ -1,11 +1,11 @@
 import Discord, { TextChannel } from "discord.js"
+import encoding from "encoding"
 import haneng from "gksdud"
 import request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import encoding from "encoding"
 import { ChainData, CmdParam, ParamAccept, ParamType, UniqueID } from "../rundefine"
 import { cloneMessage, CommandHelp, CommandStatus, DiscordFormat,
     getFirstMap, getRichTemplate, SnowFlake } from "../runutil"
@@ -118,11 +118,19 @@ export default class HanEng extends Plugin {
         }
         if (changed) {
             const clone = cloneMessage(packet)
-            const wh = await this.getWebhook(packet.channel, ...DiscordFormat.getUserProfile(packet.member))
-            await wh.send(make, {
-                files: clone.attaches,
-                embeds: clone.embeds,
-            })
+            if (pm.has("MANAGE_MESSAGES")) {
+                packet.delete()
+                const wh = await this.getWebhook(packet.channel, ...DiscordFormat.getUserProfile(packet.member))
+                await wh.send(make, {
+                    files: clone.attaches,
+                    embeds: clone.embeds,
+                })
+            } else {
+                await packet.channel.send(make, {
+                    files: clone.attaches,
+                    embed: clone.embeds.length >= 1 ? clone.embeds[0] : null,
+                })
+            }
         }
     }
 }
