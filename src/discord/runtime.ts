@@ -36,6 +36,9 @@ const presetCfgs:{[key:string]: string[]} = {
     "메세지 백업 채널": ["purger<%g>.backupChannel"],
     "상태 메시지": ["presense.stateMessage"],
     "상태": ["presense.state"],
+    "Gitlab 토큰": ["artialert.gitlabToken"],
+    "게시글 repo": ["artialert<%g>.repoPath"],
+    "게시글 branch": ["artialert<%g>.repoBranch"],
 }
 /**
  * The home of bot
@@ -411,7 +414,13 @@ export default class Runtime extends EventEmitter implements IRuntime {
             if (from === "프리셋" && watch) {
                 const rich = this.plugins[0].defaultRich
                 for (const [presetK, presetFrom] of Object.entries(presetCfgs)) {
-                    rich.addField(presetK, presetFrom.join("\n").replace(/%g/ig, msg.guild.id))
+                    let presetDecode = presetFrom.join("\n")
+                    if (presetFrom.indexOf("%g") >= 0) {
+                        if (msg.guild != null) {
+                            presetDecode = presetDecode.replace(/%g/ig, msg.guild.id)
+                        }
+                    }
+                    rich.addField(presetK, presetDecode)
                 }
                 await msg.channel.send(rich)
                 return Promise.resolve(true)
@@ -420,7 +429,9 @@ export default class Runtime extends EventEmitter implements IRuntime {
                 if (presetK === from) {
                     // preset execute
                     for (let preFrom of presetFrom) {
-                        preFrom = preFrom.replace(/%g/ig,msg.guild.id)
+                        if (msg.guild != null) {
+                            preFrom = preFrom.replace(/%g/ig,msg.guild.id)
+                        }
                         richE.push(await this.setConfig(preFrom, to, watch, msg))
                     }
                     result = true

@@ -104,6 +104,16 @@ export default class ArtiNoti extends Plugin {
         }
         return Promise.resolve()
     }
+    public async onConfigChange(msg:Discord.Message, key:string, value:unknown):Promise<unknown> {
+        if (key === "repoPath") {
+            let v = value as string
+            if (v.startsWith("https://gitlab.com/")) {
+                v = v.substr(19)
+            }
+            return encodeURIComponent(v)
+        }
+        return value
+    }
     public async onDestroy() {
         await super.onDestroy()
         WebpackTimer.clearInterval(this.timer)
@@ -148,6 +158,35 @@ export default class ArtiNoti extends Plugin {
                         Log.w("Article", "Article parse failed!")
                         continue
                     }
+                    let proxyURL:string = null
+                    if (this.config.gitlabToken.length >= 1 && cfg.repoPath.length >= 1) {
+                        // push to git content
+                        const postMD = ArticleParser.articleToMd(article, MarkType.GITHUB)
+                        try {
+                            // tslint:disable-next-line
+                            const res:object = await request.post(`https://gitlab.com/api/v4/projects/${cfg.repoPath}/repository/commits`,{
+                                headers: {
+                                    "PRIVATE-TOKEN": this.config.gitlabToken,
+                                },
+                                body: {
+                                    branch: cfg.repoBranch,
+                                    commit_message: `${article.articleId}, auto-gen, ${this.client.user.username}`,
+                                    actions: [{
+                                        action: "create",
+                                        file_path: `public/article/${article.articleId}.md`,
+                                        content: postMD,
+                                    }],
+                                },
+                                json: true,
+                            })
+                            if (res != null) {
+                                const [author, repo] = decodeURIComponent(cfg.repoPath).split("/")
+                                proxyURL = `https://${author}.gitlab.io/${repo}/view.html?${article.articleId}`
+                            }
+                        } catch (err) {
+                            Log.e(err)
+                        }
+                    }
                     for (const _v of cfg.toPostChannel) {
                         const categories = cfg.categoryFilter[_v]
                         if (categories != null) {
@@ -160,7 +199,9 @@ export default class ArtiNoti extends Plugin {
                             const ch = this.client.channels.get(_v) as Discord.TextChannel
                             for (const rich of sendContents) {
                                 try {
-                                    await ch.send(rich)
+                                    await ch.send(`${article.categoryName} 게시판에 "${
+                                        DiscordFormat.normalize(article.articleTitle, guild, true)
+                                    }" 게시글이 올라왔습니다.${proxyURL != null ? "\n" + proxyURL : ""}`, rich)
                                 } catch (err) {
                                     Log.e(err)
                                 }
@@ -310,6 +351,9 @@ export default class ArtiNoti extends Plugin {
     }
 }
 class AlertConfig extends Config {
+    public gitlabToken = ""
+    public repoPath = ""
+    public repoBranch = "master"
     public cafeURL = "<네이버 카페 URL>"
     public toPostChannel:string[] = []
     public categoryFilter:{[key in string]:string} = {}

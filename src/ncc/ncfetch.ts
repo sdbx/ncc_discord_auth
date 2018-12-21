@@ -379,8 +379,8 @@ export default class NcFetch extends NcCredent {
         // parse article names
         const doms = $("#tbody").children().toArray()
         let contents:Array<ArticleContent<InfoType>>
-        if (doms.length === 0) {
-            contents = [ArticleParser.contentText($("#tbody").text())]
+        if (doms.length === 0 || doms.filter((v) => v.tagName === "br" || v.tagName == null).length === doms.length) {
+            contents = [ArticleParser.contentText($("#tbody").text().trim())]
         } else {
             contents = await ArticleParser.domToContent(doms, $)
         }
