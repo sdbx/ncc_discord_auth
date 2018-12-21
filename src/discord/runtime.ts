@@ -15,6 +15,7 @@ import Cast from "./module/cast"
 import Color from "./module/color"
 import EventNotifier from "./module/event"
 import Gather from "./module/gather"
+import HanEng from "./module/haneng"
 import Login from "./module/login"
 import PermManager from "./module/perm"
 import Ping from "./module/ping"
@@ -23,7 +24,6 @@ import Purge from "./module/purge"
 import Plugin from "./plugin"
 import { CmdParam, ParamType } from "./rundefine"
 import { CommandHelp, DiscordFormat, getRichTemplate } from "./runutil"
-import HanEng from "./module/haneng";
 
 /**
  * List of presets
@@ -202,6 +202,9 @@ export default class Runtime extends EventEmitter implements IRuntime {
                 subConfigs: this.subConfigs,
                 webhooks: this.webhooks,
             })
+        }
+        if (this.global.authUsers.length >= 1) {
+            
         }
         // set client option
         this.client.options.disabledEvents = ["PRESENCE_UPDATE", "TYPING_START"]

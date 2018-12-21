@@ -6,6 +6,7 @@ import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
+import hangul from "hangul-js"
 import { ChainData, CmdParam, ParamAccept, ParamType, UniqueID } from "../rundefine"
 import {
     cloneMessage, CommandHelp, CommandStatus, DiscordFormat,
@@ -16,7 +17,7 @@ import {
 export default class HanEng extends Plugin {
     // declare config file: use save data
     protected config = new HanengConfig()
-    protected cache: Map<string, boolean>
+    protected cache:Map<string, boolean>
     /**
      * Initialize command
      */
@@ -29,11 +30,11 @@ export default class HanEng extends Plugin {
     /**
      * on Command Received.
      */
-    public async onCommand(msg: Discord.Message, command: string, state: CmdParam): Promise<void> {
+    public async onCommand(msg:Discord.Message, command:string, state:CmdParam):Promise<void> {
         // no need to use
         return Promise.resolve()
     }
-    public async onMessage(packet: Discord.Message) {
+    public async onMessage(packet:Discord.Message) {
         if (packet.author.bot) {
             return
         }
@@ -47,7 +48,7 @@ export default class HanEng extends Plugin {
         }
         // now, calc
         // first. Try to convert to hangul
-        const hanLength = (arr: string[]) => arr.filter((v) => v.match(/^[가-힣]+/ig) != null).length
+        const hanLength = (arr:string[]) => arr.filter((v) => v.match(/[가-힣]+/ig) != null).length
         const m = packet.content
         const pieces = m.split(/[A-Za-z]+/ig)
         const engs = m.match(/[A-Za-z]+/ig)
@@ -57,14 +58,14 @@ export default class HanEng extends Plugin {
         if (m.indexOf("http://") >= 0 || m.indexOf("https://") >= 0) {
             return
         }
+        // 한글이 한글자라도 있으면 무시
         if (hanLength([m]) >= 1) {
             return
         }
-        const applies: string[] = []
         if (m.indexOf("\`") >= 0) {
             return
         }
-        // filter to trying to google
+        // first. filter incoreect hangul.
         const kors = engs.map((v) => haneng(v)).map((v, i) => {
             if (v.length >= 2 && v === "".padStart(v.length, v.charAt(0)) &&
                 ["ㅋ", "ㅎ", "ㄱ", "ㄷ", "ㅂ", "ㅇ", "ㅗ", "ㅅ", "ㅠ"].indexOf(v.charAt(0)) >= 0) {
@@ -83,7 +84,7 @@ export default class HanEng extends Plugin {
                 value: v,
             }
         }).filter((v) => v != null)
-        const getSuggest = async (key: string) => {
+        const getSuggest = async (key:string) => {
             const url = `https://suggestqueries.google.com/complete/search?client=firefox&hl=ko&q=${
                 encodeURIComponent(key)
                 }`
@@ -91,39 +92,76 @@ export default class HanEng extends Plugin {
                 encoding.convert(await request.get(url, { encoding: null }), "utf-8", "euc-kr")) as [string, string[]]
             return r
         }
+        // convert.
+        let applies:string[] = []
+        let worked = 0
+        let added = -1
         for (const kor of kors) {
+            worked += 1
+            const add = (setCache = true) => {
+                added += 1
+                if (setCache) {
+                    this.cache.set(eng, true)
+                }
+                applies[kor.index] = kor.value
+            }
             const eng = engs[kor.index]
-            if (eng.length <= 3 || kor.value.length <= 1) {
-                // skip check because almost yes... (exclude amd plz...)
-            } else if (this.cache.has(eng)) {
+            // check so less converted
+            if (worked >= 7 && added / worked <= 0.7) {
+                applies = []
+                break
+            }
+            // check cache
+            if (this.cache.has(eng)) {
                 if (!this.cache.get(eng)) {
                     continue
+                } else {
+                    add(false)
+                    continue
                 }
-            } else {
-                // google using euc-kr? believe?
-                const [query, suggest] = await getSuggest(eng)
-                // find 1. Let's determine the "word" is exists
-                const exist = suggest.find((v) => v === query) != null
-                if (suggest.length >= 1) {
-                    if (!exist && (hanLength(suggest) / suggest.length) <= 0.4) {
-                        this.cache.set(eng, false)
-                        continue
+            }
+            // google using euc-kr? believe?
+            const [query, suggest] = await getSuggest(eng + " ")
+            // first: if there's match in english, DO NOT CONVERT
+            if (suggest.find((v) => v === eng) != null) {
+                this.cache.set(eng, false)
+                continue
+            }
+            // second: Does not anything search, JUST CONVERT
+            if (suggest.length <= 0) {
+                add()
+                continue
+            }
+            // third: if not match and almost english, DO NOT CONVERT
+            if (suggest.filter((v) => v.match(/^[ A-Za-z0-9]+/ig) != null).length / suggest.length >= 0.7) {
+                this.cache.set(eng, false)
+                continue
+            }
+            // fourth: If almost stars with KOR, JUST CONVERT
+            if (suggest.filter((v) => v.startsWith(kor.value)).length / suggest.length >= 0.7) {
+                add()
+                continue
+            }
+            // final: shouldn't have become, but... we choice by this.
+            const splitQuery = hangul.disassemble(kor.value)
+            const contain = suggest.map((v) => {
+                const splitV = hangul.disassemble(v)
+                for (let i = 0; i < splitQuery.length; i += 1) {
+                    if (splitQuery[i] !== splitV[i]) {
+                        return null
                     }
                 }
-                this.cache.set(eng, true)
+                return v
+            }).filter((v) => v != null)
+            // anyway, is this useful to... 형태소? -> JUST CONVERT
+            if (contain.length / suggest.length >= 0.6) {
+                add()
+                continue
             }
-            applies[kor.index] = kor.value
-            /*
-            // find 2. At here, How much suggests in Korean?
-            const [, spaceS] = await getSuggest(eng.trimRight() + " ")
-            const hangulS = hanLength(spaceS)
-            // how much percent we determine this is Korean word? I set 60%
-            if (spaceS.length === 0 || (spaceS.length >= 1 && hangulS / spaceS.length >= 0.6)) {
-                // ok success!
-            }
-            */
+            // gg.
+            this.cache.set(eng, false)
         }
-        let make: string = ""
+        let make:string = ""
         let changed = false
         for (let i = 0; i < pieces.length; i += 1) {
             make += pieces[i]
