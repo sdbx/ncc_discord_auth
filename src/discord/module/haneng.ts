@@ -1,12 +1,12 @@
 import Discord, { TextChannel } from "discord.js"
 import encoding from "encoding"
 import haneng from "gksdud"
+import hangul from "hangul-js"
 import request from "request-promise-native"
 import { sprintf } from "sprintf-js"
 import Config from "../../config"
 import Log from "../../log"
 import Plugin from "../plugin"
-import hangul from "hangul-js"
 import { ChainData, CmdParam, ParamAccept, ParamType, UniqueID } from "../rundefine"
 import {
     cloneMessage, CommandHelp, CommandStatus, DiscordFormat,
@@ -91,6 +91,9 @@ export default class HanEng extends Plugin {
             const r = JSON.parse(
                 encoding.convert(await request.get(url, { encoding: null }), "utf-8", "euc-kr")) as [string, string[]]
             return r
+        }
+        if (kors.length / engs.length <= 0.8) {
+            return
         }
         // convert.
         let applies:string[] = []

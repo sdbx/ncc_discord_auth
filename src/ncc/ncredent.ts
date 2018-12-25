@@ -98,7 +98,9 @@ export default class NcCredent extends EventEmitter {
         let result:string | LoginError
         let first = true
         let captcha = null
+        let tries = 0
         do {
+            tries += 1
             try {
                 result = await this.login(username, password, captcha)
             } catch (err) {
@@ -110,6 +112,9 @@ export default class NcCredent extends EventEmitter {
             }
             if (typeof result === "string") {
                 return Promise.resolve(result)
+            }
+            if (tries >= 4) {
+                return null
             }
             // error handling
             if (result.captcha) {

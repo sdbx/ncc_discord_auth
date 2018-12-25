@@ -578,7 +578,11 @@ export default class Auth extends Plugin {
     }
 }
 export function getNaver(authlist:AuthConfig, guildid:string, userid:string):string {
-    return authlist.users.find((_v) => _v.guildID === guildid && _v.userID === userid).naverID
+    const u = authlist.users.find((_v) => _v.guildID === guildid && _v.userID === userid)
+    if (u == null) {
+        return null
+    }
+    return u.naverID
 }
 enum PType {
     ID = "id/아이디",

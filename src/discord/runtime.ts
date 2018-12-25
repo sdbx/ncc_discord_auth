@@ -135,8 +135,8 @@ export default class Runtime extends EventEmitter implements IRuntime {
         this.client.on("warn", (warn) => Log.w("Discord", "Warning\n" + warn))
         // ncc login
         if (this.global.consoleLogin && !await this.ncc.availableAsync()) {
-            while (await this.ncc.genCreditByConsole() == null) {
-                continue
+            if (await this.ncc.genCreditByConsole() == null) {
+                await this.ncc.loginOTP(await Log.read("OTP Input"))
             }
         }
         // client login (ignore)
