@@ -7,6 +7,8 @@ import readline from "readline"
 import request from "request-promise-native"
 import showdown from "showdown"
 import ytdl from "ytdl-core"
+import DdsClient from "./daldalso/ddsclient"
+import DdsCredit from "./daldalso/ddscredit"
 import { MarkType } from "./discord/rundefine"
 import Runtime, { MainCfg } from "./discord/runtime"
 import Log from "./log"
@@ -62,8 +64,8 @@ async function checkEnv() {
 }
 // Log.hook()
 Log.enable = true
-checkEnv().then(() => start())
-// test()
+// checkEnv().then(() => start())
+test()
 // client()
 
 async function test() {
@@ -75,6 +77,7 @@ async function test() {
     ncc.autoConnect = false
     // const otpcode = await Log.read("OTP")
     // const loaded = await ncc.loginOTP(otpcode)
+    /*
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole())
     if (loaded != null) {
         Log.d(`name: ${loaded}`)
@@ -87,6 +90,15 @@ async function test() {
             console.log(md)
             await fs.writeFile("/home/alyac/Documents/test.html", ArticleParser.mdToHTML(article, md))
         }
+    }
+    */
+    const daldalso = new DdsCredit()
+    daldalso.id = await Log.read("DDS ID")
+    daldalso.pw = await Log.read("DDS PW", {hide:true, logResult: false})
+    const success = await daldalso.login()
+    if (success) {
+        const ddscl = new DdsClient(daldalso)
+        await ddscl.connectWS()
     }
 }
 // init();
