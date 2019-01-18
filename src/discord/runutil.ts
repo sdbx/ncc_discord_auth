@@ -733,7 +733,7 @@ export class CommandStatus {
         this.command = command
     }
     public has(key:ParamType) {
-        return this.exist(key)
+        return this.exist(key) && this.get(key).length >= 1
     }
     public exist(key:ParamType) {
         return this.requires.has(key) || this.opticals.has(key)

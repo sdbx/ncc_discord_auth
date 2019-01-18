@@ -66,13 +66,13 @@
     "@types/request": "^2.48.1",
     "@types/request-promise-native": "^1.0.15",
     "@types/set-value": "^2.0.0",
-    "@types/showdown": "^1.9.0",
+    "@types/showdown": "^1.9.2",
     "@types/socket.io-client": "^1.4.32",
     "@types/sprintf-js": "^1.1.1",
     "asn1": "^0.2.4",
     "bencodex": "0.0.0",
     "caller": "^1.0.1",
-    "chalk": "^2.4.1",
+    "chalk": "^2.4.2",
     "cheerio": "^1.0.0-rc.2",
     "color-convert": "^1.9.3",
     "color-string": "^1.5.3",
@@ -81,7 +81,7 @@
     "discord.js": "^11.4.2",
     "encoding": "^0.1.12",
     "esrever": "^0.2.0",
-    "fast-xml-parser": "^3.12.11",
+    "fast-xml-parser": "^3.12.12",
     "fs-extra": "^6.0.1",
     "get-value": "^3.0.1",
     "gksdud": "^2.0.0",
@@ -110,7 +110,7 @@
     "ytdl-core": "^0.27.1"
   },
   "devDependencies": {
-    "ava": "^1.0.1",
+    "ava": "^1.1.0",
     "codecov": "^3.1.0",
     "cz-conventional-changelog": "^2.1.0",
     "npm-run-all": "^4.1.5",
@@ -120,12 +120,12 @@
     "prettier": "1.14.2",
     "standard-version": "^4.0.0",
     "trash-cli": "^1.4.0",
-    "tslint": "^5.12.0",
+    "tslint": "^5.12.1",
     "tslint-config-prettier": "^1.17.0",
     "tslint-immutable": "^4.9.1",
     "tslint-server": "^0.1.0",
     "typedoc": "^0.11.1",
-    "typescript": "^3.2.2"
+    "typescript": "^3.2.4"
   },
   "ava": {
     "failFast": true,

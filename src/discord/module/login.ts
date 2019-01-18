@@ -103,6 +103,7 @@ export default class Login extends Plugin {
          * DO NOT FORGET ERASE PASSWORD
          */
         if (testNaver.match) {
+            const test = testNaver.get(ParamType.to)
             if (testNaver.has(ParamType.to)) {
                 /**
                  * New OTP Login
