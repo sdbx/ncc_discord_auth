@@ -191,7 +191,7 @@ export default class Purge extends Plugin {
         if (msg.attachments.size >= 1 && msg.guild.channels.find((v) => v.id === sub.backupChannel)) {
             await this.addFileCache(msg.attachments, msg.createdTimestamp)
         }
-        if (msg.content.length >= 1 && !this.purge.check(this.global, msg.content).match) {
+        if (sub.useCache && msg.content.length >= 1 && !this.purge.check(this.global, msg.content).match) {
             const lastM = this.getLastMsg(msg.channel.id)
             if (lastM == null || Date.now() - lastM.timestamp >= 600000) {
                 // slient & no await.
@@ -622,6 +622,7 @@ class PurgeConfig extends Config {
     public filterExplicit = false
     public delaySec = 0
     public allowLast = true
+    public useCache = true
     public backupChannel = "5353"
     constructor() {
         super("purger")

@@ -41,6 +41,7 @@ const presetCfgs:{[key:string]: string[]} = {
     "게시글 repo": ["artialert<%g>.repoPath"],
     "게시글 branch": ["artialert<%g>.repoBranch"],
     "한타영타 변환": ["haneng<%g>.use"],
+    "메시지 캐시 사용": ["purger<%g>.useCache"],
 }
 /**
  * The home of bot
