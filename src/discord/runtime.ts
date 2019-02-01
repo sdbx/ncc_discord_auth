@@ -14,6 +14,7 @@ import Auth from "./module/auth"
 import Cast from "./module/cast"
 import Color from "./module/color"
 import EventNotifier from "./module/event"
+import FJEmotes from "./module/fjemote"
 import Gather from "./module/gather"
 import HanEng from "./module/haneng"
 import Login from "./module/login"
@@ -81,7 +82,8 @@ export default class Runtime extends EventEmitter implements IRuntime {
         this.plugins.push(
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
             new Cast(), new Gather(), new EventNotifier(), new Color(),
-            new Purge(), new PermManager(), new Presense(), new HanEng())
+            new Purge(), new PermManager(), new Presense(), new HanEng(),
+            new FJEmotes())
     }
     /**
      * **Async**

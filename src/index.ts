@@ -1,6 +1,7 @@
 import { decode, encode } from "bencodex"
 import chalk from "chalk"
 import Discord from "discord.js"
+import emojiUnicode from "emoji-unicode"
 import fs from "fs-extra"
 import os from "os"
 import readline from "readline"

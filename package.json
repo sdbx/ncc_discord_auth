@@ -79,6 +79,7 @@
     "console-hook": "0.0.2",
     "deepcopy": "^1.0.0",
     "discord.js": "^11.4.2",
+    "emoji-unicode": "^1.0.10",
     "encoding": "^0.1.12",
     "esrever": "^0.2.0",
     "fast-xml-parser": "^3.12.12",
