@@ -27,7 +27,7 @@ export default class FJEmotes extends Plugin {
         const str:string = await request(url, { encoding: "utf8" })
         const pieces = str.match(/message.content.indexOf[\S\s]+?}/ig)
         for (const piece of pieces) {
-            const stres = piece.match(/".+?"/ig)
+            const stres = piece.match(/".+?"/ig).map((v) => v.substring(1, v.length - 1))
             const emote = stres.pop()
             for (const s of stres) {
                 this.emotes[s] = emote
@@ -42,7 +42,9 @@ export default class FJEmotes extends Plugin {
         const cfg = await this.sub(this.config, msg.guild.id, true)
         if (cfg.useEmoteAdder) {
             for (const key of Object.keys(this.emotes)) {
-                await msg.react(this.emotes[key])
+                if (msg.content.indexOf(key) >= 0) {
+                    await msg.react(this.emotes[key])
+                }
             }
         }
     }
