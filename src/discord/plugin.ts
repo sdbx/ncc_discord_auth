@@ -622,7 +622,9 @@ export default abstract class Plugin {
                 const n = changeName ? name : info.value.name
                 const i = changeImage ? image : undefined
                 try {
+                    Log.time()
                     await info.value.edit(n, i)
+                    Log.time("Webhook Edited")
                     if (changeImage) {
                         info.img = i
                     }

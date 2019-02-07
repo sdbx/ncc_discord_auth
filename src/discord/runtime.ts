@@ -22,6 +22,7 @@ import PermManager from "./module/perm"
 import Ping from "./module/ping"
 import Presense from "./module/presense"
 import Purge from "./module/purge"
+import Say from "./module/say"
 import Plugin from "./plugin"
 import { CmdParam, ParamType } from "./rundefine"
 import { CommandHelp, DiscordFormat, getRichTemplate } from "./runutil"
@@ -83,7 +84,7 @@ export default class Runtime extends EventEmitter implements IRuntime {
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
             new Cast(), new Gather(), new EventNotifier(), new Color(),
             new Purge(), new PermManager(), new Presense(), new HanEng(),
-            new FJEmotes())
+            new FJEmotes(), new Say())
     }
     /**
      * **Async**
