@@ -5,10 +5,11 @@ import Log from "../../log"
 import { TimerID, WebpackTimer } from "../../webpacktimer"
 import NCredit from "../credit/ncredit"
 import NCaptcha from "../ncaptcha"
-import { CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
+import { CHAT_BACKEND_URL, 
     CHAT_CHANNEL_URL, CHAT_HOME_URL, CHAT_URL_CRAWLER, CHATAPI_CHANNEL_BAN,
-    CHATAPI_CHANNEL_CHGOWNER, CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO, CHATAPI_CHANNEL_INVITE,
-    CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD, CHATAPI_CHANNEL_SYNC,
+    CHATAPI_CHANNEL_BLIND, CHATAPI_CHANNEL_CHGOWNER, CHATAPI_CHANNEL_CLEARMSG, CHATAPI_CHANNEL_INFO,
+    CHATAPI_CHANNEL_INVITE, CHATAPI_CHANNEL_LEAVE, CHATAPI_CHANNEL_PERIOD,
+    CHATAPI_CHANNEL_SYNC, 
     CHATAPI_CHANNEL_VALID, 
     COOKIE_CORE_SITES, 
     COOKIE_EXT_SITES } from "../ncconstant"
@@ -142,6 +143,12 @@ export default class NcChannel {
     public get latestMessage() {
         return this.detail.latestMessage
     }
+    /**
+     * Does it have permission to blind message?
+     */
+    public get blindable() {
+        return this.detail.myInfo.messageBlindPrivilege
+    }
     private constructor() {
         // :)
     }
@@ -228,7 +235,7 @@ export default class NcChannel {
             Log.d("NcChannel", "access Denied\nCookie:" + this.credit.accessToken + "\nChannel:" + this.info.name)
         })
         // ping
-        s.on("pong", async (latency) => {
+        s.on("pong", async (latency:number) => {
             this.latency = latency
             const success = await this.updateConnection(true)
             if (success !== ConnectedType.SUCCESS) {
@@ -343,6 +350,34 @@ export default class NcChannel {
                 } break
             }
         })
+        // blind event
+        s.on(ChannelEvent.BLIND, (eventmsg:object) => {
+            const obj:{
+                channelNo:number,
+                messageNo:number,
+                blindType:"HIDDEN" | "NORMAL",
+            } = eventmsg as any
+            if (obj.channelNo !== this.channelID) {
+                return
+            }
+            const msg = this.messages.find((v) => v.id === obj.messageNo)
+            if (msg != null) {
+                msg.updateHiddenState(obj.blindType === "HIDDEN")
+                this.events.onBlindMessage.dispatch(this, msg)
+            } else {
+                this.events.onBlindMessage.dispatch(this, {
+                    id: obj.messageNo,
+                    hidden: obj.blindType === "HIDDEN",
+                })
+            }
+        })
+        /*
+        {
+   "channelNo":295702801424,
+   "messageNo":4,
+   "blindType":"HIDDEN"
+}
+        */
         this.on(this.events.onMessage, (ch, msg) => this.instance.latestMessage = msg)
     }
 
@@ -589,10 +624,47 @@ export default class NcChannel {
         return NcAPIStatus.handleSuccess(request)
     }
     /**
+     * Blind / Show special message
+     * 
+     * Check `this.blindable` first
+     * 
+     * Permission: Owner | Staff
+     * @param msg to hide message
+     * @param show show message?
+     */
+    public async toggleShowMessage(msg:NcMessage | number, show:boolean) {
+        const id = typeof msg === "number" ? msg : msg.id
+        const request = await this.credit.req(
+            show ? "DELETE" : "POST", CHATAPI_CHANNEL_BLIND.get(this.channelID, id), {
+            "categoryId": this.cafe.cafeId,
+        })
+        return NcAPIStatus.handleSuccess(request)
+    }
+    /**
+     * Blind special message
+     * (Check `this.blindable` first)
+     *
+     * Permission: *Owner* | *Staff*
+     * @param msg Shown message
+     */
+    public async blindMessage(msg:NcMessage | number) {
+        return this.toggleShowMessage(msg, false)
+    }
+    /**
+     * Show special message
+     * (Check `this.blindable` first)
+     * 
+     * Permission: *Owner* | *Staff*
+     * @param msg Blinded message
+     */
+    public async showMessage(msg:NcMessage | number) {
+        return this.toggleShowMessage(msg, true)
+    }
+    /**
      * Change owner to user
      * 
      * Permission: Owner | Staff
-     * @param user 
+     * @param user User
      */
     public async changeOwner(user:Profile | string) {
         const id = typeof user === "string" ? user : user.userid
@@ -970,7 +1042,13 @@ export default class NcChannel {
     }
 }
 class Events {
+    /**
+     * on Message to chat
+     */
     public onMessage = new EventDispatcher<NcChannel, NcMessage>()
+    /**
+     * on Member join
+     */
     public onMemberJoin = new EventDispatcher<NcChannel, Join>()
     /**
      * on Member leave (official: quit)
@@ -980,6 +1058,9 @@ class Events {
      * on (other) member kicked
      */
     public onMemberKick = new EventDispatcher<NcChannel, SysUserAction>()
+    /**
+     * on Room name changed
+     */
     public onRoomnameChanged = new EventDispatcher<NcChannel, RoomName>()
     /**
      * on Owner changed
@@ -995,6 +1076,12 @@ class Events {
      * Order: older -> newer (messageNo order.)
      */
     public onPastMessage = new EventDispatcher<NcChannel, NcMessage[]>()
+    /**
+     * on Message have been blinded
+     * 
+     * Number when there's no message matched `id` in cache, else NcMessage
+     */
+    public onBlindMessage = new EventDispatcher<NcChannel, NcMessage | {id:number, hidden:boolean}>()
 }
 export enum ChannelEvent {
     SYSTEM = "sys",
@@ -1005,7 +1092,7 @@ export enum ChannelEvent {
     KICK = "kick",
     BLOCK = "block", // ban
     LEAVE = "leave",
-    BLIND = "blind",
+    BLIND = "blind", // finally handled by v3 api
     EVENT = "event", // message?
     EMOTION = "emotion",
 }

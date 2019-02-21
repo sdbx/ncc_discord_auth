@@ -29,6 +29,7 @@ export default class NcMessage {
             channelId: m.channelNo,
             readCount: m.readCount,
             memberCount: m.memberCount,
+            hidden: m.messageStatusType === "HIDDEN",
         }
     }
     /**
@@ -51,6 +52,7 @@ export default class NcMessage {
             channelId: channelNo,
             readCount: -1,
             memberCount: -1,
+            hidden: false,
         }
     }
     /**
@@ -73,6 +75,7 @@ export default class NcMessage {
             channelId: channelNo,
             readCount: m.readCount,
             memberCount: m.memberCount,
+            hidden: false,
         }
     }
     /**
@@ -315,6 +318,11 @@ export default class NcMessage {
             }
         }
     }
+    /**
+     * Message's author profile
+     * 
+     * 메시지 주인의 정보
+     */
     public get profile() {
         return this._author
     }
@@ -333,6 +341,21 @@ export default class NcMessage {
      */
     public get sentDate() {
         return new Date(this.timestamp)
+    }
+    /**
+     * Hidden message (boolean)
+     * 
+     * 숨겨진 메시지 여부
+     */
+    public get hidden() {
+        return this.instance.hidden
+    }
+    /**
+     * Update this message's hidden state
+     * @param hidden Is this message hidden?
+     */
+    public updateHiddenState(hidden:boolean) {
+        this.instance.hidden = hidden
     }
     private parseImage(json:object) {
         if (json["url"] == null) {

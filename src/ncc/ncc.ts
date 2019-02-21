@@ -6,7 +6,7 @@ import Log from "../log"
 import { bindFn, TimerID, WebpackTimer } from "../webpacktimer"
 import NCredit from "./credit/ncredit"
 import NCaptcha from "./ncaptcha"
-import { CAFE_DEFAULT_IMAGE, CHAT_API_URL, CHAT_APIS, CHAT_BACKEND_URL, 
+import { CAFE_DEFAULT_IMAGE, CHAT_BACKEND_URL, 
     CHAT_HOME_URL, CHAT_SOCKET_IO, CHATAPI_BLOCKLIST_CAFE, 
     CHATAPI_CAFE_BLOCK, CHATAPI_CAFES, CHATAPI_CHANNEL_CREATE,
     CHATAPI_CHANNEL_CREATE_PERM, CHATAPI_CHANNEL_JOIN, CHATAPI_CHANNEL_OPENCREATE,

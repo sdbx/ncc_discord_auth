@@ -23,7 +23,7 @@
       "env": {
         "TYPESCRIPT_STARTER_REPO_URL": "${workspaceFolder}"
       },
-      "console": "externalTerminal"
+      "console": "integratedTerminal"
     },
     {
       /// Usage: set appropriate breakpoints in a *.spec.ts file, then open the

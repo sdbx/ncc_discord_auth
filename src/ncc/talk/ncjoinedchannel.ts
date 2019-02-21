@@ -55,6 +55,10 @@ export default interface NcJoinedChannel extends NcBaseChannel {
      * ???
      */
     unreadCountVisible:boolean;
+    /**
+     * Can I manage message?
+     */
+    myInfo:MyInfo;
 }
 /**
  * Parse ncc's joined room response to typed object
@@ -120,6 +124,8 @@ export interface JoinedChatInfo extends OpenChatInfo {
     originalOwner:boolean;
     unreadCountVisible:boolean;
     cafeChatRoomId?:null;
+    // api v3
+    myInfo:MyInfo;
 }
 interface Owner {
     memberId:string;
@@ -129,4 +135,8 @@ interface Owner {
     manager:boolean;
     cafeMember:boolean;
     status:string;
+}
+interface MyInfo {
+    firstVisit:boolean,
+    messageBlindPrivilege:boolean,
 }

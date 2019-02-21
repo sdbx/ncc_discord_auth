@@ -46,6 +46,12 @@ export interface INcMessage {
      * Members count when message was sent.
      */
     memberCount:number;
+    /**
+     * Message is hidden? (from staff, owner, etc...)
+     * 
+     * Default: false
+     */
+    hidden:boolean;
 }
 /**
  * Interface when Synced last Message
@@ -84,7 +90,7 @@ export interface IPastMessage {
     content:string;
     memberCount:number;
     messageTypeCode:number;
-    messageStatusType:string;
+    messageStatusType:"NORMAL" | "HIDDEN";
     extras:string;
     tid:number;
     emotion?:any; // ?

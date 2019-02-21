@@ -76,7 +76,22 @@ async function test() {
     */
     const ncc = new Ncc()
     ncc.autoConnect = false
-    // const otpcode = await Log.read("OTP")
+    let uname = await ncc.loadCredit()
+    if (uname == null) {
+        const otpcode = await Log.read("OTP")
+        uname = await ncc.loginOTP(otpcode)
+    }
+    if (uname == null) {
+        return
+    }
+    Log.d(`username: ${uname}`)
+    await ncc.connect()
+    const openCh = ncc.joinedChannels.find(
+        (v) => v.cafe.cafeId === 26686242 && v.channelInfo.name === "비공개 채팅방")
+    if (openCh == null) {
+        return
+    }
+    const session = await ncc.getConnectedChannel(openCh)
     // const loaded = await ncc.loginOTP(otpcode)
     /*
     const loaded = await ncc.loadCredit().then((value) => value != null ? value : ncc.genCreditByConsole())
@@ -93,6 +108,7 @@ async function test() {
         }
     }
     */
+   /*
     const daldalso = new DdsCredit()
     daldalso.id = await Log.read("DDS ID")
     daldalso.pw = await Log.read("DDS PW", {hide:true, logResult: false})
@@ -101,6 +117,7 @@ async function test() {
         const ddscl = new DdsClient(daldalso)
         await ddscl.connectWS()
     }
+    */
 }
 // init();
 async function client() {

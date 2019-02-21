@@ -7,7 +7,8 @@ export const mCafePrefix = "https://m.cafe.naver.com"
 export const whitelistDig = ["div", "p", "span", "h1", "h2", "h3", "h4", "h5", "h6", "br"]
 export const whitelistDeco = ["strike", "u", "b", "i", "a"]
 export const CHAT_HOME_URL = "https://talk.cafe.naver.com"
-export const CHAT_API_URL = `${CHAT_HOME_URL}/talkapi/v1`
+const CHAT_API_URL_V1 = `${CHAT_HOME_URL}/talkapi/v1`
+const CHAT_API_URL_V3 = `${CHAT_HOME_URL}/talkapi/v3`
 export const CAFE_DEFAULT_IMAGE = `https://ssl.pstatic.net/static/cafe/chatting/default_cafe.png`
 export const NAVER_THUMB_PROXY = `https://dthumb-phinf.pstatic.net`
 export enum CHAT_APIS {
@@ -35,30 +36,32 @@ export const CHAT_IMAGE_UPLOADED_HOST = `https://ssl.pstatic.net/cafechat.phinf`
 export const CHAT_IMAGE_UPLOAD_URL = s(`https://cafe.upphoto.naver.com/$/simpleUpload/0`)
 
 /* per-channel command */
-export const CHATAPI_CHANNEL_BAN = s(`${CHAT_API_URL}/channels/$/ban?banUserId=$`)
-export const CHATAPI_CHANNEL_SYNC = s(`${CHAT_API_URL}/channels/$/sync`)
-export const CHATAPI_CHANNEL_LEAVE = s(`${CHAT_API_URL}/channels/$/quit`)
-export const CHATAPI_CHANNEL_PERIOD = s(`${CHAT_API_URL}/channels/$/period`)
-export const CHATAPI_CHANNEL_CLEARMSG = s(`${CHAT_API_URL}/channels/$/messages`)
-export const CHATAPI_CHANNEL_INFO = s(`${CHAT_API_URL}/channels/$`)
-export const CHATAPI_CHANNEL_CHGOWNER = s(`${CHAT_API_URL}/categories/$/channels/$/owner/$`)
-export const CHATAPI_CHANNEL_INVITE = s(`${CHAT_API_URL}/categories/$/channels/$/invite`)
-export const CHATAPI_CHANNEL_JOIN = s(`${CHAT_API_URL}/channels/$/join`)
-export const CHATAPI_CHANNEL_VALID = s(`${CHAT_API_URL}/channels/$/syncPrivileges`)
+export const CHATAPI_CHANNEL_BAN = s(`${CHAT_API_URL_V1}/channels/$/ban?banUserId=$`)
+export const CHATAPI_CHANNEL_SYNC = s(`${CHAT_API_URL_V3}/channels/$/sync`)
+export const CHATAPI_CHANNEL_LEAVE = s(`${CHAT_API_URL_V1}/channels/$/quit`)
+export const CHATAPI_CHANNEL_PERIOD = s(`${CHAT_API_URL_V1}/channels/$/period`)
+export const CHATAPI_CHANNEL_CLEARMSG = s(`${CHAT_API_URL_V1}/channels/$/messages`)
+export const CHATAPI_CHANNEL_INFO = s(`${CHAT_API_URL_V1}/channels/$`)
+export const CHATAPI_CHANNEL_CHGOWNER = s(`${CHAT_API_URL_V1}/categories/$/channels/$/owner/$`)
+export const CHATAPI_CHANNEL_INVITE = s(`${CHAT_API_URL_V1}/categories/$/channels/$/invite`)
+export const CHATAPI_CHANNEL_JOIN = s(`${CHAT_API_URL_V1}/channels/$/join`)
+export const CHATAPI_CHANNEL_VALID = s(`${CHAT_API_URL_V1}/channels/$/syncPrivileges`)
+export const CHATAPI_CHANNEL_BLIND = s(`${CHAT_API_URL_V3}/channels/$/hidden-messages/$`)
 
 /* global commands */
-export const CHATAPI_CAFES = s(`${CHAT_API_URL}/categories?channelTypeCode=$`)
-export const CHATAPI_CHANNELS = `${CHAT_API_URL}/channels?onlyVisible=false`
-export const CHATAPI_CHANNEL_CREATE = s(`${CHAT_API_URL}/categories/$/channels`)
-export const CHATAPI_CHANNEL_OPENCREATE = s(`${CHAT_API_URL}/categories/$/openchannels`)
-export const CHATAPI_CHANNEL_CREATE_PERM = s(`${CHAT_API_URL}/categories/$/createChannelPrivileges?channelTypeCode=$`)
-export const CHATAPI_CAPTCHA = `${CHAT_API_URL}/captcha`
-export const CHATAPI_PHOTO_SESSION_KEY = `${CHAT_API_URL}/photo/sessionKey`
-export const CHATAPI_USER_BLOCK = `${CHAT_API_URL}/blockMembers`
-export const CHATAPI_BLOCKLIST_CAFE = `${CHAT_API_URL}/blockCafes`
-export const CHATAPI_CAFE_BLOCK = s(`${CHAT_API_URL}/categories/$/block`)
-export const CHATAPI_OPENCHAT_LIST = s(`${CHAT_API_URL}/categories/$/openchannels`)
-export const CHATAPI_MEMBER_SEARCH = s(`${CHAT_API_URL}/categories/$/members`)
+export const CHATAPI_CAFES = s(`${CHAT_API_URL_V1}/categories?channelTypeCode=$`)
+export const CHATAPI_CHANNELS = `${CHAT_API_URL_V1}/channels?onlyVisible=false`
+export const CHATAPI_CHANNEL_CREATE = s(`${CHAT_API_URL_V1}/categories/$/channels`)
+export const CHATAPI_CHANNEL_OPENCREATE = s(`${CHAT_API_URL_V1}/categories/$/openchannels`)
+export const CHATAPI_CHANNEL_CREATE_PERM = s(
+    `${CHAT_API_URL_V1}/categories/$/createChannelPrivileges?channelTypeCode=$`)
+export const CHATAPI_CAPTCHA = `${CHAT_API_URL_V1}/captcha`
+export const CHATAPI_PHOTO_SESSION_KEY = `${CHAT_API_URL_V1}/photo/sessionKey`
+export const CHATAPI_USER_BLOCK = `${CHAT_API_URL_V1}/blockMembers`
+export const CHATAPI_BLOCKLIST_CAFE = `${CHAT_API_URL_V1}/blockCafes`
+export const CHATAPI_CAFE_BLOCK = s(`${CHAT_API_URL_V1}/categories/$/block`)
+export const CHATAPI_OPENCHAT_LIST = s(`${CHAT_API_URL_V1}/categories/$/openchannels`)
+export const CHATAPI_MEMBER_SEARCH = s(`${CHAT_API_URL_V1}/categories/$/members`)
 export const CHAT_URL_CRAWLER = `${CHAT_HOME_URL}/crawler`
 
 /* ncc config */
