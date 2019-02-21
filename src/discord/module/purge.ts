@@ -27,7 +27,12 @@ export default class Purge extends Plugin {
     private listMessage:Map<string, MessageID[]> = new Map()
     private working:string[] = []
     private caching = false
-    private filterRegex = new RegExp(`(${filterSimple.join("|")})`, "ig")
+    private filterRegex = new RegExp(`(${filterSimple.map((v) => {
+        if (v.length <= 1) {
+            return v
+        }
+        return `(${v.split("").join(`[ -~\u{00A1}-\u{ABFF}\u{D7A4}-\u{FEFF}]*`)})`
+    }).join("|")})`, "ig")
     private tempDir:tmp.DirectoryResult
     private cacheFiles:Map<string, AttachmentBackup> = new Map()
     /**
@@ -175,23 +180,33 @@ export default class Purge extends Plugin {
         return Promise.resolve()
     }
     public async onMessage(msg:Discord.Message) {
-        if (!(msg.channel instanceof Discord.TextChannel) || msg.channel.type === "dm") {
+        if (!(msg.channel instanceof Discord.TextChannel)) {
             return
         }
         const sub = await this.sub(this.config, msg.guild.id)
-        if (sub.filterExplicit && !(msg.channel as Discord.TextChannel).nsfw &&
-            msg.content.replace(/[ -~]/ig, "").match(this.filterRegex) != null) {
-            if (msg.channel instanceof Discord.GuildChannel) {
-                const perms = msg.channel.permissionsFor(msg.guild.members.find((v) => v.id === this.client.user.id))
-                if (perms.has("MANAGE_MESSAGES")) {
-                    await msg.delete()
+        if (sub.filterExplicit && !msg.channel.nsfw &&
+            msg.content.match(this.filterRegex) != null) {
+            const perms = msg.channel.permissionsFor(msg.guild.me)
+            if (perms.has("MANAGE_MESSAGES")) {
+                if (perms.has("MANAGE_WEBHOOKS")) {
+                    const webhook = await this.getWebhook(msg.channel,
+                        ...DiscordFormat.getUserProfile(msg.member)).catch(Log.e)
+                    if (webhook != null) {
+                        const clone = cloneMessage(msg)
+                        const content = clone.content.replace(this.filterRegex, (s) => `||${s}||`)
+                        await webhook.send(content, {
+                            files: clone.attaches,
+                            embeds: clone.embeds,
+                        } as Discord.WebhookMessageOptions)
+                    }
                 }
+                await msg.delete()
             }
         }
         if (msg.attachments.size >= 1 && msg.guild.channels.find((v) => v.id === sub.backupChannel)) {
             await this.addFileCache(msg.attachments, msg.createdTimestamp)
         }
-        if (msg.content.length >= 1 && !this.purge.check(this.global, msg.content).match) {
+        if (sub.useCache && msg.content.length >= 1 && !this.purge.check(this.global, msg.content).match) {
             const lastM = this.getLastMsg(msg.channel.id)
             if (lastM == null || Date.now() - lastM.timestamp >= 600000) {
                 // slient & no await.
@@ -622,6 +637,7 @@ class PurgeConfig extends Config {
     public filterExplicit = false
     public delaySec = 0
     public allowLast = true
+    public useCache = true
     public backupChannel = "5353"
     constructor() {
         super("purger")

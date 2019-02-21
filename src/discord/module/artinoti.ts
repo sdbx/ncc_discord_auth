@@ -161,7 +161,9 @@ export default class ArtiNoti extends Plugin {
                     let proxyURL:string = null
                     if (this.config.gitlabToken.length >= 1 && cfg.repoPath.length >= 1) {
                         // push to git content
-                        const postMD = ArticleParser.articleToMd(article, MarkType.GITHUB)
+                        let postMD = ArticleParser.articleToMd(article, MarkType.GITHUB)
+                        postMD = `# ${article.articleTitle.replace(/<.+?(\/>|<\/[A-Za-z0-9-_]+?>)/ig, "\\$&")
+                            } \`${article.userName}\`\n\n`
                         try {
                             // tslint:disable-next-line
                             const res:object = await request.post(`https://gitlab.com/api/v4/projects/${cfg.repoPath}/repository/commits`,{

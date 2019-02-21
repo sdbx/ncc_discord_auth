@@ -133,6 +133,14 @@ export default class Lang extends Config {
         needNaver: "네이버 카페 이름이 필요합니다.",
     }
     /*
+        Module: say
+    */
+    public sayM = {
+        sayDesc: "커스텀 프로필로 말을 합니다.",
+        noImage: "이미지 타입의 URL이 아닙니다.",
+        noDiscordUser: "디스코드 유저가 없습니다.",
+    }
+    /*
      * Module: sample
      */
     public sample = {

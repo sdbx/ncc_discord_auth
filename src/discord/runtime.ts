@@ -14,6 +14,7 @@ import Auth from "./module/auth"
 import Cast from "./module/cast"
 import Color from "./module/color"
 import EventNotifier from "./module/event"
+import FJEmotes from "./module/fjemote"
 import Gather from "./module/gather"
 import HanEng from "./module/haneng"
 import Login from "./module/login"
@@ -21,6 +22,7 @@ import PermManager from "./module/perm"
 import Ping from "./module/ping"
 import Presense from "./module/presense"
 import Purge from "./module/purge"
+import Say from "./module/say"
 import Plugin from "./plugin"
 import { CmdParam, ParamType } from "./rundefine"
 import { CommandHelp, DiscordFormat, getRichTemplate } from "./runutil"
@@ -41,6 +43,7 @@ const presetCfgs:{[key:string]: string[]} = {
     "게시글 repo": ["artialert<%g>.repoPath"],
     "게시글 branch": ["artialert<%g>.repoBranch"],
     "한타영타 변환": ["haneng<%g>.use"],
+    "메시지 캐시 사용": ["purger<%g>.useCache"],
 }
 /**
  * The home of bot
@@ -80,7 +83,8 @@ export default class Runtime extends EventEmitter implements IRuntime {
         this.plugins.push(
             new Ping(), new Login(), new Auth(),new ArtiNoti(),
             new Cast(), new Gather(), new EventNotifier(), new Color(),
-            new Purge(), new PermManager(), new Presense(), new HanEng())
+            new Purge(), new PermManager(), new Presense(), new HanEng(),
+            new FJEmotes(), new Say())
     }
     /**
      * **Async**

@@ -67,7 +67,7 @@ export default class HanEng extends Plugin {
         }
         // first. filter incoreect hangul.
         const kors = engs.map((v) => haneng(v)).map((v, i) => {
-            if (v.length >= 2 && v === "".padStart(v.length, v.charAt(0)) &&
+            if (v.length >= 2 && v === this.fillText(v.charAt(0), v.length) &&
                 ["ㅋ", "ㅎ", "ㄱ", "ㄷ", "ㅂ", "ㅇ", "ㅗ", "ㅅ", "ㅠ"].indexOf(v.charAt(0)) >= 0) {
                 // for o
                 return {
@@ -179,11 +179,18 @@ export default class HanEng extends Plugin {
         }
         if (changed) {
             const clone = cloneMessage(packet)
-            await packet.channel.send(make, {
+            await packet.channel.send(`${DiscordFormat.getNickname(packet.member)} : ${make}`, {
                 files: clone.attaches,
                 embed: clone.embeds.length >= 1 ? clone.embeds[0] : null,
             })
         }
+    }
+    private fillText(text:string, ln:number) {
+        let out = ""
+        for (let i = 0; i < ln; i += 1) {
+            out += text
+        }
+        return out
     }
 }
 class HanengConfig extends Config {

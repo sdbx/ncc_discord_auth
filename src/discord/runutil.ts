@@ -145,6 +145,7 @@ export class CommandHelp {
             output.reqParam = output.requires.size < this.fields.filter((v) => v.require).length
         } else if (content.startsWith(global.simplePrefix)) {
             // simple mode
+            // 1. check command name
             let isvalid = false
             for (const commandSuffix of this.cmds) {
                 const str = global.simplePrefix + commandSuffix
@@ -160,12 +161,137 @@ export class CommandHelp {
                 return new CommandStatus(output.match, output.reqParam,
                     output.requires, output.opticals, output.command)
             }
+            output.match = true
+            // 2. split to blank
+            const safeMatch = <T extends any[]>(arr:T) => (arr == null ? [] : arr) as T
+            const queries = safeMatch(message.trim().match(/("([^\\"]|\\")*")|(\S+)/ig)).map((v) => {
+                if (v.startsWith("\"")) {
+                    v = v.substr(1)
+                }
+                if (v.endsWith("\"")) {
+                    v = v.substring(0, v.length - 1)
+                }
+                return v
+            })
+            const fields = [...this.fields.map((v, index) => ({
+                index,
+                ...v,
+            }))]
+            fields.sort((a, b) => a.index - b.index)
+            queries.sort((a, b) => b.indexOf(":") - a.indexOf(":"))
+            const isReqParam = (f:Param) => f.code != null && (!this.complex || f.code.length >= 2)
+            /*
+            for (let q = 0; q < queries.length; q += 1) {
+                const query = queries[q]
+                const splitPs = query.indexOf(":")
+                if (splitPs >= 1 && query.length > splitPs + 2) {
+                    let _break = false
+                    // insert all parameteres with field (Ex. kkiro:god <code>:<value>)
+                    for (let k = 0; k < fields.length; k += 1) {
+                        const field = fields[k]
+                        const arr = (field.require ? output.requires : output.opticals)
+                        if (_break) {
+                            break
+                        }
+                        if (field.code != null) {
+                            for (const codes of field.code) {
+                                if (_break) {
+                                    break
+                                }
+                                for (const code of codes.split(seperator)) {
+                                    if (_break) {
+                                        break
+                                    }
+                                    if (query.startsWith(code + ":")) {
+                                        arr.set(field.type, {
+                                            content: query.substr(splitPs + 1),
+                                            type: field.type,
+                                            subType: codes[0],
+                                            ends: "",
+                                        })
+                                        fields.splice(k, 1)
+                                        queries.splice(q, 1)
+                                        k -= 1
+                                        _break = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (_break) {
+                        continue
+                    }
+                }
+            }
+            */
+            for (let q = 0; q < queries.length; q += 1) {
+                const query = queries[q]
+                const splitPs = query.indexOf(":")
+                if (splitPs >= 1 && query.length > splitPs + 2) {
+                    let _break = false
+                    // insert all parameteres with field (Ex. kkiro:god <code>:<value>)
+                    for (let k = 0; k < fields.length; k += 1) {
+                        const field = fields[k]
+                        const arr = (field.require ? output.requires : output.opticals)
+                        if (_break) {
+                            break
+                        }
+                        if (field.code != null) {
+                            for (const codes of field.code.map((v) => v.split(seperator))) {
+                                if (_break) {
+                                    break
+                                }
+                                for (const code of codes) {
+                                    if (_break) {
+                                        break
+                                    }
+                                    if (query.startsWith(code + ":")) {
+                                        arr.set(field.type, {
+                                            content: query.substr(splitPs + 1),
+                                            type: field.type,
+                                            subType: codes[0],
+                                            ends: "",
+                                        })
+                                        fields.splice(k, 1)
+                                        k -= 1
+                                        _break = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (_break) {
+                        continue
+                    }
+                }
+                for (let k = 0; k < fields.length; k += 1) {
+                    const field = fields[k]
+                    const arr = (field.require ? output.requires : output.opticals)
+                    if (isReqParam(field)) {
+                        continue
+                    }
+                    const cmpFields = fields.filter((v) => !isReqParam(v))
+                    arr.set(field.type, {
+                        content: (cmpFields.length <= 1 ? queries.slice(q, queries.length).join(" ") : query),
+                        type: field.type,
+                        subType: (field.code != null && field.code.length === 1) ?
+                            field.code[0].split(seperator)[0] : null,
+                        ends: "",
+                    })
+                    fields.splice(k, 1)
+                    k -= 1
+                    break
+                }
+            }
+            output.reqParam = fields.filter((v) => v.require).length >= 1
+            return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command)
+            /*
             message = message.trim()
             const split = message.split(/\s+/ig)
 
             output.match = true
             output.reqParam = false
-            const fields = this.fields
+            // const fields = this.fields
             const requires = fields.filter((_v) => _v.require)
             const opticals = fields.filter((_v) => !_v.require)
             let i = 0
@@ -225,6 +351,7 @@ export class CommandHelp {
                 }
             }
             output.reqParam = !exist
+            */
         }
         return new CommandStatus(output.match, output.reqParam, output.requires, output.opticals, output.command)
     }
@@ -733,7 +860,7 @@ export class CommandStatus {
         this.command = command
     }
     public has(key:ParamType) {
-        return this.exist(key)
+        return this.exist(key) && this.get(key).length >= 1
     }
     public exist(key:ParamType) {
         return this.requires.has(key) || this.opticals.has(key)
