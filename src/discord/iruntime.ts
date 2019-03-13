@@ -1,7 +1,7 @@
 import { Client, Webhook } from "discord.js"
+import { Ncc } from "ncc.js"
 import Cache from "../cache"
 import Config from "../config"
-import Ncc from "../ncc/ncc"
 import Lang from "./lang"
 import { MainCfg } from "./runtime"
 
